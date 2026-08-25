@@ -659,6 +659,7 @@ textarea {
       <div class="mf"><label>Nome Completo <span style="color:var(--re)">*</span></label><input id="cr-nome" placeholder="Nome completo do cliente"/></div>
       <div class="mf"><label>CPF</label><input id="cr-cpf" placeholder="000.000.000-00" maxlength="14"/></div>
       <div class="mf"><label>Ordem de Serviço</label><input id="cr-os" placeholder="Ex: 4546"/></div>
+      <div class="mf"><label>Data da Compra <span style="color:var(--re)">*</span></label><input id="cr-dtcompra" type="date"/></div>
       <div class="mf"><label>Financeira <span style="color:var(--re)">*</span></label>
         <select id="cr-fin-novo">
           <option value="multicredito">Multicrédito</option>
@@ -768,6 +769,7 @@ textarea {
       <div class="mf"><label>Nome Completo <span style="color:var(--re)">*</span></label><input id="cr-edit-nome" placeholder="Nome completo"/></div>
       <div class="mf"><label>CPF</label><input id="cr-edit-cpf" placeholder="000.000.000-00" maxlength="14"/></div>
       <div class="mf"><label>OS</label><input id="cr-edit-os" placeholder="Nº da OS"/></div>
+      <div class="mf"><label>Data da Compra</label><input id="cr-edit-dtcompra" type="date"/></div>
       <div class="mf"><label>Financeira</label>
         <select id="cr-edit-fin">
           <option value="multicredito">Multicrédito</option>
@@ -880,6 +882,15 @@ async function seedEstoque(){
   await loadData(true);
   if(typeof rnEst==='function')rnEst();
 }
+
+// -- DATAS NO HORARIO DE BRASILIA ------------------------------------------
+// new Date().toISOString() devolve UTC. Depois das 21h no Brasil ele ja
+// mostra o dia seguinte, e a parcela que vence hoje virava "atrasada".
+const _FMT_BR=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'});
+function dataBR(d){return _FMT_BR.format(d||new Date());}
+function hojeBR(){return dataBR(new Date());}
+// '2026-08-12' ou '2026-08-12T10:00:00Z' -> '12/08/2026'
+function dtBR(s){return s?String(s).split('T')[0].split('-').reverse().join('/'):'\u2014';}
 
 function setSy(s,m){
   const d=document.getElementById('sd'),t=document.getElementById('sx');
@@ -1092,7 +1103,7 @@ function tGC(t){if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
-  document.getElementById('fprazo').value=d.toISOString().split('T')[0];
+  document.getElementById('fprazo').value=dataBR(d);
 }
 function tgG(v){
   const obsWrap=document.getElementById('obs-wrap');
@@ -1217,7 +1228,7 @@ function getRangeCr(){
     ini=new Date(n.getFullYear(),n.getMonth(),1,0,0,0);
     fim=new Date(n.getFullYear(),n.getMonth()+1,0,23,59,59);
   }
-  return{ini:ini.toISOString().split('T')[0],fim:fim.toISOString().split('T')[0]};
+  return{ini:dataBR(ini),fim:dataBR(fim)};
 }
 
 function opNovoCr(){
@@ -1225,6 +1236,7 @@ function opNovoCr(){
   document.getElementById('cr-nome').value='';
   document.getElementById('cr-cpf').value='';
   document.getElementById('cr-os').value='';
+  document.getElementById('cr-dtcompra').value=hojeBR();
   document.getElementById('cr-fin-novo').value='multicredito';
   document.getElementById('cr-vcompra').value='';
   document.getElementById('cr-vcred').value='';
@@ -1249,7 +1261,7 @@ function gerarParcelas(){
     const dt=new Date(dt1+'T12:00:00');
     dt.setMonth(dt.getMonth()+i);
     dt.setDate(Math.min(dia,new Date(dt.getFullYear(),dt.getMonth()+1,0).getDate()));
-    crParcelas.push({numero:i+1,valor:vp,dt_vencimento:dt.toISOString().split('T')[0]});
+    crParcelas.push({numero:i+1,valor:vp,dt_vencimento:dataBR(dt)});
   }
   renderParcelas();
 }
@@ -1280,6 +1292,8 @@ async function svNovoCr(){
   const vcred=parseFloat(document.getElementById('cr-vcred').value)||0;
   if(!nome){alert('Preencha o nome do cliente.');return;}
   if(!vcred){alert('Preencha o valor do crediário.');return;}
+  const dtCompra=document.getElementById('cr-dtcompra').value;
+  if(!dtCompra){alert('Preencha a data da compra.');return;}
   if(!crParcelas.length){alert('Adicione pelo menos uma parcela.');return;}
   const invalidas=crParcelas.filter(p=>!p.dt_vencimento||!p.valor);
   if(invalidas.length){alert('Preencha valor e data de todas as parcelas.');return;}
@@ -1295,6 +1309,7 @@ async function svNovoCr(){
     id,unidade:un,financeira:fin,
     nome,cpf:document.getElementById('cr-cpf').value.trim()||null,
     os:document.getElementById('cr-os').value.trim()||null,
+    dt_compra:dtCompra,
     valor_compra:vcompra,valor_crediario:vcred,
     valor_entrada:ventrada,
     dt_entrada:document.getElementById('cr-dtentrada').value||null,
@@ -1357,7 +1372,7 @@ async function rnCr(){
     }
 
     // Atualiza status atrasado
-    const hoje=new Date().toISOString().split('T')[0];
+    const hoje=hojeBR();
     parcs.forEach(p=>{upCampos(p,['baixado_por','obs']);if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
 
     // KPIs
@@ -1410,7 +1425,7 @@ async function rnCr(){
 
     if(body)body.innerHTML=`<table>
       <thead><tr>
-        <th>#</th><th>Nome</th><th>OS</th><th>Financeira</th>
+        <th>#</th><th>Dt. Compra</th><th>Nome</th><th>OS</th><th>Financeira</th>
         <th>Vl. Crediário</th><th>Entrada</th><th>Parcelas</th><th>Situação</th><th>Ações</th>
       </tr></thead>
       <tbody>${filtrados.map((c,i)=>{
@@ -1431,6 +1446,7 @@ async function rnCr(){
         }
         return`<tr style="${trSt}">
           <td style="color:var(--mu);font-size:11px;${txt}">${i+1}</td>
+          <td style="font-weight:600;white-space:nowrap;${txt||'color:var(--tx);'}">${dtBR(c.dt_compra||c.created_at)}</td>
           <td style="font-weight:700;${txt}">${c.nome}${canc?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#DC2626;color:#fff;font-weight:800;letter-spacing:.04em">CANCELADO</span>':''}<br><span style="font-size:10px;color:${canc?'#B91C1C':'var(--mu)'};font-weight:400">${c.cpf||''}</span></td>
           <td style="color:${canc?'#B91C1C':'var(--mu)'}">${c.os||'—'}</td>
           <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${canc?'background:#FEE2E2;color:#B91C1C':(finColor[c.financeira]||'')}">${finLabel[c.financeira]||c.financeira}</span></td>
@@ -1467,7 +1483,7 @@ async function opCrDet(cid){
     window._crDetId=cid;
     window._crDetData={c,parcs};
 
-    const hoje=new Date().toISOString().split('T')[0];
+    const hoje=hojeBR();
     parcs.forEach(p=>{if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
     const stStyle={aberto:'background:#EFF6FF;color:#1D4ED8',atrasado:'background:#FEF2F2;color:#DC2626',pago:'background:#F0FDF4;color:#16A34A',cancelado:'background:#F1F5F9;color:#64748B'};
     const stLabel={aberto:'Em aberto',atrasado:'Atrasado',pago:'Pago',cancelado:'Cancelado'};
@@ -1477,6 +1493,7 @@ async function opCrDet(cid){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:10px">
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Nome</div><div style="font-weight:700">${c.nome}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">OS</div><div>${c.os||'—'}</div></div>
+        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Data da Compra</div><div style="font-weight:600">${dtBR(c.dt_compra||c.created_at)}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">CPF</div><div>${c.cpf||'—'}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Financeira</div><div style="font-weight:600">${finLabel[c.financeira]||c.financeira}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Vl. Compra</div><div>R$ ${(c.valor_compra||0).toFixed(2)}</div></div>
@@ -1511,7 +1528,7 @@ function clsCrDet(){document.getElementById('cr-detalhe-modal').style.display='n
 function opCrBaixa(pid){
   document.getElementById('cr-detalhe-modal').style.display='none';
   document.getElementById('cr-baixa-id').value=pid;
-  document.getElementById('cr-baixa-dt').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cr-baixa-dt').value=hojeBR();
   document.getElementById('cr-baixa-obs').value='';
   document.getElementById('cr-baixa-modal').style.display='flex';
 }
@@ -1536,7 +1553,7 @@ async function svCrBaixa(){
 }
 
 async function crBaixaEntrada(cid){
-  const dt=new Date().toISOString().split('T')[0];
+  const dt=hojeBR();
   try{
     await sbPatch('crediario',{entrada_paga:true,dt_entrada_paga:dt,entrada_paga_por:U.n},{id:cid});
     await opCrDet(cid);
@@ -1548,7 +1565,7 @@ function expCrPDF(){
   const data=window._crDetData;
   if(!data)return;
   const{c,parcs}=data;
-  const hoje=new Date().toISOString().split('T')[0];
+  const hoje=hojeBR();
   parcs.forEach(p=>{if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
   const stLabel={aberto:'Em aberto',atrasado:'Atrasado',pago:'Pago'};
   const finLabel={multicredito:'Multicrédito',asaas:'ASAAS'};
@@ -1587,6 +1604,7 @@ function expCrPDF(){
     <div class="grid">
       <div class="field"><label>Nome do Cliente</label><br><span>${c.nome}</span></div>
       <div class="field"><label>Ordem de Serviço</label><br><span>${c.os||'—'}</span></div>
+      <div class="field"><label>Data da Compra</label><br><span>${dtBR(c.dt_compra||c.created_at)}</span></div>
       <div class="field"><label>Valor da Compra</label><br><span>R$ ${(c.valor_compra||0).toFixed(2)}</span></div>
       <div class="field"><label>Valor do Crediário</label><br><span style="color:#1BA8A0">R$ ${(c.valor_crediario||0).toFixed(2)}</span></div>
       <div class="field"><label>Entrada</label><br><span>${c.valor_entrada?'R$ '+c.valor_entrada.toFixed(2):' — '}</span></div>
@@ -1806,7 +1824,7 @@ function getRangeIG(){
     ini=vi?new Date(vi+'T00:00:00'):new Date(0);
     fim=vf?new Date(vf+'T23:59:59'):new Date();
   }
-  return{ini:ini.toISOString().split('T')[0],fim:fim.toISOString().split('T')[0]};
+  return{ini:dataBR(ini),fim:dataBR(fim)};
 }
 
 function opNovoIG(){
@@ -1818,7 +1836,7 @@ function opNovoIG(){
   document.getElementById('ig-nome2').value='';
   document.getElementById('ig-os2').value='';
   document.getElementById('ig-vc2').value='';
-  document.getElementById('ig-data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('ig-data').value=hojeBR();
   document.getElementById('ig-premio').value='pix';
   document.getElementById('ig-modal').style.display='flex';
 }
@@ -1907,7 +1925,6 @@ async function rnIG(){
     const vlInvestPix=totalPix*50;
     const vlInvestTotal=vlInvestPix; // óculos tem valor variável, conta quantidade
     const vlCompraIndicacao=igData.reduce((s,r)=>s+(r.valor_compra_indicacao||0),0);
-    const vlCompraIndicou=igData.reduce((s,r)=>s+(r.valor_compra_indicou||0),0);
 
     const kpis=document.getElementById('ig-kpis');
     if(kpis)kpis.innerHTML=`
@@ -1915,8 +1932,7 @@ async function rnIG(){
       <div class="rs2"><div class="rl">PIX (R$ 50)</div><div class="rv" style="color:#16A34A">${totalPix}</div></div>
       <div class="rs2"><div class="rl">Óculos de Sol</div><div class="rv" style="color:#7C3AED">${totalOculos}</div></div>
       <div class="rs2"><div class="rl">Investido PIX</div><div class="rv d">R$ ${vlInvestPix.toFixed(2)}</div></div>
-      <div class="rs2"><div class="rl">Vl. Compras Indicações</div><div class="rv v">R$ ${vlCompraIndicacao.toFixed(2)}</div></div>
-      <div class="rs2"><div class="rl">Vl. Compras Indicadores</div><div class="rv i">R$ ${vlCompraIndicou.toFixed(2)}</div></div>`;
+      <div class="rs2"><div class="rl">Vl. Compras Indicações</div><div class="rv v">R$ ${vlCompraIndicacao.toFixed(2)}</div></div>`;
 
     if(!igData.length){
       if(body)body.innerHTML='<div class="er">Nenhuma indicação neste período.</div>';
@@ -2176,6 +2192,7 @@ function opEditCr(cid){
   document.getElementById('cr-edit-nome').value=c.nome||'';
   document.getElementById('cr-edit-cpf').value=c.cpf||'';
   document.getElementById('cr-edit-os').value=c.os||'';
+  document.getElementById('cr-edit-dtcompra').value=(c.dt_compra||'').split('T')[0];
   document.getElementById('cr-edit-fin').value=c.financeira||'multicredito';
   document.getElementById('cr-edit-vcompra').value=c.valor_compra||'';
   document.getElementById('cr-edit-vcred').value=c.valor_crediario||'';
@@ -2215,6 +2232,7 @@ async function svEditCr(){
       nome,
       cpf:document.getElementById('cr-edit-cpf').value.trim()||null,
       os:document.getElementById('cr-edit-os').value.trim()||null,
+      dt_compra:document.getElementById('cr-edit-dtcompra').value||null,
       financeira:document.getElementById('cr-edit-fin').value,
       valor_compra:parseFloat(document.getElementById('cr-edit-vcompra').value)||null,
       valor_crediario:parseFloat(document.getElementById('cr-edit-vcred').value)||null,
@@ -2359,10 +2377,10 @@ function opOs(){
   document.getElementById('freceita').value='';
   document.getElementById('fobs-txt').value='';
   document.getElementById('foscompra').value='';
-  document.getElementById('fdt').value=new Date().toISOString().split('T')[0];
+  document.getElementById('fdt').value=hojeBR();
   document.getElementById('ft').value='venda';
   const d=new Date();d.setDate(d.getDate()+10);
-  document.getElementById('fprazo').value=d.toISOString().split('T')[0];
+  document.getElementById('fprazo').value=dataBR(d);
   document.getElementById('furgente').checked=false;
   rnOculos(1,[{}]);
   tgG('venda');
@@ -2376,7 +2394,7 @@ function opEdit(id){
   document.getElementById('om-title').textContent='Editar OS — '+c.os;
   document.getElementById('nw').style.display='none';
   document.getElementById('fo').value=c.os||'';
-  document.getElementById('fdt').value=c.dtVenda||new Date().toISOString().split('T')[0];
+  document.getElementById('fdt').value=c.dtVenda||hojeBR();
   document.getElementById('fprazo').value=c.prazo||'';
   document.getElementById('furgente').checked=!!c.urgente;
   document.getElementById('ft').value=c.tipo||'venda';
@@ -2956,7 +2974,7 @@ function baixarPedidoCSV(){
   ].join('\r\n');
   const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const u=URL.createObjectURL(b);const a=document.createElement('a');
-  a.href=u;a.download='pedido_lentes_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.href=u;a.download='pedido_lentes_'+hojeBR()+'.csv';
   a.click();URL.revokeObjectURL(u);
   clsPed();
 }
