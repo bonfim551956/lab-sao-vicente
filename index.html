@@ -530,7 +530,6 @@ textarea {
     <h3 id="om-title">Nova ordem de serviço</h3>
     <div id="nw" class="wb" style="display:none">Sem permissão.</div>
     <div class="mf"><label>Número da OS</label><input id="fo" placeholder="Ex: OS-0001"/></div>
-    <div class="mf" id="fp-wrap"><label>Número do pedido</label><input id="fp" placeholder="Ex: PED-001"/></div>
     <div class="mf"><label>Data da venda <span style="color:var(--re)">*</span></label><input id="fdt" type="date"/></div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-bottom:10px">
       <div class="mf" style="margin:0"><label>Prazo de entrega</label><input id="fprazo" type="date"/></div>
@@ -549,17 +548,18 @@ textarea {
         <option value="passagem">Passagem</option>
       </select>
     </div>
-    <div id="gg" style="display:none;background:var(--bg);border:1px solid var(--bo);border-radius:9px;padding:10px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--mu);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Grau das lentes</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
-        <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod" placeholder="Ex: -1.00" type="number" step="0.25"/></div>
-        <div class="mf" style="margin:0"><label>Cil. OD <span style="color:var(--re)">*</span></label><input id="fcd" placeholder="Ex: -0.50" type="number" step="0.25"/></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
+      <div class="mf" style="margin:0;flex:1"><label>Quantidade de óculos</label>
+        <select id="fqtd" onchange="rnOculos(+this.value)">
+          <option value="1">1 óculos</option>
+          <option value="2">2 óculos</option>
+          <option value="3">3 óculos</option>
+          <option value="4">4 óculos</option>
+        </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="mf" style="margin:0"><label>Esf. OE <span style="color:var(--re)">*</span></label><input id="foe" placeholder="Ex: -1.00" type="number" step="0.25"/></div>
-        <div class="mf" style="margin:0"><label>Cil. OE <span style="color:var(--re)">*</span></label><input id="fce" placeholder="Ex: -0.50" type="number" step="0.25"/></div>
-      </div>
+      <button type="button" id="btn-add-oculos" onclick="addOculos()" style="font-size:12px;font-weight:700;font-family:inherit;padding:10px 14px;border-radius:10px;border:2px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer;white-space:nowrap">+ Adicionar óculos</button>
     </div>
+    <div id="oculos-wrap"></div>
     <div id="obs-wrap" style="display:none">
       <div class="mf"><label>Motivo da garantia <span style="color:var(--re)">*</span></label>
         <select id="fobs">
@@ -1089,7 +1089,86 @@ function tgUrgente(checked){
   d.setDate(d.getDate()+(checked?3:10));
   document.getElementById('fprazo').value=d.toISOString().split('T')[0];
 }
-function tgG(v){document.getElementById('gg').style.display=COM_GRAU.includes(v)?'grid':'none';const obsWrap=document.getElementById('obs-wrap');if(obsWrap)obsWrap.style.display=v&&v.startsWith('gar')?'block':'none';const semPed=['passagem','gar-hora','gar-armacao','hora'];const fpw=document.getElementById('fp-wrap');if(fpw)fpw.style.display=semPed.includes(v)?'none':'block';if(semPed.includes(v)){document.getElementById('fp').value=v.toUpperCase();}else{const cur=document.getElementById('fp').value;if(['PASSAGEM','GAR-HORA','GAR-ARMACAO','HORA'].includes(cur))document.getElementById('fp').value='';}}
+function tgG(v){
+  const obsWrap=document.getElementById('obs-wrap');
+  if(obsWrap)obsWrap.style.display=v&&v.startsWith('gar')?'block':'none';
+  const a=lerOculosForm();
+  // limpa o pedido automatico quando volta para um tipo que exige numero
+  if(!SEM_PEDIDO.includes(v))a.forEach(o=>{if(['PASSAGEM','GAR-HORA','GAR-ARMACAO','HORA'].includes(o.ped))o.ped='';});
+  rnOculos(ocQtd,a);
+}
+
+
+// -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
+let ocQtd=1;
+const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','hora'];
+
+// Lista de oculos de um card (cards antigos, sem "pedidos", viram 1 oculos)
+function ocDoCard(c){
+  if(Array.isArray(c.pedidos)&&c.pedidos.length)return c.pedidos;
+  return [{ped:c.ped||'',esfOD:c.esfOD,cilOD:c.cilOD,esfOE:c.esfOE,cilOE:c.cilOE}];
+}
+function pedsTxt(c){return ocDoCard(c).map(o=>o.ped||'').filter(Boolean).join(' · ');}
+
+// Le o que esta digitado nos blocos, para nao perder nada ao redesenhar
+function lerOculosForm(){
+  const out=[];
+  for(let i=0;i<4;i++){
+    if(!document.getElementById('fp_'+i))break;
+    const g=id=>{const e=document.getElementById(id+'_'+i);return e?e.value:'';};
+    out.push({ped:g('fp'),esfOD:g('fod'),cilOD:g('fcd'),esfOE:g('foe'),cilOE:g('fce')});
+  }
+  return out;
+}
+
+function rnOculos(n,dados){
+  n=Math.max(1,Math.min(4,n||1));
+  const atuais=dados||lerOculosForm();
+  ocQtd=n;
+  const tipo=document.getElementById('ft').value;
+  const comGrau=COM_GRAU.includes(tipo);
+  const semPed=SEM_PEDIDO.includes(tipo);
+  let html='';
+  for(let i=0;i<n;i++){
+    const d=atuais[i]||{};
+    const v=x=>(d[x]===0||d[x])?d[x]:'';
+    const pedVal=semPed?tipo.toUpperCase():v('ped');
+    html+=`<div style="border:1.5px solid ${n>1?'var(--v)':'var(--bo)'};border-radius:12px;padding:10px;margin-bottom:10px;background:${n>1?'var(--vl)':'var(--bg)'}">
+      ${n>1?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.07em">Óculos ${i+1}</span>
+        ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
+      </div>`:''}
+      <div class="mf" style="margin-bottom:${comGrau?'10px':'0'};${semPed?'display:none':''}">
+        <label>Número do pedido${i===0?' <span style="color:var(--re)">*</span>':''}</label>
+        <input id="fp_${i}" value="${pedVal}" placeholder="Ex: PED-001"/>
+      </div>
+      ${comGrau?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+        <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod_${i}" value="${v('esfOD')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
+        <div class="mf" style="margin:0"><label>Cil. OD <span style="color:var(--re)">*</span></label><input id="fcd_${i}" value="${v('cilOD')}" type="number" step="0.25" placeholder="Ex: -0.50"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="mf" style="margin:0"><label>Esf. OE <span style="color:var(--re)">*</span></label><input id="foe_${i}" value="${v('esfOE')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
+        <div class="mf" style="margin:0"><label>Cil. OE <span style="color:var(--re)">*</span></label><input id="fce_${i}" value="${v('cilOE')}" type="number" step="0.25" placeholder="Ex: -0.50"/></div>
+      </div>`:''}
+    </div>`;
+  }
+  document.getElementById('oculos-wrap').innerHTML=html;
+  const sel=document.getElementById('fqtd');if(sel)sel.value=String(n);
+  const btn=document.getElementById('btn-add-oculos');
+  if(btn){btn.disabled=n>=4;btn.style.opacity=n>=4?'.35':'1';btn.style.cursor=n>=4?'not-allowed':'pointer';}
+}
+function addOculos(){if(ocQtd<4)rnOculos(ocQtd+1);}
+function removerOculos(i){const a=lerOculosForm();a.splice(i,1);rnOculos(ocQtd-1,a);}
+
+// Monta o card resumido de cada oculos no kanban
+function blocoOculos(c,s){
+  const ocs=ocDoCard(c);
+  return ocs.map((o,i)=>{
+    const grau=(o.esfOD!=null)?`<div class="cg">OD ${fG(o.esfOD,o.cilOD)} · OE ${fG(o.esfOE,o.cilOE)}</div>`:'';
+    const tit=ocs.length>1?`<div class="cg" style="font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.06em;margin-top:${i?7:4}px">Óculos ${i+1}</div>`:'';
+    return tit+`<div class="cp">${hl(o.ped||'—',s||'')}</div>`+grau;
+  }).join('');
+}
 
 // ── BUSCA ─────────────────────────────────────────
 function tgFiltro(tipo){
@@ -2150,8 +2229,8 @@ function mvCard(id){
   const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
   if(c.col>=5)return;
   if(!R.mv.includes(c.col)){alert('Sem permissão para mover desta coluna.');return;}
-  if(c.col===0&&COM_GRAU.includes(c.tipo)&&(c.esfOD==null||c.esfOE==null)){
-    alert('Preencha o grau (OD e OE) antes de mover para Ag. montagem.');return;
+  if(c.col===0&&COM_GRAU.includes(c.tipo)&&ocDoCard(c).some(o=>o.esfOD==null||o.esfOE==null)){
+    alert('Preencha o grau (OD e OE) de todos os óculos antes de mover para Ag. montagem.');return;
   }
   if(c.col===0){
     mvPendId=id;
@@ -2173,7 +2252,10 @@ async function mvCardExec(id,lab,obsmv){
   const baixa=from===0&&COM_BAIXA.includes(c.tipo);
   c.history.push({u:U.n,r:U.r,from,to:c.col,at:Date.now(),mc,garantia:isGarMc,passagem:isPassagem});
   if(baixa){
-    for(const [e,cl] of [[c.esfOD,c.cilOD||0],[c.esfOE,c.cilOE||0]]){
+    // 1 oculos = 2 lentes (OD + OE). 2 oculos = 4 lentes, e assim por diante.
+    const lentes=[];
+    ocDoCard(c).forEach(o=>{lentes.push([o.esfOD,o.cilOD||0]);lentes.push([o.esfOE,o.cilOE||0]);});
+    for(const [e,cl] of lentes){
       if(e===null||e===undefined)continue;
       const k=eK(e,cl);
       if(!ST.estoque[k])ST.estoque[k]={esf:e,cil:cl,qty:0};
@@ -2243,16 +2325,19 @@ function opOs(){
   editId=null;
   document.getElementById('om-title').textContent='Nova ordem de serviço';
   document.getElementById('nw').style.display=R&&R.ca?'none':'block';
-  ['fo','fp','fod','foe','fcd','fce'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('fobs').value='';
+  document.getElementById('fo').value='';
+  document.getElementById('fobs').value='';
   document.getElementById('fresp-gar').value='';
   document.getElementById('freceita').value='';
   document.getElementById('fobs-txt').value='';
   document.getElementById('foscompra').value='';
   document.getElementById('fdt').value=new Date().toISOString().split('T')[0];
-  document.getElementById('ft').value='venda';tgG('venda');document.getElementById('fp-wrap').style.display='block';
+  document.getElementById('ft').value='venda';
   const d=new Date();d.setDate(d.getDate()+10);
   document.getElementById('fprazo').value=d.toISOString().split('T')[0];
   document.getElementById('furgente').checked=false;
+  rnOculos(1,[{}]);
+  tgG('venda');
   document.getElementById('om').style.display='flex';
 }
 function clsOs(){document.getElementById('om').style.display='none';editId=null;}
@@ -2263,33 +2348,50 @@ function opEdit(id){
   document.getElementById('om-title').textContent='Editar OS — '+c.os;
   document.getElementById('nw').style.display='none';
   document.getElementById('fo').value=c.os||'';
-  document.getElementById('fp').value=c.ped||'';
   document.getElementById('fdt').value=c.dtVenda||new Date().toISOString().split('T')[0];
   document.getElementById('fprazo').value=c.prazo||'';
   document.getElementById('furgente').checked=!!c.urgente;
   document.getElementById('ft').value=c.tipo||'venda';
-  tgG(c.tipo||'venda');
-  document.getElementById('fp-wrap').style.display=['passagem','gar-hora','gar-armacao','hora'].includes(c.tipo)?'none':'block';
-  if(c.esfOD!=null)document.getElementById('fod').value=c.esfOD;
-  if(c.esfOE!=null)document.getElementById('foe').value=c.esfOE;
-  if(c.cilOD!=null)document.getElementById('fcd').value=c.cilOD;
-  if(c.cilOE!=null)document.getElementById('fce').value=c.cilOE;
   document.getElementById('fobs').value=c.obs||'';
   document.getElementById('fresp-gar').value=c.respGar||'';
   document.getElementById('freceita').value=c.receita||'';
   document.getElementById('fobs-txt').value=c.obsTxt||'';
   document.getElementById('foscompra').value=c.osCompra||'';
+  const obsWrap=document.getElementById('obs-wrap');
+  if(obsWrap)obsWrap.style.display=(c.tipo||'').startsWith('gar')?'block':'none';
+  const ocs=ocDoCard(c);
+  rnOculos(ocs.length,ocs);
   document.getElementById('om').style.display='flex';
 }
 
 async function svOS(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
   const os=document.getElementById('fo').value.trim();
-  const ped=document.getElementById('fp').value.trim();
   const tipo=document.getElementById('ft').value;
   const dtVenda=document.getElementById('fdt').value;
-  if(!os||!ped||!dtVenda){alert('Preencha OS, pedido e data da venda.');return;}
-  const grauVisivel=document.getElementById('gg').style.display==='grid'||document.getElementById('gg').style.display==='block';
+  if(!os||!dtVenda){alert('Preencha o número da OS e a data da venda.');return;}
+
+  const comGrau=COM_GRAU.includes(tipo);
+  const semPed=SEM_PEDIDO.includes(tipo);
+  const brutos=lerOculosForm().slice(0,ocQtd);
+  const oculos=[];
+  for(let i=0;i<brutos.length;i++){
+    const b=brutos[i];
+    const ped=semPed?tipo.toUpperCase():(b.ped||'').trim();
+    if(!ped){alert('Preencha o número do pedido do óculos '+(i+1)+'.');return;}
+    if(comGrau&&(b.esfOD===''||b.cilOD===''||b.esfOE===''||b.cilOE==='')){
+      alert('Preencha todos os graus do óculos '+(i+1)+' (Esf. OD, Cil. OD, Esf. OE, Cil. OE).');return;
+    }
+    oculos.push({
+      ped,
+      esfOD:b.esfOD!==''&&b.esfOD!=null?parseFloat(b.esfOD):null,
+      cilOD:b.cilOD!==''&&b.cilOD!=null?parseFloat(b.cilOD):0,
+      esfOE:b.esfOE!==''&&b.esfOE!=null?parseFloat(b.esfOE):null,
+      cilOE:b.cilOE!==''&&b.cilOE!=null?parseFloat(b.cilOE):0
+    });
+  }
+  if(!oculos.length){alert('Adicione ao menos um óculos.');return;}
+
   const obsVisivel=document.getElementById('obs-wrap').style.display==='block';
   const obs=document.getElementById('fobs').value;
   const respGar=document.getElementById('fresp-gar').value.trim();
@@ -2297,32 +2399,28 @@ async function svOS(){
   if(obsVisivel&&!obs){alert('Selecione o motivo da garantia.');return;}
   if(obsVisivel&&!respGar){alert('Preencha o responsável pela garantia.');return;}
   if(obsVisivel&&!document.getElementById('fobs-txt').value.trim()){alert('Preencha o campo de observação.');return;}
-  const esfOD=document.getElementById('fod').value;
-  const esfOE=document.getElementById('foe').value;
-  const cilOD=document.getElementById('fcd').value;
-  const cilOE=document.getElementById('fce').value;
-  if(grauVisivel&&(esfOD===''||esfOE===''||cilOD===''||cilOE==='')){alert('Preencha todos os graus (Esf. OD, Cil. OD, Esf. OE, Cil. OE).');return;}
+
   const now=Date.now();
-  const esfODv=esfOD!==''&&esfOD!=null?parseFloat(esfOD):null;
-  const esfOEv=esfOE!==''&&esfOE!=null?parseFloat(esfOE):null;
-  const cilODv=cilOD!==''&&cilOD!=null?parseFloat(cilOD):0;
-  const cilOEv=cilOE!==''&&cilOE!=null?parseFloat(cilOE):0;
   const prazo=document.getElementById('fprazo').value;
   const urgente=document.getElementById('furgente').checked;
   const obsTxt=document.getElementById('fobs-txt').value.trim();
   const osCompra=document.getElementById('foscompra').value.trim();
+  const p0=oculos[0];
+
   if(editId){
-    // Modo edição — atualiza card existente
     const ce=ST.cards.find(x=>x.id===editId);
     if(ce){
-      // Detecta o que mudou
-      const LABELS={os:'Nº OS',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',esfOD:'Esf.OD',esfOE:'Esf.OE',cilOD:'Cil.OD',cilOE:'Cil.OE'};
-      const novos={os,ped,tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',obs,respGar,receita,obsTxt,osCompra,esfOD:esfODv,esfOE:esfOEv,cilOD:cilODv,cilOE:cilOEv};
-      const antigos={os:ce.os,ped:ce.ped,tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,esfOD:ce.esfOD,esfOE:ce.esfOE,cilOD:ce.cilOD,cilOE:ce.cilOE};
+      const LABELS={os:'Nº OS',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
+      const novos={os,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
+      const ocAntigos=ocDoCard(ce);
+      const antigos={os:ce.os,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
-      ce.os=os;ce.ped=ped;ce.tipo=tipo;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
+      const grauMudou=JSON.stringify(ocAntigos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]))!==JSON.stringify(oculos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]));
+      if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
+      ce.os=os;ce.tipo=tipo;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
-      ce.esfOD=esfODv;ce.esfOE=esfOEv;ce.cilOD=cilODv;ce.cilOE=cilOEv;
+      ce.pedidos=oculos;
+      ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
       ce.ts=Date.now();
       if(!ce.history)ce.history=[];
       ce.history.push({u:U.n,r:U.r,from:ce.col,to:ce.col,at:Date.now(),mc:false,edicao:true,diffs});
@@ -2331,9 +2429,11 @@ async function svOS(){
     }
     return;
   }
-  const c={id:'os_'+now,os,ped,tipo,dtVenda,prazo,urgente,obs,respGar,receita,obsTxt,osCompra,esfOD:esfODv,esfOE:esfOEv,cilOD:cilODv,cilOE:cilOEv,col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
+  const c={id:'os_'+now,os,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,obs,respGar,receita,obsTxt,osCompra,
+    esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
+    col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
   const isVenda=tipo==='venda'||tipo==='hora';
-  c.history.push({u:U.n,r:U.r,from:-1,to:0,at:now,mc:false,venda:isVenda,garantia:false});
+  c.history.push({u:U.n,r:U.r,from:-1,to:0,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
   ST.cards.unshift(c);clsOs();rnKan();
   await saveCard(c);
 }
@@ -2364,7 +2464,7 @@ function rnKan(){
     return (c.history||[]).some(h=>h.to===3&&h.at>=inicioMes&&h.at<=fimMes);
   }).length;
   const mi=new Set();
-  if(srch){ST.cards.forEach(c=>{if(c.os.toLowerCase().includes(srch)||c.ped.toLowerCase().includes(srch))mi.add(c.id);});}
+  if(srch){ST.cards.forEach(c=>{const alvo=((c.os||'')+' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase();if(alvo.includes(srch))mi.add(c.id);});}
   const srbb=document.getElementById('srb'),srbt=document.getElementById('srt');
   if(srch){srbb.className='srb show';srbt.textContent=mi.size===0?`Nenhuma OS para "${srch}"`:`${mi.size} OS encontrada${mi.size>1?'s':''} para "${srch}"`;}
   else{srbb.className='srb';}
@@ -2391,7 +2491,7 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}</div>${editBtn}</div><div class="cp">${hl(c.ped,srch)}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${c.esfOD!=null?`<div class="cg">OD ${fG(c.esfOD,c.cilOD)} · OE ${fG(c.esfOE,c.cilOE)}</div>`:''}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
