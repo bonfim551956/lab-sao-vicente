@@ -264,8 +264,27 @@ textarea {
 
 /* quantas colunas cabem de uma vez */
 @media (max-width:1024px) and (min-width:901px){ .co{flex:0 0 calc((100% - 20px)/3)} }   /* 3 colunas */
-@media (max-width:900px)  and (min-width:641px){ .co{flex:0 0 calc((100% - 10px)/2)} }   /* 2 colunas */
-@media (max-width:640px)                       { .co{flex:0 0 88%}                   }   /* 1 coluna  */
+@media (max-width:900px)  and (min-width:481px){ .co{flex:0 0 calc((100% - 10px)/2)} }   /* 2 colunas */
+@media (max-width:480px)                       { .co{flex:0 0 88%}                   }   /* 1 coluna  */
+
+/* ─────────── 481 a 640px: 2 colunas em tela pequena, card enxuto ─────────── */
+@media (max-width:640px) and (min-width:481px){
+  .co{padding:8px;gap:6px}
+  .ch{padding-bottom:7px}
+  .cn{font-size:9.5px;letter-spacing:.04em}
+  .ca{padding:9px}
+  .cos{font-size:12.5px}
+  .cp{font-size:10.5px}
+  .cg{font-size:9.5px;margin-top:2px}
+  .bg2{font-size:9px;padding:2px 6px}
+  .tm{font-size:10px}
+  .cu{font-size:9px}
+  .cac{gap:4px;padding-top:7px;margin-top:7px}
+  .bn{font-size:10px;padding:6px 4px}
+  .bh{font-size:10px;padding:6px}
+  .bde{font-size:9px;padding:5px 6px}
+}
+
 
 /* ─────────── ATE 900px: card um pouco mais compacto ─────────── */
 @media (max-width:900px){
