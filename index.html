@@ -2538,18 +2538,16 @@ async function svEst(){
   ST.estoque[k]={esf:e,cil:c,qty:novaQty,id:k};
   clsEm();rnEst();
   try{
-    if(atual>0||ST.estoque[k]){
-      // Registro existe — usa PATCH
-      await sbPatch('estoque',{qty:novaQty},{id:k});
-    } else {
-      // Novo registro — usa INSERT
-      await sbUpsert('estoque',{id:k,unidade:un,esf:e,cil:c,qty:novaQty});
-    }
+    await sbPatch('estoque',{qty:novaQty},{id:k,unidade:un});
     setSy('ok','Estoque atualizado!');
-  }catch(err){
-    // Fallback: tenta upsert
-    try{await sbUpsert('estoque',{id:k,unidade:un,esf:e,cil:c,qty:novaQty});}
-    catch(err2){setSy('e','Erro estoque: '+err2.message);}
+  }catch(err1){
+    try{
+      await sbUpsert('estoque',{id:k,unidade:un,esf:e,cil:c,qty:novaQty});
+      setSy('ok','Estoque salvo!');
+    }catch(err2){
+      alert('Erro ao salvar estoque:\n'+err2.message);
+      setSy('e','Erro: '+err2.message);
+    }
   }
 }
 
