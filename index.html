@@ -840,6 +840,28 @@ async function sbDelete(table,match){
   if(!r.ok){const t=await r.text();throw new Error(`DELETE ${table} ${r.status}`);}
 }
 
+// -- ESTOQUE EM TABELA PROPRIA DA LOJA --------------------------------
+const TB_EST='estoque_saovicente';
+(function(){
+  const _g=sbGet,_p=sbPatch,_u=sbUpsert;
+  const semUn=o=>{const x={...o};delete x.unidade;return x;};
+  sbGet=(t,p='')=>t==='estoque'?_g(TB_EST,String(p).replace(/&?unidade=eq\.[^&]*/g,'')):_g(t,p);
+  sbPatch=(t,d,m)=>t==='estoque'?_p(TB_EST,semUn(d),semUn(m)):_p(t,d,m);
+  sbUpsert=(t,d)=>t==='estoque'?_u(TB_EST,Array.isArray(d)?d.map(semUn):semUn(d)):_u(t,d);
+})();
+// Popular estoque inicial: rodar UMA VEZ no console (F12) -> seedEstoque()
+async function seedEstoque(){
+  const rows=Object.entries(ESTINIT).map(([k,v])=>({
+    id:`${Number(v.esf).toFixed(2)}_${Number(v.cil).toFixed(2)}`,
+    esf:v.esf,cil:v.cil,qty:v.qty
+  }));
+  console.log('Enviando '+rows.length+' graus para '+TB_EST+'...');
+  await sbUpsert(TB_EST,rows);
+  console.log('OK! Recarregando...');
+  await loadData();
+  if(typeof rnEst==='function')rnEst();
+}
+
 function setSy(s,m){
   const d=document.getElementById('sd'),t=document.getElementById('sx');
   d.className='sd'+(s==='e'?' e':s==='l'?' l':'');
