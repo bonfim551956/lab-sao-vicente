@@ -1009,18 +1009,6 @@ async function saveEstoque(){}
 // ── LOGIN ──────────────────────────────────────────
 document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('lu').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lp').focus();});
-// Restaura sessão salva
-(function(){
-  try{
-    const saved=localStorage.getItem('idealize_session');
-    if(saved){
-      const {u,p}=JSON.parse(saved);
-      document.getElementById('lu').value=u;
-      document.getElementById('lp').value=p;
-      doLogin();
-    }
-  }catch(e){localStorage.removeItem('idealize_session');}
-})();
 
 function doLogin(){
   const u=document.getElementById('lu').value.trim().toLowerCase();
@@ -1373,11 +1361,14 @@ async function rnCr(){
     parcs.forEach(p=>{upCampos(p,['baixado_por','obs']);if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
 
     // KPIs
-    const total=contratos.length;
-    const vlTotal=contratos.reduce((s,c)=>s+(c.valor_crediario||0),0);
-    const vlPago=parcs.filter(p=>p.status==='pago').reduce((s,p)=>s+(p.valor||0),0);
-    const vlAberto=parcs.filter(p=>p.status!=='pago').reduce((s,p)=>s+(p.valor||0),0);
-    const atrasados=parcs.filter(p=>p.status==='atrasado').length;
+    const cancelados=new Set(contratos.filter(c=>c.status==='cancelado').map(c=>c.id));
+    const vivos=contratos.filter(c=>!cancelados.has(c.id));
+    const pVivas=parcs.filter(p=>!cancelados.has(p.crediario_id));
+    const total=vivos.length;
+    const vlTotal=vivos.reduce((s,c)=>s+(c.valor_crediario||0),0);
+    const vlPago=pVivas.filter(p=>p.status==='pago').reduce((s,p)=>s+(p.valor||0),0);
+    const vlAberto=pVivas.filter(p=>p.status!=='pago').reduce((s,p)=>s+(p.valor||0),0);
+    const atrasados=pVivas.filter(p=>p.status==='atrasado').length;
 
     const kpis=document.getElementById('cr-kpis');
     if(kpis)kpis.innerHTML=`
@@ -1385,7 +1376,8 @@ async function rnCr(){
       <div class="rs2"><div class="rl">Vl. Total</div><div class="rv" style="color:var(--tx)">R$ ${vlTotal.toFixed(2)}</div></div>
       <div class="rs2"><div class="rl">Vl. Recebido</div><div class="rv v">R$ ${vlPago.toFixed(2)}</div></div>
       <div class="rs2"><div class="rl">Vl. Em aberto</div><div class="rv d">R$ ${vlAberto.toFixed(2)}</div></div>
-      <div class="rs2"><div class="rl">Parc. Atrasadas</div><div class="rv d">${atrasados}</div></div>`;
+      <div class="rs2"><div class="rl">Parc. Atrasadas</div><div class="rv d">${atrasados}</div></div>
+      ${cancelados.size?`<div class="rs2" style="border-color:#FECACA;background:#FEF2F2"><div class="rl" style="color:#B91C1C">Cancelados</div><div class="rv d">${cancelados.size}</div></div>`:''}`;
 
     // Monta mapa de parcelas por contrato
     const parcMap={};
@@ -1397,6 +1389,9 @@ async function rnCr(){
       if(dtIni&&(c.created_at||'').split('T')[0]<dtIni)return false;
       if(dtFim&&(c.created_at||'').split('T')[0]>dtFim)return false;
       const cParcs=parcMap[c.id]||[];
+      // contrato cancelado continua na lista, mas so aparece em "Todos" ou "Cancelados"
+      if(c.status==='cancelado')return statusFiltro==='todos'||statusFiltro==='cancelado';
+      if(statusFiltro==='cancelado')return false;
       if(statusFiltro==='pago'&&cParcs.some(p=>p.status!=='pago'))return false;
       if(statusFiltro==='atrasado'&&!cParcs.some(p=>p.status==='atrasado'))return false;
       if(statusFiltro==='aberto'&&!cParcs.some(p=>p.status==='aberto'))return false;
@@ -1422,15 +1417,26 @@ async function rnCr(){
         const cParcs=parcMap[c.id]||[];
         const pagas=cParcs.filter(p=>p.status==='pago').length;
         const atras=cParcs.some(p=>p.status==='atrasado');
-        const st=pagas===cParcs.length&&cParcs.length?'pago':atras?'atrasado':'aberto';
-        return`<tr>
-          <td style="color:var(--mu);font-size:11px">${i+1}</td>
-          <td style="font-weight:700">${c.nome}<br><span style="font-size:10px;color:var(--mu);font-weight:400">${c.cpf||''}</span></td>
-          <td style="color:var(--mu)">${c.os||'—'}</td>
-          <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${finColor[c.financeira]||''}">${finLabel[c.financeira]||c.financeira}</span></td>
-          <td style="font-weight:700">R$ ${(c.valor_crediario||0).toFixed(2)}</td>
-          <td style="color:var(--mu)">${c.valor_entrada?'R$ '+c.valor_entrada.toFixed(2):'—'}</td>
-          <td style="color:var(--mu)">${pagas}/${cParcs.length}</td>
+        const canc=c.status==='cancelado';
+        const st=canc?'cancelado':(pagas===cParcs.length&&cParcs.length?'pago':atras?'atrasado':'aberto');
+        // contrato cancelado: linha inteira em vermelho
+        const trSt=canc?'background:#FEF2F2;':'';
+        const txt=canc?'color:#B91C1C;':'';
+        // entrada: verde quando paga, vermelha quando em aberto
+        let entrada='<span style="color:var(--mu)">—</span>';
+        if(c.valor_entrada){
+          const paga=!!c.entrada_paga;
+          entrada=`<span style="font-weight:700;color:${canc?'#B91C1C':(paga?'#16A34A':'#DC2626')}">R$ ${c.valor_entrada.toFixed(2)}</span>`
+            +`<br><span style="font-size:9px;font-weight:800;letter-spacing:.04em;color:${canc?'#B91C1C':(paga?'#16A34A':'#DC2626')}">${paga?'PAGA':'EM ABERTO'}</span>`;
+        }
+        return`<tr style="${trSt}">
+          <td style="color:var(--mu);font-size:11px;${txt}">${i+1}</td>
+          <td style="font-weight:700;${txt}">${c.nome}${canc?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#DC2626;color:#fff;font-weight:800;letter-spacing:.04em">CANCELADO</span>':''}<br><span style="font-size:10px;color:${canc?'#B91C1C':'var(--mu)'};font-weight:400">${c.cpf||''}</span></td>
+          <td style="color:${canc?'#B91C1C':'var(--mu)'}">${c.os||'—'}</td>
+          <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${canc?'background:#FEE2E2;color:#B91C1C':(finColor[c.financeira]||'')}">${finLabel[c.financeira]||c.financeira}</span></td>
+          <td style="font-weight:700;${canc?'color:#B91C1C;text-decoration:line-through':''}">R$ ${(c.valor_crediario||0).toFixed(2)}</td>
+          <td>${entrada}</td>
+          <td style="color:${canc?'#B91C1C':'var(--mu)'}">${pagas}/${cParcs.length}</td>
           <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${stStyle[st]}">${stLabel[st]}</span></td>
           <td style="display:flex;gap:4px">
             <button onclick="opCrDet('${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--tx);cursor:pointer;font-weight:600">Ver</button>
@@ -2986,6 +2992,19 @@ document.addEventListener('keydown',e=>{
   if(e.key!=='Escape'&&e.key!=='Esc')return;
   if(fecharModalTopo()){e.preventDefault();e.stopPropagation();}
 });
+
+// Restaura sessão salva
+(function(){
+  try{
+    const saved=localStorage.getItem('idealize_session');
+    if(saved){
+      const {u,p}=JSON.parse(saved);
+      document.getElementById('lu').value=u;
+      document.getElementById('lp').value=p;
+      doLogin();
+    }
+  }catch(e){localStorage.removeItem('idealize_session');}
+})();
 
 setInterval(()=>{
   if(!U)return;
