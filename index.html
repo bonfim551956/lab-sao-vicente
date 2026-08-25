@@ -518,7 +518,7 @@ textarea {
       <div class="rs2"><div class="rl">Zerados</div><div class="rv d" id="e3">0</div></div>
     </div>
     <div class="tw">
-      <div class="th2"><span class="tt">Lentes por grau</span><div style="display:flex;gap:6px"><button class="bex" onclick="expEstCSV()">CSV</button><button class="bex" style="background:#FEF3E2;color:#C05E0A;border-color:rgba(245,154,42,.3)" onclick="expEstPDF()">PDF</button><button class="bex" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-weight:700" onclick="expListaPedidoPDF()">Lista p/ Pedir</button></div></div>
+      <div class="th2"><span class="tt">Lentes por grau</span><div style="display:flex;gap:6px"><button class="bex" onclick="expEstCSV()">CSV</button><button class="bex" style="background:#FEF3E2;color:#C05E0A;border-color:rgba(245,154,42,.3)" onclick="expEstPDF()">PDF</button><button class="bex" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;font-weight:700" onclick="expListaPedidoPDF()">Lista p/ Pedir</button><button class="bex" style="background:#0F1923;color:#fff;border-color:#0F1923;font-weight:700" onclick="opPed()">Arquivo de Pedido</button></div></div>
       <div id="etb"><div class="er">Carregando...</div></div>
     </div>
   </div>
@@ -788,6 +788,25 @@ textarea {
   </div>
 </div>
 
+
+<!-- Modal Arquivo de Pedido -->
+<div class="mb" id="ped-modal" style="display:none">
+  <div class="md" style="max-width:560px;width:95vw;max-height:92vh;overflow-y:auto">
+    <div class="mh"><span>Arquivo de Pedido</span><button class="mx" onclick="clsPed()">&#10005;</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="mf"><label>C\u00f3digo do produto</label><input id="ped-cod" value="279"/></div>
+      <div class="mf"><label>Repor at\u00e9 (lentes)</label><input id="ped-alvo" type="number" min="1" step="1" value="5" oninput="rnPedPrev()"/></div>
+    </div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:10px;font-weight:500">
+      O laborat\u00f3rio pede em <b>pares</b> \u2014 1 lente = 0,5. Uma prateleira zerada com alvo 5 sai como <b>2,5</b>.
+    </div>
+    <div id="ped-prev"></div>
+    <div class="mft">
+      <button class="bc" onclick="clsPed()">Cancelar</button>
+      <button class="bsv" onclick="baixarPedidoCSV()">Baixar CSV</button>
+    </div>
+  </div>
+</div>
 <script>
 const SB_URL='https://xxmrdadnchxdsfinvzsp.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4bXJkYWRuY2h4ZHNmaW52enNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MzI2NDgsImV4cCI6MjA5OTAwODY0OH0.vq3SGXJjmqJ68rcl-nplayx4L_xhy7VMtOAkbvlsep8';
@@ -800,10 +819,10 @@ const US=[
   {u:'posvendas',p:'pos321',n:'Pós-vendas',r:'posvendas',un:'saovicente'},
 ];
 const RS={
-  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,ce:true,es:true,ed:true},
-  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4,5],ca:true,cd:false,ce:true,es:true,ed:true},
-  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false},
-  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false},
+  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,ce:true,es:true,ed:true,rf:true},
+  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4,5],ca:true,cd:false,ce:true,es:true,ed:true,rf:true},
+  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false,rf:false},
+  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:true},
 };
 const CF=['Pedido','Aguardando montagem','Em montagem','Pronto','Avisado','Entregue']; // mantido para histórico
 const CS=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado'];
@@ -2107,9 +2126,10 @@ async function svEditCr(){
 let rfId=null,mvPendId=null,editId=null;
 function clsLab(){mvPendId=null;document.getElementById('labm').style.display='none';}
 async function svLab(){const lab=document.getElementById('flab').value;if(!lab){alert('Selecione Lab Próprio ou Lab Parceiro.');return;}const pendId=mvPendId;clsLab();await mvCardExec(pendId,lab,null);}
-function opRf(id){rfId=id;document.getElementById('frf').value='';document.getElementById('rfm').style.display='flex';}
+function opRf(id){if(!R||!R.rf){alert('Sem permissão para refazer serviços.');return;}rfId=id;document.getElementById('frf').value='';document.getElementById('rfm').style.display='flex';}
 function clsRf(){rfId=null;document.getElementById('rfm').style.display='none';}
 async function svRf(){
+  if(!R||!R.rf){alert('Sem permissão.');return;}
   const motivo=document.getElementById('frf').value.trim();
   if(!motivo){alert('Preencha o motivo do refazer.');return;}
   const c=ST.cards.find(x=>x.id===rfId);
@@ -2371,7 +2391,7 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}</div>${editBtn}</div><div class="cp">${hl(c.ped,srch)}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${c.esfOD!=null?`<div class="cg">OD ${fG(c.esfOD,c.cilOD)} · OE ${fG(c.esfOE,c.cilOE)}</div>`:''}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}</div>${editBtn}</div><div class="cp">${hl(c.ped,srch)}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${c.esfOD!=null?`<div class="cg">OD ${fG(c.esfOD,c.cilOD)} · OE ${fG(c.esfOE,c.cilOE)}</div>`:''}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
@@ -2761,6 +2781,58 @@ function rnEst(){
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FDE047;box-shadow:inset 0 0 0 2px #A16207;border-radius:3px;display:inline-block"></span>Selecionada — 1 clique seleciona, 2 cliques lançam quantidade</span>
   </div>`;
 }
+
+// -- ARQUIVO DE PEDIDO (layout de importacao do laboratorio) ----------------
+// Qtde vai em PARES: 1 lente = 0,5. Repor ate o alvo -> (alvo - atual) / 2
+function opPed(){document.getElementById('ped-modal').style.display='flex';rnPedPrev();}
+function clsPed(){document.getElementById('ped-modal').style.display='none';}
+
+function itensPedido(){
+  const alvo=parseInt(document.getElementById('ped-alvo').value)||5;
+  return Object.values(ST.estoque)
+    .filter(i=>i.qty<alvo)
+    .sort((a,b)=>(a.esf-b.esf)||(a.cil-b.cil))
+    .map(i=>({...i,pares:(alvo-i.qty)/2}));
+}
+function numBR(n){return(n%1===0)?String(n):String(n).replace('.',',');}
+
+function rnPedPrev(){
+  const itens=itensPedido();
+  const totPares=itens.reduce((s,i)=>s+i.pares,0);
+  const el=document.getElementById('ped-prev');
+  if(!itens.length){el.innerHTML='<div class="er" style="padding:1.5rem">Nenhuma lente abaixo do alvo.</div>';return;}
+  el.innerHTML=`<div class="rsum" style="margin-bottom:10px">
+      <div class="rs2" style="min-width:110px"><div class="rl">Itens</div><div class="rv v">${itens.length}</div></div>
+      <div class="rs2" style="min-width:110px"><div class="rl">Total pares</div><div class="rv" style="color:var(--vc)">${numBR(totPares)}</div></div>
+      <div class="rs2" style="min-width:110px"><div class="rl">Total lentes</div><div class="rv i">${totPares*2}</div></div>
+    </div>
+    <div style="max-height:210px;overflow-y:auto;border:1px solid var(--bo);border-radius:10px">
+    <table><thead><tr><th>Esf</th><th>Cil</th><th>Atual</th><th>Qtde (pares)</th></tr></thead><tbody>
+    ${itens.map(i=>`<tr>
+      <td style="font-weight:700">${fmtGrau(i.esf)}</td>
+      <td>${fmtGrau(i.cil)}</td>
+      <td style="color:${i.qty===0?'#DC2626':'var(--mu)'};font-weight:${i.qty===0?'700':'500'}">${i.qty}</td>
+      <td style="font-weight:800;color:var(--v)">${numBR(i.pares)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function baixarPedidoCSV(){
+  const itens=itensPedido();
+  if(!itens.length){alert('Nenhuma lente abaixo do alvo.');return;}
+  const cod=(document.getElementById('ped-cod').value||'').trim();
+  if(!cod){alert('Informe o código do produto.');return;}
+  // layout exigido: Codigo ; Código Barras ; Qtde
+  const csv=['Codigo;Código Barras;Qtde',
+    ...itens.map(i=>cod+';;'+numBR(i.pares))
+  ].join('\r\n');
+  const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='pedido_lentes_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();URL.revokeObjectURL(u);
+  clsPed();
+}
+
 function expEstCSV(){
   const it=Object.values(ST.estoque);if(!it.length){alert('Nenhum dado.');return;}
   const csv=['Esferico,Cilindrico,Quantidade',...it.map(v=>`${v.esf},${v.cil},${v.qty}`)].join('\n');
@@ -2776,7 +2848,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
