@@ -223,6 +223,12 @@ tbody tr:hover{background:var(--bg);}
 .hi b{color:var(--tx);font-weight:700;}
 .ht{font-size:10px;padding:2px 7px;border-radius:6px;background:var(--bg);border:1px solid var(--bo);font-weight:600;}
 .mt{font-size:10px;padding:2px 7px;border-radius:6px;background:var(--vl);color:#0D7A75;margin-left:4px;font-weight:700;}
+
+/* Força maiúsculas em todos os inputs e textareas */
+input:not([type="date"]):not([type="number"]):not([type="password"]):not([type="email"]),
+textarea {
+  text-transform: uppercase;
+}
 </style>
 </head>
 <body>
