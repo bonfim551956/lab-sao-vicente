@@ -1501,7 +1501,13 @@ function expCrPDF(){
 
 
 // ── EXPORTAR PDF GENÉRICO ────────────────────────────────────────────────────
-function abrirPDF(titulo, conteudoHTML){
+function abrirPDF(titulo, conteudoHTML, imprimir){
+  const auto = imprimir===false ? '' : '<script>window.onload=()=>window.print();<\/script>';
+  const barra = imprimir===false
+    ? '<div class="no-print" style="display:flex;gap:10px;align-items:center;margin-bottom:14px">'
+      +'<button onclick="window.print()" style="font-size:13px;font-weight:700;padding:9px 20px;border:none;border-radius:9px;background:#1BA8A0;color:#fff;cursor:pointer;font-family:Arial,sans-serif">Salvar / Imprimir PDF</button>'
+      +'<span style="font-size:11px;color:#64748B">No destino da impressao escolha "Salvar como PDF"</span></div>'
+    : '';
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>${titulo}</title>
@@ -1527,9 +1533,10 @@ function abrirPDF(titulo, conteudoHTML){
     <div><div class="brand">Óticas Idealize</div><div class="sub">${titulo}</div></div>
     <div style="text-align:right"><div class="sub">Emitido em: ${new Date().toLocaleDateString('pt-BR')}</div><div class="sub">${U?U.n:''}</div></div>
   </div>
+  ${barra}
   ${conteudoHTML}
   <div class="footer"><span>Óticas Idealize — Sistema de Laboratório</span><span>${new Date().toLocaleString('pt-BR')}</span></div>
-  <script>window.onload=()=>window.print();<\/script>
+  ${auto}
   </body></html>`);
   w.document.close();
 }
@@ -1594,7 +1601,7 @@ function expPrazosPDF(){
 
 // PDF Estoque
 function expListaPedidoPDF(){
-  const itens=Object.values(ST.estoque).filter(i=>i.qty<=3).sort((a,b)=>a.qty-b.qty||(a.esf-b.esf)||(a.cil-b.cil));
+  const itens=Object.values(ST.estoque).filter(i=>i.qty<=3).sort((a,b)=>(a.esf-b.esf)||(a.cil-b.cil));
   if(!itens.length){alert('Nenhuma lente abaixo de 3 unidades!');return;}
   const zerados=itens.filter(i=>i.qty===0);
   const baixos=itens.filter(i=>i.qty>0&&i.qty<=3);
@@ -1617,7 +1624,7 @@ function expListaPedidoPDF(){
       <td style="border-bottom:1px solid #94A3B8;min-width:80px">&nbsp;</td>
     </tr>`;
   }).join('')}</tbody></table>`;
-  abrirPDF('Lista de Lentes para Pedir', kpis+tabela);
+  abrirPDF('Lista de Lentes para Pedir', kpis+tabela, false);
 }
 
 function expEstPDF(){
@@ -2665,9 +2672,41 @@ function cC(q){
   return'background:#FEF3C7;color:#92400E;font-weight:600';
 }
 
+// -- MARCACAO DE LENTES (apoio na hora de fazer o pedido) -------------------
+let estMarcados=new Set();
+try{estMarcados=new Set(JSON.parse(localStorage.getItem('idealize_marcados')||'[]'));}catch(e){}
+function salvarMarcados(){try{localStorage.setItem('idealize_marcados',JSON.stringify([...estMarcados]));}catch(e){}}
+
+let _estTimer=null;
+// 1 clique = marca/desmarca | 2 cliques = abre a janela de quantidade
+function estClick(td,k){
+  if(_estTimer){clearTimeout(_estTimer);_estTimer=null;}
+  _estTimer=setTimeout(()=>{
+    _estTimer=null;
+    if(estMarcados.has(k))estMarcados.delete(k);else estMarcados.add(k);
+    salvarMarcados();rnEst();
+  },230);
+}
+function estDbl(k){
+  if(_estTimer){clearTimeout(_estTimer);_estTimer=null;}
+  if(R&&R.ce)opEm(k);
+}
+function limparMarcados(){estMarcados.clear();salvarMarcados();rnEst();}
+
 function rnEst(){
   const ce=R&&R.ce;
   const ea=document.getElementById('ea');ea.innerHTML='';
+  ea.style.display='flex';ea.style.gap='6px';ea.style.alignItems='center';ea.style.flexWrap='wrap';
+  if(estMarcados.size){
+    const tag=document.createElement('span');
+    tag.style.cssText='font-size:11px;font-weight:800;padding:6px 12px;border-radius:9px;background:#FEF08A;color:#713F12;border:1px solid #FACC15';
+    tag.textContent=estMarcados.size+(estMarcados.size>1?' lentes marcadas':' lente marcada');
+    ea.appendChild(tag);
+    const lim=document.createElement('button');
+    lim.className='eab';lim.style.cssText='background:var(--bg);color:var(--mu);border:1.5px solid var(--bo)';
+    lim.textContent='Limpar marcações';lim.onclick=limparMarcados;
+    ea.appendChild(lim);
+  }
   if(ce){const btn=document.createElement('button');btn.className='eab';btn.textContent='+ Adicionar lente';btn.onclick=()=>opEm(null);ea.appendChild(btn);}
   const CILS=[0,-0.25,-0.50,-0.75,-1.00,-1.25,-1.50,-1.75,-2.00];
   const NEG=[-.25,-.5,-.75,-1,-1.25,-1.5,-1.75,-2,-2.25,-2.5,-2.75,-3,-3.25,-3.5,-3.75,-4];
@@ -2680,16 +2719,21 @@ function rnEst(){
   document.getElementById('e0').textContent=tot;document.getElementById('e1').textContent=its.length;
   document.getElementById('e2').textContent=rep;document.getElementById('e3').textContent=ze;
 
-  const thC=CILS.map(c=>`<th style="min-width:44px;text-align:center;font-size:11px;padding:5px 2px">${c===0?'0.00':(c).toFixed(2)}</th>`).join('');
   const mkT=(esfs,tit,cor)=>{
+    // cabecalhos ficam amarelos quando ha alguma lente marcada naquela linha/coluna
+    const colSel=CILS.map(cil=>esfs.some(e=>estMarcados.has(eK(e,cil))));
+    const thC=CILS.map((c,i)=>`<th style="min-width:44px;text-align:center;font-size:11px;padding:5px 2px;background:${colSel[i]?'#FEF08A':'#F5F3EE'}">${c===0?'0.00':(c).toFixed(2)}</th>`).join('');
     let rows='';
     esfs.forEach(esf=>{
+      const rowSel=CILS.some(cil=>estMarcados.has(eK(esf,cil)));
       let tds='';
       CILS.forEach(cil=>{
         const q=gQ(esf,cil);const k=eK(esf,cil);
-        tds+=`<td style="text-align:center;padding:5px 3px;font-size:12px;${cC(q)};cursor:${ce?'pointer':'default'};border:1px solid #E5E2DA" ${ce?`onclick="opEm('${k}')"`:''}>${q>0?q:'—'}</td>`;
+        const sel=estMarcados.has(k);
+        const stSel=sel?'background:#FDE047 !important;color:#422006 !important;font-weight:800 !important;box-shadow:inset 0 0 0 2px #A16207;':'';
+        tds+=`<td title="1 clique marca · 2 cliques lança quantidade" style="text-align:center;padding:5px 3px;font-size:12px;${cC(q)};${stSel}cursor:pointer;border:1px solid #E5E2DA;user-select:none" onclick="estClick(this,'${k}')" ondblclick="estDbl('${k}')">${q>0?q:'—'}</td>`;
       });
-      rows+=`<tr><td style="font-weight:700;font-size:12px;padding:5px 10px;white-space:nowrap;background:#F5F3EE;border:1px solid #E5E2DA">${(esf>0?'+':'')+esf.toFixed(2)}</td>${tds}</tr>`;
+      rows+=`<tr><td style="font-weight:700;font-size:12px;padding:5px 10px;white-space:nowrap;background:${rowSel?'#FEF08A':'#F5F3EE'};border:1px solid #E5E2DA">${(esf>0?'+':'')+esf.toFixed(2)}</td>${tds}</tr>`;
     });
     return`<div style="margin-bottom:1.5rem;overflow-x:auto"><div style="font-size:13px;font-weight:700;color:#fff;background:${cor};padding:8px 14px;border-radius:9px 9px 0 0">${tit}</div><table style="width:100%;border-collapse:collapse;border:1px solid #E5E2DA"><thead><tr style="background:#F5F3EE"><th style="padding:6px 10px;font-size:11px;text-align:left;border:1px solid #E5E2DA">Esf \ Cil</th>${thC}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
@@ -2700,6 +2744,7 @@ function rnEst(){
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#E0F7F6;border-radius:3px;display:inline-block"></span>4 a 6 — ideal</span>
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF2F2;border-radius:3px;display:inline-block"></span>1 a 3 — repor</span>
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:3px;display:inline-block"></span>Zerado</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FDE047;box-shadow:inset 0 0 0 2px #A16207;border-radius:3px;display:inline-block"></span>Marcada — 1 clique marca, 2 cliques lançam quantidade</span>
   </div>`;
 }
 function expEstCSV(){
