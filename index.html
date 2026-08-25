@@ -858,7 +858,7 @@ async function seedEstoque(){
   console.log('Enviando '+rows.length+' graus para '+TB_EST+'...');
   await sbUpsert(TB_EST,rows);
   console.log('OK! Recarregando...');
-  await loadData();
+  await loadData(true);
   if(typeof rnEst==='function')rnEst();
 }
 
@@ -868,33 +868,84 @@ function setSy(s,m){
   t.textContent=m;
 }
 
-async function loadData(){
-  setSy('l','Sincronizando...');
+// -- MOTOR DE SINCRONIZACAO -------------------------------------------------
+let _ultimoTs=0,_sincronizando=false,_ciclo=0;
+
+function mapCard(r){return{
+  id:r.id,unidade:r.unidade,os:r.os,ped:r.ped,tipo:r.tipo,
+  dtVenda:r.dt_venda,prazo:r.prazo,urgente:r.urgente,col:r.col,
+  lab:r.lab,obs:r.obs,respGar:r.resp_gar,receita:r.receita,
+  obsTxt:r.obs_txt,osCompra:r.os_compra,
+  esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
+  refeito:r.refeito,motivoRefeito:r.motivo_refeito,
+  obsAlert:r.obs_alert,pedidos:r.pedidos||[],
+  history:r.history||[],ts:r.ts,tsCreated:r.ts_created
+};}
+
+function unFiltro(){return U&&U.un==='central'?'':'&unidade=eq.'+(U?U.un:'');}
+function horaAgora(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+function abaAtual(){return localStorage.getItem('idealize_tab')||'k';}
+function modalAberto(){return Array.from(document.querySelectorAll('.mb')).some(m=>m.style.display==='flex');}
+
+// Junta os cards novos/alterados aos que ja estao em memoria
+function mesclarCards(novos){
+  if(!novos||!novos.length)return 0;
+  const m=new Map(ST.cards.map(c=>[c.id,c]));
+  novos.forEach(c=>{m.set(c.id,c);if((c.ts||0)>_ultimoTs)_ultimoTs=c.ts||0;});
+  ST.cards=Array.from(m.values()).sort((a,b)=>(b.tsCreated||0)-(a.tsCreated||0));
+  return novos.length;
+}
+
+// Redesenha SO a aba que esta na tela (Crediario/Indique/Historico buscam sozinhos)
+function rnAtiva(){
+  const t=abaAtual();
+  if(t==='r')return rnRel();
+  if(t==='g')return rnGar();
+  if(t==='r2')return rnRef();
+  if(t==='pz')return rnPrazos();
+  if(t==='e')return rnEst();
+  if(t==='k')return rnKan();
+}
+
+async function carregarEstoque(){
+  const rows=await sbGet('estoque','order=esf.asc'+unFiltro());
+  ST.estoque={};
+  (rows||[]).forEach(r=>{const k=eK(r.esf,r.cil);ST.estoque[k]={esf:r.esf,cil:r.cil,qty:r.qty,id:k};});
+}
+
+// loadData(true) = recarga completa | loadData() = traz so o que mudou
+async function loadData(full){
+  if(!U||_sincronizando)return;
+  _sincronizando=true;
+  const un=unFiltro();
   try{
-    const unFilter=U.un==='central'?'':'&unidade=eq.'+U.un;
-    const cards=await sbGet('os_cards','order=ts_created.desc'+unFilter);
-    ST.cards=(cards||[]).map(r=>({
-      id:r.id,unidade:r.unidade,os:r.os,ped:r.ped,tipo:r.tipo,
-      dtVenda:r.dt_venda,prazo:r.prazo,urgente:r.urgente,col:r.col,
-      lab:r.lab,obs:r.obs,respGar:r.resp_gar,receita:r.receita,
-      obsTxt:r.obs_txt,osCompra:r.os_compra,
-      esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
-      refeito:r.refeito,motivoRefeito:r.motivo_refeito,
-      obsAlert:r.obs_alert,pedidos:r.pedidos||[],
-      history:r.history||[],ts:r.ts,tsCreated:r.ts_created
-    }));
-    const estoqueRows=await sbGet('estoque','order=esf.asc'+unFilter);
-    ST.estoque={};
-    (estoqueRows||[]).forEach(r=>{
-      const k=eK(r.esf,r.cil);
-      ST.estoque[k]={esf:r.esf,cil:r.cil,qty:r.qty,id:k};
-    });
-    setSy('ok','Sincronizado — '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
-    const _savedTab=localStorage.getItem('idealize_tab');
-    if(_savedTab&&_savedTab!=='k'){sw(_savedTab);}else{rnKan();}
+    // --- sincronizacao incremental (rapida) ---
+    if(!full&&_ultimoTs&&ST.cards.length){
+      const novos=await sbGet('os_cards','ts=gt.'+_ultimoTs+'&order=ts.desc'+un);
+      const qtd=mesclarCards((novos||[]).map(mapCard));
+      setSy('ok','Sincronizado — '+horaAgora());
+      if(qtd)rnAtiva();
+      return;
+    }
+    // --- recarga completa, em 2 fases ---
+    setSy('l','Sincronizando...');
+    // fase 1: so as OS em andamento -> o quadro aparece quase na hora
+    const ativos=await sbGet('os_cards','col=lt.5&order=ts_created.desc'+un);
+    ST.cards=(ativos||[]).map(mapCard);
+    ST.cards.forEach(c=>{if((c.ts||0)>_ultimoTs)_ultimoTs=c.ts||0;});
+    setSy('ok','Sincronizado — '+horaAgora());
+    rnAtiva();
+    await carregarEstoque();
+    if(abaAtual()==='e')rnEst();
+    // fase 2: entregues carregam em segundo plano (usados nos relatorios)
+    sbGet('os_cards','col=eq.5&order=ts_created.desc'+un)
+      .then(ent=>{if(mesclarCards((ent||[]).map(mapCard)))rnAtiva();})
+      .catch(()=>{});
   }catch(e){
     setSy('e','Erro: '+e.message);
-    setTimeout(loadData,5000);
+    setTimeout(()=>loadData(true),5000);
+  }finally{
+    _sincronizando=false;
   }
 }
 
@@ -957,13 +1008,15 @@ function doLogin(){
   document.getElementById('t-e').style.display=(R&&R.es)?'block':'none';
   document.getElementById('t-cr').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
   document.getElementById('t-ig').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-  loadData();
-  // Restaura aba ativa
-  const savedTab=localStorage.getItem('idealize_tab');
-  if(savedTab&&savedTab!=='k')setTimeout(()=>sw(savedTab),800);
+  // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
+  let aba=localStorage.getItem('idealize_tab')||'k';
+  const btnAba=document.getElementById('t-'+aba);
+  if(!btnAba||btnAba.style.display==='none')aba='k';
+  sw(aba);
+  loadData(true);
 }
 function doLogout(){
-  U=null;R=null;
+  U=null;R=null;_ultimoTs=0;_sincronizando=false;ST.cards=[];ST.estoque={};
   localStorage.removeItem('idealize_session');
   document.getElementById('as').style.display='none';
   document.getElementById('ls').style.display='flex';
@@ -991,6 +1044,7 @@ function sw(tab){
     if(tab==='k')active.style.display='block';
     else{active.style.display='flex';active.style.flexDirection='column';}
   }
+  if(tab==='k')rnKan();
   if(tab==='r')rnRel();
   if(tab==='g')rnGar();
   if(tab==='r2')rnRef();
@@ -2656,7 +2710,15 @@ function expEstCSV(){
 
 ['om','hm','em2','rfm','labm'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.style.display='none';});});
 document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape')clrSrch();});
-setInterval(()=>{if(U)loadData();},30000);
+setInterval(()=>{
+  if(!U)return;
+  if(document.hidden)return;      // aba do navegador em segundo plano
+  if(modalAberto())return;        // nao atrapalha quem esta preenchendo algo
+  _ciclo++;
+  loadData(_ciclo%8===0);         // recarga completa a cada 4 minutos
+},30000);
+// Ao voltar para a aba do navegador, sincroniza na hora
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&U&&!modalAberto())loadData();});
 </script>
 </body>
 </html>
