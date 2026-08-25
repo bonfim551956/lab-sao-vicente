@@ -861,7 +861,8 @@ async function loadData(){
       ST.estoque[k]={esf:r.esf,cil:r.cil,qty:r.qty,id:k};
     });
     setSy('ok','Sincronizado — '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
-    rnKan();
+    const _savedTab=localStorage.getItem('idealize_tab');
+    if(_savedTab&&_savedTab!=='k'){sw(_savedTab);}else{rnKan();}
   }catch(e){
     setSy('e','Erro: '+e.message);
     setTimeout(loadData,5000);
