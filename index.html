@@ -235,10 +235,26 @@ textarea {
   .nb{padding:0 .9rem}
   .tab{padding:5px 10px;font-size:11px}
   .nn{display:none}                          /* nome do usuario sai, fica o avatar */
-  .mn{padding:.9rem}
+  .mn{padding:.9rem;overflow-x:visible}
   .rm{padding:.9rem}
-  .bd{min-width:0}
-  .co{min-width:210px}
+  /* as 5 colunas dividem a largura disponivel, sem rolagem lateral */
+  .bd{min-width:0;width:100%;gap:8px}
+  .co{flex:1 1 0;min-width:0;padding:8px;gap:6px}
+  .ch{padding-bottom:8px}
+  .cn{font-size:10px;letter-spacing:.05em}
+  .cc{padding:2px 6px}
+  /* card mais compacto para caber bem na coluna estreita */
+  .ca{padding:9px}
+  .cos{font-size:12.5px}
+  .cp{font-size:10.5px}
+  .cg{font-size:10px;margin-top:2px}
+  .bg2{font-size:9px;padding:2px 6px}
+  .tm{font-size:10px}
+  .cu{font-size:9px}
+  .cac{gap:4px;padding-top:7px;margin-top:7px}
+  .bn{font-size:10px;padding:6px 4px}
+  .bh{font-size:10px;padding:6px}
+  .bde{font-size:9px;padding:4px 6px}
   #si{width:180px}
   #si:focus{width:200px}
   .rs2{min-width:112px;padding:.75rem 1rem}
