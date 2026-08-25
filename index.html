@@ -890,7 +890,23 @@ function setSy(s,m){
 // -- MOTOR DE SINCRONIZACAO -------------------------------------------------
 let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 
-function mapCard(r){return{
+// -- TEXTO SEMPRE EM MAIUSCULAS --------------------------------------------
+// Vale para o que e DADO. Nao mexe em chaves internas (tipo, unidade, perfil,
+// financeira, premio), nem em datas, numeros, ids ou senhas.
+function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
+function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
+const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv'];
+function upCard(c){
+  upCampos(c,CAMPOS_OS);
+  if(Array.isArray(c.pedidos))c.pedidos.forEach(o=>upCampos(o,['ped']));
+  if(Array.isArray(c.history))c.history.forEach(h=>{
+    upCampos(h,['u','obsTxt','motivoRefeito']);
+    if(Array.isArray(h.diffs))h.diffs.forEach(d=>upCampos(d,['de','para']));
+  });
+  return c;
+}
+
+function mapCard(r){return upCard({
   id:r.id,unidade:r.unidade,os:r.os,ped:r.ped,tipo:r.tipo,
   dtVenda:r.dt_venda,prazo:r.prazo,urgente:r.urgente,col:r.col,
   lab:r.lab,obs:r.obs,respGar:r.resp_gar,receita:r.receita,
@@ -899,7 +915,7 @@ function mapCard(r){return{
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
   history:r.history||[],ts:r.ts,tsCreated:r.ts_created
-};}
+});}
 
 function unFiltro(){return U&&U.un==='central'?'':'&unidade=eq.'+(U?U.un:'');}
 function horaAgora(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
@@ -969,6 +985,7 @@ async function loadData(full){
 }
 
 async function saveCard(c){
+  upCard(c);
   try{
     await sbUpsert('os_cards',{
       id:c.id,unidade:c.unidade||'saovicente',os:c.os,ped:c.ped,tipo:c.tipo,
@@ -1020,7 +1037,7 @@ function doLogin(){
   document.getElementById('ls').style.display='none';
   document.getElementById('as').style.display='flex';
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
-  document.getElementById('nn').textContent=U.n;
+  document.getElementById('nn').textContent=UP(U.n);
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
   const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
@@ -1307,6 +1324,7 @@ async function svNovoCr(){
   }));
 
   try{
+    upCampos(contrato,['nome','os','obs','criado_por']);
     await sbUpsert('crediario',contrato);
     for(const p of parcelas) await sbUpsert('crediario_parcelas',p);
     clsNovoCr();
@@ -1341,6 +1359,7 @@ async function rnCr(){
     if(crIni)params+=`&created_at=gte.${crIni}`;
     if(crFim)params+=`&created_at=lte.${crFim}T23:59:59`;
     const contratos=await sbGet('crediario',params);
+    (contratos||[]).forEach(c=>upCampos(c,['nome','os','obs','criado_por','entrada_paga_por']));
 
     // Carrega parcelas
     const ids=contratos.map(c=>c.id);
@@ -1351,7 +1370,7 @@ async function rnCr(){
 
     // Atualiza status atrasado
     const hoje=new Date().toISOString().split('T')[0];
-    parcs.forEach(p=>{if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
+    parcs.forEach(p=>{upCampos(p,['baixado_por','obs']);if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
 
     // KPIs
     const total=contratos.length;
@@ -1432,7 +1451,8 @@ async function opCrDet(cid){
       sbGet('crediario',`id=eq.${cid}`),
       sbGet('crediario_parcelas',`crediario_id=eq.${cid}&order=numero.asc`)
     ]);
-    const c=contratos[0];if(!c)return;
+    const c=upCampos(contratos[0],['nome','os','obs','criado_por','entrada_paga_por']);if(!c)return;
+    (parcs||[]).forEach(p=>upCampos(p,['baixado_por','obs']));
     document.getElementById('cr-det-title').textContent=c.nome+(c.os?' — '+c.os:'')+(c.status==='cancelado'?' [CANCELADO]':'');
     const crEditBtn=document.getElementById('cr-det-edit-btn');
     if(crEditBtn)crEditBtn.style.display=R&&R.ed?'inline-block':'none';
@@ -1846,6 +1866,7 @@ async function svNovoIG(){
   };
 
   try{
+    upCampos(reg,['nome_indicou','os_indicou','nome_indicacao','os_indicacao','criado_por']);
     await sbUpsert('indique_ganhe',reg);
     clsNovoIG();
     await rnIG();
@@ -1872,7 +1893,7 @@ async function rnIG(){
 
   try{
     const rows=await sbGet('indique_ganhe',`unidade=eq.${un}&data=gte.${ini}&data=lte.${fim}&order=data.desc`);
-    igData=rows||[];
+    igData=(rows||[]).map(r=>upCampos(r,['nome_indicou','os_indicou','nome_indicacao','os_indicacao','criado_por']));
 
     // KPIs
     const totalPix=igData.filter(r=>r.premio==='pix').length;
@@ -2019,6 +2040,7 @@ async function rnHist(){
     // Busca cards entregues (col=5) do Supabase
     const unFilter=un==='central'?'':'&unidade=eq.'+un;
     const cards=await sbGet('os_cards','col=eq.5&order=ts.desc'+unFilter);
+    (cards||[]).forEach(c=>{upCampos(c,['os','ped','lab']);(c.history||[]).forEach(h=>upCampos(h,['u']));});
 
     // Filtra por período e busca
     hsData=(cards||[]).filter(c=>{
