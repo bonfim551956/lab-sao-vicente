@@ -2769,6 +2769,30 @@ function expEstCSV(){
 
 ['om','hm','em2','rfm','labm'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.style.display='none';});});
 document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape')clrSrch();});
+
+// -- ESC fecha o box aberto -------------------------------------------------
+// Cada modal usa a sua propria funcao de fechar, para nao perder o
+// comportamento de reabrir a tela anterior (baixa/edicao de crediario).
+const FECHAR_MODAL={
+  'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
+  'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG()
+};
+function fecharModalTopo(){
+  const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
+  if(!abertos.length)return false;
+  // fecha primeiro o que estiver por cima (maior z-index; empate = o ultimo do HTML)
+  abertos.sort((a,b)=>(parseInt(getComputedStyle(a).zIndex)||0)-(parseInt(getComputedStyle(b).zIndex)||0));
+  const topo=abertos[abertos.length-1];
+  const fn=FECHAR_MODAL[topo.id];
+  if(fn)fn();else topo.style.display='none';
+  return true;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'&&e.key!=='Esc')return;
+  if(fecharModalTopo()){e.preventDefault();e.stopPropagation();}
+});
+
 setInterval(()=>{
   if(!U)return;
   if(document.hidden)return;      // aba do navegador em segundo plano
