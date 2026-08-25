@@ -928,6 +928,9 @@ function doLogin(){
   document.getElementById('t-cr').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
   document.getElementById('t-ig').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
   loadData();
+  // Restaura aba ativa
+  const savedTab=localStorage.getItem('idealize_tab');
+  if(savedTab&&savedTab!=='k')setTimeout(()=>sw(savedTab),800);
 }
 function doLogout(){
   U=null;R=null;
@@ -940,6 +943,7 @@ function doLogout(){
 
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
+  localStorage.setItem('idealize_tab',tab);
   const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',cr:'crs',ig:'igs',hs:'hss',e:'es'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
@@ -2228,8 +2232,26 @@ function rnKan(){
   if(!U||!R)return;
   const board=document.getElementById('bd');board.innerHTML='';
   const btnNova=document.getElementById('btn-nova-os');if(btnNova)btnNova.style.display=R.ca?'block':'none';
-  let t=0,al=0,en=0,mh=0;
-  ST.cards.forEach(c=>{(c.history||[]).forEach(h=>{if(h.mc&&itd(h.at))mh++;});});
+  let t=0,al=0,en=0;
+  // Calcula KPIs do mês atual
+  const agora=new Date();
+  const inicioMes=new Date(agora.getFullYear(),agora.getMonth(),1,0,0,0).getTime();
+  const fimMes=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59).getTime();
+  // Total serviços do mês — OS criadas no mês (tsCreated dentro do mês)
+  const totalMes=ST.cards.filter(c=>{
+    const cr=c.tsCreated||c.ts||0;
+    return cr>=inicioMes&&cr<=fimMes;
+  }).length;
+  // Garantias do mês — tipo garantia lançadas no mês
+  const garMes=ST.cards.filter(c=>{
+    if(!c.tipo||!c.tipo.startsWith('gar'))return false;
+    const cr=c.tsCreated||c.ts||0;
+    return cr>=inicioMes&&cr<=fimMes;
+  }).length;
+  // Montagens do mês — OS que chegaram a Pronto (col>=3) no mês
+  const montMes=ST.cards.filter(c=>{
+    return (c.history||[]).some(h=>h.to===3&&h.at>=inicioMes&&h.at<=fimMes);
+  }).length;
   const mi=new Set();
   if(srch){ST.cards.forEach(c=>{if(c.os.toLowerCase().includes(srch)||c.ped.toLowerCase().includes(srch))mi.add(c.id);});}
   const srbb=document.getElementById('srb'),srbt=document.getElementById('srt');
@@ -2264,8 +2286,9 @@ function rnKan(){
 
     board.appendChild(col);
   });
-  document.getElementById('s0').textContent=t;document.getElementById('s1').textContent=al;
-  document.getElementById('s3').textContent=mh;
+  document.getElementById('s0').textContent=totalMes;
+  document.getElementById('s1').textContent=garMes;
+  document.getElementById('s3').textContent=montMes;
 }
 
 // ── RELATÓRIO ─────────────────────────────────────
