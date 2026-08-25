@@ -2672,7 +2672,7 @@ function cC(q){
   return'background:#FEF3C7;color:#92400E;font-weight:600';
 }
 
-// -- LENTE SELECIONADA (uma por vez, para leitura da grade) -----------------
+// -- LENTE SELECIONADA (uma por vez, faixa ate os graus, tipo Haytek) -------
 let estSel=null;
 try{estSel=localStorage.getItem('idealize_lente_sel')||null;}catch(e){}
 function salvarSel(){try{estSel?localStorage.setItem('idealize_lente_sel',estSel):localStorage.removeItem('idealize_lente_sel');}catch(e){}}
@@ -2683,7 +2683,7 @@ function estClick(td,k){
   if(_estTimer){clearTimeout(_estTimer);_estTimer=null;}
   _estTimer=setTimeout(()=>{
     _estTimer=null;
-    estSel = (estSel===k) ? null : k;   // clicar de novo na mesma desmarca
+    estSel=(estSel===k)?null:k;   // clicar de novo na mesma desmarca
     salvarSel();rnEst();
   },230);
 }
@@ -2696,7 +2696,6 @@ function fmtGrau(v){return(v>0?'+':v<0?'\u2212':'')+Math.abs(v).toFixed(2).repla
 
 function rnEst(){
   const ce=R&&R.ce;
-  // grau selecionado (esf/cil) a partir da chave "esf_cil"
   let selEsf=null,selCil=null;
   if(estSel){const p=estSel.split('_');selEsf=parseFloat(p[0]);selCil=parseFloat(p[1]);}
 
@@ -2727,24 +2726,28 @@ function rnEst(){
   document.getElementById('e2').textContent=rep;document.getElementById('e3').textContent=ze;
 
   const igual=(a,b)=>a!=null&&b!=null&&Math.abs(a-b)<0.001;
-  const TINT='box-shadow:inset 0 0 0 999px rgba(250,204,21,.30);';   // realce da linha/coluna
+  const FAIXA='box-shadow:inset 0 0 0 999px rgba(250,204,21,.30);';  // caminho ate os graus
   const HDR_ON='background:#FACC15;color:#422006;';
+  const iCil=CILS.findIndex(c=>igual(c,selCil));                     // coluna selecionada
 
   const mkT=(esfs,tit,cor)=>{
-    const thC=CILS.map(c=>`<th style="min-width:44px;text-align:center;font-size:11px;padding:5px 2px;${igual(c,selCil)?HDR_ON:'background:#F5F3EE;'}">${c===0?'0.00':(c).toFixed(2)}</th>`).join('');
+    const iEsf=esfs.findIndex(e=>igual(e,selEsf));                   // linha selecionada nesta tabela
+    const aqui=iEsf>=0&&iCil>=0;                                     // a selecao esta nesta tabela?
+    const thC=CILS.map((c,ci)=>`<th style="min-width:44px;text-align:center;font-size:11px;padding:5px 2px;${aqui&&ci===iCil?HDR_ON:'background:#F5F3EE;'}">${c===0?'0.00':(c).toFixed(2)}</th>`).join('');
     let rows='';
-    esfs.forEach(esf=>{
-      const naLinha=igual(esf,selEsf);
+    esfs.forEach((esf,ei)=>{
+      const linhaSel=aqui&&ei===iEsf;
       let tds='';
-      CILS.forEach(cil=>{
+      CILS.forEach((cil,ci)=>{
         const q=gQ(esf,cil);const k=eK(esf,cil);
-        const naColuna=igual(cil,selCil);
         let extra='';
         if(k===estSel)extra='background:#FDE047 !important;color:#422006 !important;font-weight:800 !important;box-shadow:inset 0 0 0 3px #A16207;';
-        else if(naLinha||naColuna)extra=TINT;
+        // faixa so do ponto selecionado ate os cabecalhos (formato de L)
+        else if(aqui&&ei===iEsf&&ci<iCil)extra=FAIXA;
+        else if(aqui&&ci===iCil&&ei<iEsf)extra=FAIXA;
         tds+=`<td title="1 clique seleciona · 2 cliques lançam quantidade" style="text-align:center;padding:5px 3px;font-size:12px;${cC(q)};${extra}cursor:pointer;border:1px solid #E5E2DA;user-select:none" onclick="estClick(this,'${k}')" ondblclick="estDbl('${k}')">${q>0?q:'—'}</td>`;
       });
-      rows+=`<tr><td style="font-weight:${naLinha?'800':'700'};font-size:12px;padding:5px 10px;white-space:nowrap;${naLinha?HDR_ON:'background:#F5F3EE;'}border:1px solid #E5E2DA">${(esf>0?'+':'')+esf.toFixed(2)}</td>${tds}</tr>`;
+      rows+=`<tr><td style="font-weight:${linhaSel?'800':'700'};font-size:12px;padding:5px 10px;white-space:nowrap;${linhaSel?HDR_ON:'background:#F5F3EE;'}border:1px solid #E5E2DA">${(esf>0?'+':'')+esf.toFixed(2)}</td>${tds}</tr>`;
     });
     return`<div style="margin-bottom:1.5rem;overflow-x:auto"><div style="font-size:13px;font-weight:700;color:#fff;background:${cor};padding:8px 14px;border-radius:9px 9px 0 0">${tit}</div><table style="width:100%;border-collapse:collapse;border:1px solid #E5E2DA"><thead><tr style="background:#F5F3EE"><th style="padding:6px 10px;font-size:11px;text-align:left;border:1px solid #E5E2DA">Esf \ Cil</th>${thC}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
