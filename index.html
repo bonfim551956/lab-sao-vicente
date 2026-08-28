@@ -535,14 +535,20 @@ textarea {
     <div class="rh">
       <span class="rt">Crediário</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="pb active" id="cr-ph" onclick="setPerCr('h')">Hoje</button>
+        <button class="pb" id="cr-ph" onclick="setPerCr('h')">Hoje</button>
         <button class="pb" id="cr-ps" onclick="setPerCr('s')">Esta semana</button>
         <button class="pb" id="cr-pm" onclick="setPerCr('m')">Este mês</button>
-        <button class="pb" id="cr-ptd" onclick="setPerCr('td')">Todos</button>
+        <button class="pb active" id="cr-ptd" onclick="setPerCr('td')">Todos</button>
         <select id="cr-fin" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
           <option value="todos">Todas as financeiras</option>
           <option value="multicredito">Multicrédito</option>
           <option value="asaas">ASAAS</option>
+        </select>
+        <select id="cr-venc" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
+          <option value="todos">Qualquer vencimento</option>
+          <option value="3">Vence em até 3 dias</option>
+          <option value="5">Vence em até 5 dias</option>
+          <option value="10">Vence em até 10 dias</option>
         </select>
         <select id="cr-status" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none">
           <option value="todos">Todos os status</option>
@@ -645,6 +651,8 @@ textarea {
     <h3 id="om-title">Nova ordem de serviço</h3>
     <div id="nw" class="wb" style="display:none">Sem permissão.</div>
     <div class="mf"><label>Número da OS</label><input id="fo" placeholder="Ex: OS-0001"/></div>
+    <div class="mf"><label>Cliente</label><input id="fcli" placeholder="Nome do cliente"/></div>
+    <div class="mf"><label>WhatsApp <span style="color:var(--mu);font-weight:400">(para avisar quando ficar pronto)</span></label><input id="ftel" placeholder="(13) 99999-9999" maxlength="16" inputmode="numeric" oninput="mascTel(this)"/></div>
     <div class="mf"><label>Data da venda <span style="color:var(--re)">*</span></label><input id="fdt" type="date"/></div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-bottom:10px">
       <div class="mf" style="margin:0"><label>Prazo de entrega</label><input id="fprazo" type="date"/></div>
@@ -1035,7 +1043,7 @@ let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 // financeira, premio), nem em datas, numeros, ids ou senhas.
 function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
 function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
-const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv'];
+const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente'];
 function upCard(c){
   upCampos(c,CAMPOS_OS);
   if(Array.isArray(c.pedidos))c.pedidos.forEach(o=>upCampos(o,['ped']));
@@ -1053,6 +1061,7 @@ function mapCard(r){return upCard({
   obsTxt:r.obs_txt,osCompra:r.os_compra,
   esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
+  cliente:r.cliente,telefone:r.telefone,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
   history:r.history||[],ts:r.ts,tsCreated:r.ts_created
 });}
@@ -1135,6 +1144,7 @@ async function saveCard(c){
       esf_od:c.esfOD!=null?c.esfOD:null,cil_od:c.cilOD!=null?c.cilOD:null,
       esf_oe:c.esfOE!=null?c.esfOE:null,cil_oe:c.cilOE!=null?c.cilOE:null,
       refeito:!!c.refeito,motivo_refeito:c.motivoRefeito||null,
+      cliente:c.cliente||null,telefone:c.telefone||null,
       obs_alert:!!c.obsAlert,pedidos:c.pedidos||[],
       history:c.history||[],ts:c.ts,ts_created:c.tsCreated
     });
@@ -1243,6 +1253,44 @@ function tgG(v){
   rnOculos(ocQtd,a);
 }
 
+
+
+// -- AVISO DE "OCULOS PRONTO" PELO WHATSAPP ---------------------------------
+// Abre o WhatsApp com a mensagem pronta. Nada e enviado sozinho: quem
+// confirma o envio e o atendente. Para editar o texto, mexa aqui embaixo.
+const MSG_PRONTO='Olá{nome}! Aqui é da Óticas Idealize São Vicente.\n\n'
+  +'Seu óculos da OS {os} está PRONTO para retirada! 🕶️\n\n'
+  +'Pode passar na loja quando for melhor para você. Qualquer dúvida, é só chamar por aqui.';
+
+function mascTel(el){
+  let v=el.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>10)      el.value='('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7);
+  else if(v.length>6)  el.value='('+v.slice(0,2)+') '+v.slice(2,6)+'-'+v.slice(6);
+  else if(v.length>2)  el.value='('+v.slice(0,2)+') '+v.slice(2);
+  else                 el.value=v;
+}
+
+function waLink(c){
+  const tel=String(c.telefone||'').replace(/\D/g,'');
+  if(tel.length<10)return '';
+  const num=tel.length<=11?'55'+tel:tel;          // DDI do Brasil
+  const pri=(c.cliente||'').trim().split(/\s+/)[0]||'';
+  const msg=MSG_PRONTO.replace('{nome}',pri?' '+pri:'').replace('{os}',c.os||'');
+  return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
+}
+
+function jaAvisado(c){return (c.history||[]).some(h=>h.whats);}
+
+async function avisarWhats(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  const url=waLink(c);
+  if(!url){alert('Esta OS não tem WhatsApp cadastrado.\nClique em Editar e preencha o telefone do cliente.');return;}
+  window.open(url,'_blank');            // aberto no clique, para nao ser bloqueado
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,whats:true});
+  rnKan();
+  await saveCard(c);
+}
 
 // -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
 let ocQtd=1;
@@ -1494,6 +1542,15 @@ async function rnCr(){
   const finFiltro=document.getElementById('cr-fin')?.value||'todos';
   const statusFiltro=document.getElementById('cr-status')?.value||'todos';
   const busca=(document.getElementById('cr-busca')?.value||'').toLowerCase();
+  const vencFiltro=document.getElementById('cr-venc')?.value||'todos';
+  // janela de vencimento: de hoje ate hoje + N dias
+  const hojeD=hojeBR();
+  let limite=null;
+  if(vencFiltro!=='todos'){
+    const d=new Date(hojeD+'T12:00:00');
+    d.setDate(d.getDate()+parseInt(vencFiltro,10));
+    limite=dataBR(d);
+  }
   const dtIni=document.getElementById('cr-dt-ini')?.value||'';
   const dtFim=document.getElementById('cr-dt-fim')?.value||'';
   const body=document.getElementById('cr-body');
@@ -1553,8 +1610,10 @@ async function rnCr(){
       if(dtFim&&(c.created_at||'').split('T')[0]>dtFim)return false;
       const cParcs=parcMap[c.id]||[];
       // contrato cancelado continua na lista, mas so aparece em "Todos" ou "Cancelados"
-      if(c.status==='cancelado')return statusFiltro==='todos'||statusFiltro==='cancelado';
+      // contrato cancelado nao entra na busca por vencimento
+      if(c.status==='cancelado')return !limite&&(statusFiltro==='todos'||statusFiltro==='cancelado');
       if(statusFiltro==='cancelado')return false;
+      if(limite&&!cParcs.some(p=>p.status!=='pago'&&p.dt_vencimento&&p.dt_vencimento>=hojeD&&p.dt_vencimento<=limite))return false;
       if(statusFiltro==='pago'&&cParcs.some(p=>p.status!=='pago'))return false;
       if(statusFiltro==='atrasado'&&!cParcs.some(p=>p.status==='atrasado'))return false;
       if(statusFiltro==='aberto'&&!cParcs.some(p=>p.status==='aberto'))return false;
@@ -1574,7 +1633,7 @@ async function rnCr(){
     if(body)body.innerHTML=`<table>
       <thead><tr>
         <th>#</th><th>Dt. Compra</th><th>Nome</th><th>OS</th><th>Financeira</th>
-        <th>Vl. Crediário</th><th>Entrada</th><th>Parcelas</th><th>Situação</th><th>Ações</th>
+        <th>Vl. Crediário</th><th>Entrada</th><th>Parcelas</th><th>Próx. Venc.</th><th>Situação</th><th>Ações</th>
       </tr></thead>
       <tbody>${filtrados.map((c,i)=>{
         const cParcs=parcMap[c.id]||[];
@@ -1601,6 +1660,17 @@ async function rnCr(){
           <td style="font-weight:700;${canc?'color:#B91C1C;text-decoration:line-through':''}">R$ ${(c.valor_crediario||0).toFixed(2)}</td>
           <td>${entrada}</td>
           <td style="color:${canc?'#B91C1C':'var(--mu)'}">${pagas}/${cParcs.length}</td>
+          <td style="white-space:nowrap">${(()=>{
+            if(canc)return '<span style="color:#B91C1C">—</span>';
+            const ab=cParcs.filter(p=>p.status!=='pago'&&p.dt_vencimento).sort((a,b)=>a.dt_vencimento<b.dt_vencimento?-1:1);
+            if(!ab.length)return '<span style="color:#16A34A;font-weight:700">quitado</span>';
+            const v=ab[0].dt_vencimento;
+            const dias=Math.round((new Date(v+'T12:00:00')-new Date(hojeD+'T12:00:00'))/86400000);
+            const cor=dias<0?'#DC2626':dias<=3?'#D97706':dias<=10?'#1D4ED8':'var(--mu)';
+            const nota=dias<0?'atrasada '+Math.abs(dias)+'d':dias===0?'vence hoje':dias===1?'amanhã':'em '+dias+' dias';
+            return '<span style="color:'+cor+';font-weight:700">'+dtBR(v)+'</span>'
+                 +'<br><span style="font-size:9px;font-weight:700;color:'+cor+'">'+nota.toUpperCase()+'</span>';
+          })()}</td>
           <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${stStyle[st]}">${stLabel[st]}</span></td>
           <td style="display:flex;gap:4px">
             <button onclick="opCrDet('${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--tx);cursor:pointer;font-weight:600">Ver</button>
@@ -2522,7 +2592,7 @@ function opH(id){
   const l=document.getElementById('hl');
   if(!c.history||!c.history.length){l.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Sem movimentações.</div>';}
   else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`:'';
-const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.obs?'':ed+' → <b>'+CF[h.to]+'</b>'}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
+const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">avisou pelo WhatsApp</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
   document.getElementById('hm').style.display='flex';
 }
 function clsH(){document.getElementById('hm').style.display='none';}
@@ -2532,6 +2602,8 @@ function opOs(){
   document.getElementById('om-title').textContent='Nova ordem de serviço';
   document.getElementById('nw').style.display=R&&R.ca?'none':'block';
   document.getElementById('fo').value='';
+  document.getElementById('fcli').value='';
+  document.getElementById('ftel').value='';
   document.getElementById('fobs').value='';
   document.getElementById('fresp-gar').value='';
   document.getElementById('freceita').value='';
@@ -2554,6 +2626,8 @@ function opEdit(id){
   document.getElementById('om-title').textContent='Editar OS — '+c.os;
   document.getElementById('nw').style.display='none';
   document.getElementById('fo').value=c.os||'';
+  document.getElementById('fcli').value=c.cliente||'';
+  document.getElementById('ftel').value=c.telefone||'';
   document.getElementById('fdt').value=c.dtVenda||hojeBR();
   document.getElementById('fprazo').value=c.prazo||'';
   document.getElementById('furgente').checked=!!c.urgente;
@@ -2573,6 +2647,8 @@ function opEdit(id){
 async function svOS(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
   const os=document.getElementById('fo').value.trim();
+  const cliente=document.getElementById('fcli').value.trim();
+  const telefone=document.getElementById('ftel').value.trim();
   const tipo=document.getElementById('ft').value;
   const dtVenda=document.getElementById('fdt').value;
   if(!os||!dtVenda){alert('Preencha o número da OS e a data da venda.');return;}
@@ -2616,14 +2692,14 @@ async function svOS(){
   if(editId){
     const ce=ST.cards.find(x=>x.id===editId);
     if(ce){
-      const LABELS={os:'Nº OS',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
-      const novos={os,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
+      const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
+      const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
       const ocAntigos=ocDoCard(ce);
-      const antigos={os:ce.os,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
+      const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
       const grauMudou=JSON.stringify(ocAntigos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]))!==JSON.stringify(oculos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]));
       if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
-      ce.os=os;ce.tipo=tipo;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
+      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
       ce.pedidos=oculos;
       ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
@@ -2635,7 +2711,7 @@ async function svOS(){
     }
     return;
   }
-  const c={id:'os_'+now,os,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,obs,respGar,receita,obsTxt,osCompra,
+  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
   const isVenda=tipo==='venda'||tipo==='hora';
@@ -2670,7 +2746,7 @@ function rnKan(){
     return (c.history||[]).some(h=>h.to===3&&h.at>=inicioMes&&h.at<=fimMes);
   }).length;
   const mi=new Set();
-  if(srch){ST.cards.forEach(c=>{const alvo=((c.os||'')+' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase();if(alvo.includes(srch))mi.add(c.id);});}
+  if(srch){ST.cards.forEach(c=>{const alvo=((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')+' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase();if(alvo.includes(srch))mi.add(c.id);});}
   const srbb=document.getElementById('srb'),srbt=document.getElementById('srt');
   if(srch){srbb.className='srb show';srbt.textContent=mi.size===0?`Nenhuma OS para "${srch}"`:`${mi.size} OS encontrada${mi.size>1?'s':''} para "${srch}"`;}
   else{srbb.className='srb';}
@@ -2697,7 +2773,7 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(ci>=3&&c.telefone)?`<button class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
