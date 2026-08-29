@@ -1281,15 +1281,55 @@ function waLink(c){
 
 function jaAvisado(c){return (c.history||[]).some(h=>h.whats);}
 
+// Tenta enviar sozinho pelo Z-API. Se o servidor nao responder (arquivo
+// aberto localmente, internet fora, Z-API desconectado), avisa e passa a
+// abrir o WhatsApp na mao no proximo clique -- nunca fica sem saida.
+const API_WHATS='/api/whatsapp-enviar';
+let _waManual={};
+
+function abrirWhatsManual(c){
+  const url=waLink(c);
+  if(!url){alert('Esta OS não tem WhatsApp cadastrado.\nClique em Editar e preencha o telefone do cliente.');return false;}
+  window.open(url,'_blank');
+  return true;
+}
+
 async function avisarWhats(id){
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
-  const url=waLink(c);
-  if(!url){alert('Esta OS não tem WhatsApp cadastrado.\nClique em Editar e preencha o telefone do cliente.');return;}
-  window.open(url,'_blank');            // aberto no clique, para nao ser bloqueado
-  if(!c.history)c.history=[];
-  c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,whats:true});
-  rnKan();
-  await saveCard(c);
+  if(!c.telefone){alert('Esta OS não tem WhatsApp cadastrado.\nClique em Editar e preencha o telefone do cliente.');return;}
+
+  // segunda tentativa depois de uma falha: abre na mao, no proprio clique
+  if(_waManual[id]){
+    delete _waManual[id];
+    if(abrirWhatsManual(c)){
+      if(!c.history)c.history=[];
+      c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,whats:true});
+      rnKan();await saveCard(c);
+    }
+    return;
+  }
+
+  const btn=document.getElementById('wa-'+id);
+  if(btn){btn.textContent='Enviando...';btn.disabled=true;}
+  try{
+    const r=await fetch(API_WHATS,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:c.id,usuario:U.n,perfil:U.r})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.erro||('HTTP '+r.status));
+    // o servidor ja gravou o historico; recarrega para o card refletir
+    setSy('ok','WhatsApp enviado — '+horaAgora());
+    await loadData(true);
+  }catch(e){
+    _waManual[id]=true;
+    alert('Não consegui enviar automaticamente.\n\n'+(e.message||e)
+      +'\n\nClique no botão de novo para abrir o WhatsApp e enviar na mão.');
+    rnKan();
+  }finally{
+    if(btn){btn.disabled=false;}
+    rnKan();
+  }
 }
 
 // -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
@@ -2773,7 +2813,7 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(ci>=3&&c.telefone)?`<button class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#DC2626;font-weight:700;font-size:11px;background:#FEE2E2;padding:2px 6px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(ci>=3&&c.telefone)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
