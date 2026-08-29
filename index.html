@@ -1479,7 +1479,7 @@ function renderParcelas(){
 }
 
 async function svNovoCr(){
-  const nome=document.getElementById('cr-nome').value.trim();
+  const nome=UP(document.getElementById('cr-nome').value.trim());
   const fin=document.getElementById('cr-fin-novo').value;
   const vcompra=parseFloat(document.getElementById('cr-vcompra').value)||0;
   const vcred=parseFloat(document.getElementById('cr-vcred').value)||0;
@@ -2078,8 +2078,8 @@ function opEditIG(id){
 function clsNovoIG(){document.getElementById('ig-modal').style.display='none';}
 
 async function svNovoIG(){
-  const nome1=document.getElementById('ig-nome1').value.trim();
-  const nome2=document.getElementById('ig-nome2').value.trim();
+  const nome1=UP(document.getElementById('ig-nome1').value.trim());
+  const nome2=UP(document.getElementById('ig-nome2').value.trim());
   const data=document.getElementById('ig-data').value;
   const premio=document.getElementById('ig-premio').value;
   if(!nome1){alert('Preencha o nome de quem indicou.');return;}
@@ -2441,7 +2441,7 @@ function clsEditCr(){
 }
 async function svEditCr(){
   const cid=document.getElementById('cr-edit-id').value;
-  const nome=document.getElementById('cr-edit-nome').value.trim();
+  const nome=UP(document.getElementById('cr-edit-nome').value.trim());
   if(!nome){alert('Preencha o nome.');return;}
   const finEd=document.getElementById('cr-edit-fin').value;
   const cepEd=document.getElementById('cr-edit-cep').value.trim();
@@ -2460,7 +2460,7 @@ async function svEditCr(){
     await sbPatch('crediario',{
       nome,
       cpf:document.getElementById('cr-edit-cpf').value.trim()||null,
-      os:document.getElementById('cr-edit-os').value.trim()||null,
+      os:UP(document.getElementById('cr-edit-os').value.trim())||null,
       dt_compra:document.getElementById('cr-edit-dtcompra').value||null,
       cep:finEd==='asaas'?cepEd:null,
       financeira:finEd,
@@ -2468,7 +2468,7 @@ async function svEditCr(){
       valor_crediario:parseFloat(document.getElementById('cr-edit-vcred').value)||null,
       valor_entrada:parseFloat(document.getElementById('cr-edit-ventrada').value)||null,
       dt_entrada:document.getElementById('cr-edit-dtentrada').value||null,
-      obs:document.getElementById('cr-edit-obs').value.trim()||null,
+      obs:UP(document.getElementById('cr-edit-obs').value.trim())||null,
       historico:hist
     },{id:cid});
     clsEditCr();
@@ -2647,7 +2647,7 @@ function opEdit(id){
 async function svOS(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
   const os=document.getElementById('fo').value.trim();
-  const cliente=document.getElementById('fcli').value.trim();
+  const cliente=UP(document.getElementById('fcli').value.trim());
   const telefone=document.getElementById('ftel').value.trim();
   const tipo=document.getElementById('ft').value;
   const dtVenda=document.getElementById('fdt').value;
