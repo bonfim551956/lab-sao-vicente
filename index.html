@@ -1266,9 +1266,11 @@ function tgG(v){
 // -- AVISO DE "OCULOS PRONTO" PELO WHATSAPP ---------------------------------
 // Abre o WhatsApp com a mensagem pronta. Nada e enviado sozinho: quem
 // confirma o envio e o atendente. Para editar o texto, mexa aqui embaixo.
-const MSG_PRONTO='Olá{nome}! Aqui é da Óticas Idealize São Vicente.\n\n'
-  +'Seu óculos da OS {os} está PRONTO para retirada! 🕶️\n\n'
-  +'Pode passar na loja quando for melhor para você. Qualquer dúvida, é só chamar por aqui.';
+const MSG_PRONTO='Olá, tudo bem?\n'
+  +'Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, '
+  +'seu óculos da Ordem de Serviço nº {os}{nome} já está pronto! 😉\n'
+  +'Estamos abertos de segunda a sexta das 9h às 19h, '
+  +'e aos sábados e feriados das 9h às 15h.';
 
 function mascTel(el){
   let v=el.value.replace(/\D/g,'').slice(0,11);
@@ -1282,8 +1284,8 @@ function waLink(c){
   const tel=String(c.telefone||'').replace(/\D/g,'');
   if(tel.length<10)return '';
   const num=tel.length<=11?'55'+tel:tel;          // DDI do Brasil
-  const pri=(c.cliente||'').trim().split(/\s+/)[0]||'';
-  const msg=MSG_PRONTO.replace('{nome}',pri?' '+pri:'').replace('{os}',c.os||'');
+  const nome=(c.cliente||'').trim();
+  const msg=MSG_PRONTO.replace('{nome}',nome?' em nome de: '+nome:'').replace('{os}',c.os||'');
   return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
 }
 
