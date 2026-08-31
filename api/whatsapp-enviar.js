@@ -28,11 +28,14 @@ const COLUNAS = ['Pedido', 'Ag. montagem', 'Em montagem', 'Pronto', 'Avisado', '
 const MINUTOS_ENTRE_ENVIOS = 10;   // trava contra clique repetido
 
 function texto(card) {
-  const primeiro = String(card.cliente || '').trim().split(/\s+/)[0] || '';
-  return `Olá${primeiro ? ' ' + primeiro : ''}! Aqui é da Óticas Idealize ${LOJA_NOME || ''}.\n\n`
-       + `Seu óculos da OS ${card.os} está PRONTO para retirada! 🕶️\n\n`
-       + `Pode passar na loja quando for melhor para você. `
-       + `Qualquer dúvida, é só chamar por aqui.`;
+  const nome = String(card.cliente || '').trim();
+  // sem nome cadastrado, a frase se ajusta em vez de deixar buraco
+  const emNome = nome ? ` em nome de: ${nome}` : '';
+  return 'Olá, tudo bem?\n'
+       + `Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, `
+       + `seu óculos da Ordem de Serviço nº ${card.os}${emNome} já está pronto! 😉\n`
+       + 'Estamos abertos de segunda a sexta das 9h às 19h, '
+       + 'e aos sábados e feriados das 9h às 15h.';
 }
 
 // (13) 99123-4567 -> 5513991234567
