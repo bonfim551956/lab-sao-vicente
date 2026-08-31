@@ -768,7 +768,15 @@ textarea {
     <input type="hidden" id="eid"/>
     <div class="mf"><label>Esférico <span style="color:var(--re)">*</span></label><input id="fes" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
     <div class="mf"><label>Cilíndrico <span style="color:var(--mu);font-weight:400">(padrão 0.00)</span></label><input id="fci" type="number" step="0.25" placeholder="0.00"/></div>
-    <div class="mf"><label>Quantidade a adicionar <span style="color:var(--re)">*</span></label><input id="fq" type="number" min="1" placeholder="0"/></div>
+    <div class="mf" id="est-modo-wrap" style="display:none">
+      <label>Operação</label>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="est-modo-add" onclick="setModoEst('add')" style="flex:1;font-size:12px;font-weight:700;font-family:inherit;padding:9px;border-radius:10px;cursor:pointer;border:2px solid var(--v);background:var(--v);color:#fff">Adicionar</button>
+        <button type="button" id="est-modo-fix" onclick="setModoEst('fix')" style="flex:1;font-size:12px;font-weight:700;font-family:inherit;padding:9px;border-radius:10px;cursor:pointer;border:2px solid var(--bo);background:var(--bg);color:var(--mu)">Corrigir contagem</button>
+      </div>
+    </div>
+    <div id="est-atual" style="display:none;font-size:12px;font-weight:600;background:var(--bg);border:1px solid var(--bo);border-radius:10px;padding:9px 12px;margin-bottom:12px"></div>
+    <div class="mf"><label id="fq-label">Quantidade a adicionar <span style="color:var(--re)">*</span></label><input id="fq" type="number" min="0" placeholder="0"/></div>
     <div class="mft"><button class="bc" onclick="clsEm()">Cancelar</button><button class="bsv" onclick="svEst()">Salvar</button></div>
   </div>
 </div>
@@ -958,10 +966,10 @@ const US=[
   {u:'posvendas',p:'pos321',n:'Pós-vendas',r:'posvendas',un:'saovicente'},
 ];
 const RS={
-  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,ce:true,es:true,ed:true,rf:true},
-  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4,5],ca:true,cd:false,ce:true,es:true,ed:true,rf:true},
-  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false,rf:false},
-  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:true},
+  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,ce:true,es:true,ed:true,rf:true,aj:true},
+  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4,5],ca:true,cd:false,ce:true,es:true,ed:true,rf:true,aj:false},
+  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false},
+  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:true,aj:false},
 };
 const CF=['Pedido','Aguardando montagem','Em montagem','Pronto','Avisado','Entregue']; // mantido para histórico
 const CS=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado'];
@@ -1317,7 +1325,7 @@ async function avisarWhats(id){
       body:JSON.stringify({id:c.id,usuario:U.n,perfil:U.r})
     });
     const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.erro||('HTTP '+r.status));
+    if(!r.ok)throw new Error((d.erro||('HTTP '+r.status))+(d.detalhe?'\n\nDetalhe: '+d.detalhe:''));
     // o servidor ja gravou o historico; recarrega para o card refletir
     setSy('ok','WhatsApp enviado — '+horaAgora());
     await loadData(true);
@@ -3077,28 +3085,68 @@ function opEm(id){
     document.getElementById('fci').value='0.00';
   }
   document.getElementById('fq').value='';
+  // a correcao so aparece para quem tem permissao, e so em lente que ja existe
+  const podeAj=R&&R.aj&&!!id;
+  document.getElementById('est-modo-wrap').style.display=podeAj?'block':'none';
+  const atualEl=document.getElementById('est-atual');
+  if(id&&ST.estoque[id]){
+    atualEl.style.display='block';
+    atualEl.innerHTML='No sistema hoje: <b style="color:var(--v)">'+ST.estoque[id].qty+' un</b>';
+  }else{atualEl.style.display='none';}
+  setModoEst('add');
   document.getElementById('em2').style.display='flex';
 }
 function clsEm(){document.getElementById('em2').style.display='none';}
+
+// "Adicionar" soma ao que existe. "Corrigir contagem" substitui pelo numero
+// contado na prateleira -- e so o Supervisor enxerga essa opcao.
+let modoEst='add';
+function setModoEst(m){
+  modoEst=m;
+  const add=document.getElementById('est-modo-add'), fix=document.getElementById('est-modo-fix');
+  const on ='border:2px solid var(--v);background:var(--v);color:#fff';
+  const onF='border:2px solid #D97706;background:#D97706;color:#fff';
+  const off='border:2px solid var(--bo);background:var(--bg);color:var(--mu)';
+  const base='flex:1;font-size:12px;font-weight:700;font-family:inherit;padding:9px;border-radius:10px;cursor:pointer;';
+  add.style.cssText=base+(m==='add'?on:off);
+  fix.style.cssText=base+(m==='fix'?onF:off);
+  document.getElementById('fq-label').innerHTML=(m==='fix')
+    ? 'Quantidade real na prateleira <span style="color:var(--re)">*</span>'
+    : 'Quantidade a adicionar <span style="color:var(--re)">*</span>';
+  document.getElementById('emt').textContent=(m==='fix')?'Corrigir contagem':'Adicionar quantidade';
+}
 async function svEst(){
   const eid=document.getElementById('eid').value;
   const e=parseFloat(document.getElementById('fes').value);
   const cVal=document.getElementById('fci').value;const c=cVal!==''?parseFloat(cVal):0;
-  const q=parseInt(document.getElementById('fq').value)||0;
+  const q=parseInt(document.getElementById('fq').value);
   if(isNaN(e)){alert('Preencha o grau esférico.');return;}
-  if(q<=0){alert('Informe uma quantidade maior que zero.');return;}
+  const corrigir=(modoEst==='fix')&&R&&R.aj;
+  if(isNaN(q)||q<0){alert('Informe a quantidade.');return;}
+  if(!corrigir&&q<=0){alert('Informe uma quantidade maior que zero.');return;}
+
   const k=eid||eK(e,c);
-  const un=U&&U.un?U.un:'saovicente';
   const atual=ST.estoque[k]?ST.estoque[k].qty:0;
-  const novaQty=atual+q;
+  const novaQty=corrigir?q:atual+q;
+
+  if(corrigir){
+    const dif=novaQty-atual;
+    const txt='Corrigir '+fmtGrau(e)+' / '+fmtGrau(c)+'\n\n'
+      +'No sistema: '+atual+' un\n'
+      +'Contagem real: '+novaQty+' un\n'
+      +'Diferença: '+(dif>0?'+':'')+dif+' un\n\n'
+      +'Confirma a correção?';
+    if(!confirm(txt))return;
+  }
+
   ST.estoque[k]={esf:e,cil:c,qty:novaQty,id:k};
   clsEm();rnEst();
   try{
-    await sbPatch('estoque',{qty:novaQty},{id:k,unidade:un});
-    setSy('ok','Estoque atualizado!');
+    await sbPatch('estoque',{qty:novaQty},{id:k});
+    setSy('ok',(corrigir?'Estoque corrigido — ':'Estoque atualizado — ')+horaAgora());
   }catch(err1){
     try{
-      await sbUpsert('estoque',{id:k,unidade:un,esf:e,cil:c,qty:novaQty});
+      await sbUpsert('estoque',{id:k,esf:e,cil:c,qty:novaQty});
       setSy('ok','Estoque salvo!');
     }catch(err2){
       alert('Erro ao salvar estoque:\n'+err2.message);
