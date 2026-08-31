@@ -2790,9 +2790,13 @@ function rnKan(){
     return cr>=inicioMes&&cr<=fimMes;
   }).length;
   // Montagens do mês — OS que chegaram a Pronto (col>=3) no mês
-  const montMes=ST.cards.filter(c=>{
-    return (c.history||[]).some(h=>h.to===3&&h.at>=inicioMes&&h.at<=fimMes);
-  }).length;
+  // cada óculos do card conta como uma montagem; card refeito que passa
+  // duas vezes pela montagem conta as duas
+  let montMes=0;
+  ST.cards.forEach(c=>{
+    const vezes=(c.history||[]).filter(h=>h.mc&&h.at>=inicioMes&&h.at<=fimMes).length;
+    if(vezes)montMes+=vezes*ocDoCard(c).length;
+  });
   const mi=new Set();
   if(srch){ST.cards.forEach(c=>{const alvo=((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')+' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase();if(alvo.includes(srch))mi.add(c.id);});}
   const srbb=document.getElementById('srb'),srbt=document.getElementById('srt');
@@ -3040,13 +3044,18 @@ function rnRel(){
     (c.history||[]).forEach(h=>{
       const d=new Date(h.at);
       if(d>=ini&&d<=fim){
-        // Tudo conta só quando passa para Pronto (mc=true)
+        // Conta quando passa para Pronto (mc=true).
+        // Um card com 2 óculos são 2 montagens — uma linha para cada.
         if(h.mc){
-          if(c.tipo==='venda') vendaPedidoCount++;
-          else if(c.tipo==='hora') vendaHoraCount++;
-          else if(c.tipo&&c.tipo.startsWith('gar')) garCount++;
-          else if(c.tipo==='passagem') passagemCount++;
-          relR.push({os:c.os,ped:c.ped,tipo:c.tipo,u:h.u,r:h.r,at:h.at,ev:'montagem'});
+          const ocs=ocDoCard(c);
+          ocs.forEach((o,idx)=>{
+            if(c.tipo==='venda') vendaPedidoCount++;
+            else if(c.tipo==='hora') vendaHoraCount++;
+            else if(c.tipo&&c.tipo.startsWith('gar')) garCount++;
+            else if(c.tipo==='passagem') passagemCount++;
+            relR.push({os:c.os,ped:o.ped||c.ped,tipo:c.tipo,u:h.u,r:h.r,at:h.at,ev:'montagem',
+                       oc:ocs.length>1?(idx+1):0,totOc:ocs.length});
+          });
         }
       }
     });
@@ -3064,7 +3073,7 @@ function rnRel(){
   if(!relR.length){b.innerHTML='<div class="er">Nenhuma montagem neste período.</div>';return;}
   const evLabel={montagem:'Montagem',venda:'Venda',garantia:'Garantia',passagem:'Passagem'};
   const evColor={montagem:'background:#E0F7F6;color:#0D7A75',venda:'background:#D1FAE5;color:#065F46',garantia:'background:#FEF0E6;color:#C05E0A',passagem:'background:#EDE9FE;color:#5B21B6'};
-  b.innerHTML=`<table><thead><tr><th>#</th><th>Evento</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Responsável</th><th>Data</th></tr></thead><tbody>${relR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;${evColor[r.ev]||''}">${evLabel[r.ev]||r.ev}</span></td><td style="font-weight:600">${r.os}</td><td>${r.ped||'—'}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(r.tipo)}">${tGL(r.tipo)}</span></td><td style="color:var(--mu)">${r.u}</td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
+  b.innerHTML=`<table><thead><tr><th>#</th><th>Evento</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Responsável</th><th>Data</th></tr></thead><tbody>${relR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;${evColor[r.ev]||''}">${evLabel[r.ev]||r.ev}</span></td><td style="font-weight:600">${r.os}${r.oc?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800">ÓCULOS ${r.oc}/${r.totOc}</span>`:''}</td><td>${r.ped||'—'}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(r.tipo)}">${tGL(r.tipo)}</span></td><td style="color:var(--mu)">${r.u}</td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
 }
 function expCSV(){
   if(!relR.length){alert('Nenhum dado.');return;}
