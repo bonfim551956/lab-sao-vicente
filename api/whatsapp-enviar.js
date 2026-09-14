@@ -13,6 +13,10 @@
 // para número arbitrário.
 // ============================================================================
 
+// Espaço colado no copiar/colar é o erro mais comum ao configurar a Vercel.
+// Limpamos tudo aqui na entrada para nunca mais dar problema.
+const limpo = v => (v === undefined || v === null) ? v : String(v).trim();
+
 const {
   ZAPI_INSTANCE,          // id da instância no Z-API
   ZAPI_TOKEN,             // token da instância
@@ -22,7 +26,9 @@ const {
   LOJA_UNIDADE,           // 'saovicente'
   LOJA_NOME,              // 'São Vicente'
   ORIGENS,                // 'https://saovicente.oticasidealize.online'
-} = process.env;
+  AGENDAR_INDIQUE,        // 'sim' liga o convite 24h depois. Qualquer outra
+                          // coisa (ou ausente) = só o aviso de pronto.
+} = Object.fromEntries(Object.entries(process.env).map(([k, v]) => [k, limpo(v)]));
 
 const COLUNAS = ['Pedido', 'Ag. montagem', 'Em montagem', 'Pronto', 'Avisado', 'Entregue'];
 const MINUTOS_ENTRE_ENVIOS = 10;   // trava contra clique repetido
@@ -46,18 +52,40 @@ function numero(tel) {
   return d;
 }
 
-async function sb(caminho, opcoes = {}) {
-  const r = await fetch(`${SB_URL}/rest/v1/${caminho}`, {
-    ...opcoes,
-    headers: {
-      apikey: SB_SERVICE_KEY,
-      Authorization: `Bearer ${SB_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      ...(opcoes.headers || {}),
-    },
-  });
-  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
-  return r.status === 204 ? null : r.json();
+// Falha temporária do Supabase (502/503/504) acontece de vez em quando.
+// Em vez de desistir na primeira, tentamos de novo com uma pausa curta.
+async function sb(caminho, opcoes = {}, tentativa = 1) {
+  const base = String(SB_URL).replace(/\/+$/, '');
+  const parar = new AbortController();
+  const relogio = setTimeout(() => parar.abort(), 8000);   // 8s por tentativa
+  try {
+    const r = await fetch(`${base}/rest/v1/${caminho}`, {
+      ...opcoes,
+      signal: parar.signal,
+      headers: {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        ...(opcoes.headers || {}),
+      },
+    });
+    if (!r.ok) {
+      const temporario = r.status >= 500;
+      if (temporario && tentativa < 3) {
+        await new Promise(x => setTimeout(x, 600 * tentativa));
+        return sb(caminho, opcoes, tentativa + 1);
+      }
+      throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    }
+    return r.status === 204 ? null : r.json();
+  } catch (e) {
+    if (e.name === 'AbortError' && tentativa < 3) {
+      return sb(caminho, opcoes, tentativa + 1);
+    }
+    throw e;
+  } finally {
+    clearTimeout(relogio);
+  }
 }
 
 module.exports = async (req, res) => {
@@ -86,7 +114,8 @@ module.exports = async (req, res) => {
     if (!id) return res.status(400).json({ erro: 'Informe o id da OS.' });
 
     // ── busca a OS no banco (é o servidor quem decide os dados) ────────────
-    const achados = await sb(`os_cards?id=eq.${encodeURIComponent(id)}&select=*`);
+    const achados = await sb(`os_cards?id=eq.${encodeURIComponent(id)}`
+      + `&select=id,unidade,os,col,cliente,telefone,history`);
     const card = achados && achados[0];
     if (!card) return res.status(404).json({ erro: 'OS não encontrada.' });
 
@@ -143,16 +172,53 @@ module.exports = async (req, res) => {
       mc: false, whats: true, auto: true,
       zapId: resposta.messageId || resposta.id || null,
     });
-    await sb(`os_cards?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ history: historico }),
-    });
+    // A MENSAGEM JÁ SAIU. Se gravar o histórico falhar, não devolvemos erro:
+    // o atendente clicaria de novo e o cliente receberia duas vezes.
+    let historicoGravado = true;
+    try {
+      await sb(`os_cards?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ history: historico }),
+      });
+    } catch (e) {
+      historicoGravado = false;
+      console.error('Mensagem enviada, mas o histórico não foi gravado:', e.message);
+    }
+
+    // ── agenda o convite do Indique e Ganhe para 24h depois ───────────────
+    // Só acontece se AGENDAR_INDIQUE estiver como 'sim'. Sem isso, a loja
+    // usa apenas o aviso de "óculos pronto".
+    // Se falhar, não atrapalha: o aviso de "pronto" já foi entregue.
+    let agendado = false;
+    if (String(AGENDAR_INDIQUE || '').trim().toLowerCase() === 'sim') try {
+      const daquiA24h = new Date(Date.now() + 24 * 60 * 60000).toISOString();
+      await sb('whatsapp_fila', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        body: JSON.stringify([{
+          id: 'wf_' + card.id + '_indique',
+          unidade: card.unidade,
+          os_id: card.id,
+          os_numero: card.os,
+          cliente: card.cliente || null,
+          telefone: fone,
+          tipo: 'indique',
+          agendado_para: daquiA24h,
+          status: 'pendente',
+        }]),
+      });
+      agendado = true;
+    } catch (e) {
+      console.error('Não consegui agendar o Indique e Ganhe:', e.message);
+    }
 
     return res.status(200).json({
       ok: true,
       telefone: fone,
       messageId: resposta.messageId || resposta.id || null,
+      indique_agendado: agendado,
+      historico_gravado: historicoGravado,
     });
   } catch (e) {
     return res.status(500).json({ erro: 'Falha no envio.', detalhe: String(e.message || e) });
