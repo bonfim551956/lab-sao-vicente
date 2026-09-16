@@ -559,7 +559,7 @@ textarea {
       <div class="tw">
         <div class="th2"><span class="tt">Entregas do dia</span>
           <div style="display:flex;gap:8px;align-items:center">
-            <span style="font-size:10px;color:var(--mu);font-weight:600">vem do sistema</span>
+            <span style="font-size:10px;color:var(--mu);font-weight:600" title="As entregas do dia vêm do sistema e não são editáveis. Use + Linha para lançar um caso à parte, como Asaas.">vem do sistema · não editável</span>
             <button class="bex" onclick="addEntrega()">+ Linha</button>
           </div></div>
         <div id="fc-entregas" style="padding:10px;max-height:420px;overflow-y:auto"></div>
@@ -1290,6 +1290,7 @@ function rnAtiva(){
   if(t==='g')return rnGar();
   if(t==='r2')return rnRef();
   if(t==='pz')return rnPrazos();
+  if(t==='fc')return sincEntregasFech();
   if(t==='sd')return rnSaldos();
   if(t==='e')return rnEst();
   if(t==='k')return rnKan();
@@ -1603,7 +1604,36 @@ async function svReneg(){
 
 // ── FECHAMENTO DE CAIXA ─────────────────────────────────────────────────────
 // Vendas: digitadas pelo operador.  Entregas: vêm do sistema, editáveis aqui.
-let fcVendas=[], fcEntregas=[], fcSalvo=null;
+let fcVendas=[], fcEntregas=[], fcSalvo=null, fcDiaCarregado=null;
+
+// Entregas daquele dia, lidas dos cards em memória
+function entregasDoDia(dia){
+  const ini=new Date(dia+'T00:00:00').getTime(), fim=new Date(dia+'T23:59:59').getTime();
+  const out=[];
+  ST.cards.forEach(c=>{
+    const h=(c.history||[]).filter(x=>x.to===5).pop();
+    if(!h||h.at<ini||h.at>fim)return;
+    out.push({os:c.os||'',cliente:c.cliente||'',
+      forma:c.entregaForma||'Sem saldo',valor:num(c.entregaValor),
+      forma2:c.entregaForma2||'',valor2:num(c.entregaValor2)});
+  });
+  return out;
+}
+
+// Chamada a cada sincronização. As OS entregues chegam numa segunda etapa,
+// depois que a tela já abriu — sem isto o bloco ficava vazio ao recarregar.
+// Só mexe nas entregas: o que está sendo digitado nas vendas não é tocado.
+function sincEntregasFech(){
+  const cam=document.getElementById('fc-data');
+  if(!cam||!cam.value||fcDiaCarregado!==cam.value)return;
+  const auto=entregasDoDia(cam.value);
+  if(!auto.length)return;
+  const jaTem=new Set(fcEntregas.map(e=>String(e.os||'').trim()).filter(Boolean));
+  const novas=auto.filter(a=>!jaTem.has(String(a.os).trim()));
+  if(!novas.length)return;
+  fcEntregas=fcEntregas.concat(novas);
+  rnFechLinhas();
+}
 const rs=v=>'R$ '+Number(v||0).toFixed(2);
 const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
 
@@ -1614,16 +1644,7 @@ async function rnFech(){
   if(!cam.value)cam.value=hojeBR();
   const dia=cam.value;
 
-  // entregas do dia, direto dos cards
-  const ini=new Date(dia+'T00:00:00').getTime(), fim=new Date(dia+'T23:59:59').getTime();
-  const auto=[];
-  ST.cards.forEach(c=>{
-    const h=(c.history||[]).filter(x=>x.to===5).pop();
-    if(!h||h.at<ini||h.at>fim)return;
-    auto.push({os:c.os||'',cliente:c.cliente||'',
-      forma:c.entregaForma||'Sem saldo',valor:num(c.entregaValor),
-      forma2:c.entregaForma2||'',valor2:num(c.entregaValor2)});
-  });
+  const auto=entregasDoDia(dia);
 
   // garantias lançadas no dia: entram nas vendas com valor zero,
   // como na planilha. Não contam como venda porque o valor é zero.
@@ -1655,6 +1676,7 @@ async function rnFech(){
     +(salvo?'background:#F0FDF4;color:#16A34A':'background:#FEF3C7;color:#92400E');
   document.getElementById('fc-google').value=salvo?(salvo.google_avaliacoes||''):'';
   document.getElementById('fc-obs').value=salvo?(salvo.obs||''):'';
+  fcDiaCarregado=dia;
   rnFechLinhas();
 }
 
@@ -1747,14 +1769,31 @@ function rnFechLinhas(){
           +'<div style="margin-top:3px">'+inp(e.cliente,"edEnt("+i+",'cliente',this.value)","Cliente",'e_'+i+'_cliente')+'</div></div>'
         : '<div><div style="font-size:12px;font-weight:800">'+(e.os||'—')+'</div>'
           +'<div style="font-size:9px;color:var(--mu)">'+(e.cliente||'')+'</div></div>')
-      +'<div>'+selForma(e.forma,"edEnt("+i+",'forma',this.value)",'e_'+i+'_forma')+'</div>'
-      +'<div>'+inpN(e.valor,"edEnt("+i+",'valor',this.value)",'e_'+i+'_valor')+'</div></div>'
-      +((e.forma2||num(e.valor2)>0||e._dois)
-        ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
-          +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
-          +'<div>'+selForma(e.forma2,"edEnt("+i+",'forma2',this.value)",'e_'+i+'_forma2')+'</div>'
-          +'<div>'+inpN(e.valor2,"edEnt("+i+",'valor2',this.value)",'e_'+i+'_valor2')+'</div></div>'
-        : '<button onclick="tgEnt2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma de pagamento</button>')
+      +(e._manual
+        ? '<div>'+selForma(e.forma,"edEnt("+i+",'forma',this.value)",'e_'+i+'_forma')+'</div>'
+          +'<div>'+inpN(e.valor,"edEnt("+i+",'valor',this.value)",'e_'+i+'_valor')+'</div>'
+        : (function(){
+            const semSaldo=!num(e.valor)&&!num(e.valor2);
+            return '<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;'
+              +(semSaldo?'background:#F1F5F9;color:#64748B':'background:#F0FDF4;color:#16A34A')+'">'
+              +(semSaldo?'SEM SALDO':(e.forma||'—'))+'</span></div>'
+              +'<div style="font-size:12px;font-weight:800;color:'+(semSaldo?'var(--mu)':'#16A34A')+'">'
+              +(semSaldo?'—':rs(e.valor))+'</div>';
+          })())
+      +'</div>'
+      +(!e._manual
+        ? ((e.forma2&&num(e.valor2))
+            ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
+              +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
+              +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:#F0FDF4;color:#16A34A">'+e.forma2+'</span></div>'
+              +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+rs(e.valor2)+'</div></div>'
+            : '')
+        : ((e.forma2||num(e.valor2)>0||e._dois)
+          ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
+            +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
+            +'<div>'+selForma(e.forma2,"edEnt("+i+",'forma2',this.value)",'e_'+i+'_forma2')+'</div>'
+            +'<div>'+inpN(e.valor2,"edEnt("+i+",'valor2',this.value)",'e_'+i+'_valor2')+'</div></div>'
+          : '<button onclick="tgEnt2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma de pagamento</button>'))
       +'</div>').join('');
   totFech();
 }
