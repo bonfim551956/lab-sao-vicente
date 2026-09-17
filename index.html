@@ -407,6 +407,7 @@ textarea {
         <button id="btn-urg" onclick="tgFiltro('urg')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid var(--re);background:none;color:var(--re);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Urgentes</button>
         <button id="btn-gar" onclick="tgFiltro('gar')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid #F59A2A;background:none;color:#F59A2A;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Garantias</button>
         <button id="btn-vnd" onclick="tgFiltro('vnd')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid var(--v);background:none;color:var(--v);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Vendas</button>
+        <button id="btn-ord" onclick="tgOrdem()" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid var(--bo);background:none;color:var(--mu);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Mais antigos</button>
         <button id="btn-lbp" onclick="tgFiltro('lbp')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid #0D7A75;background:none;color:#0D7A75;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Lab Próprio</button>
         <button id="btn-lbc" onclick="tgFiltro('lbc')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid #1D4ED8;background:none;color:#1D4ED8;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Lab Parceiro</button>
         <button id="btn-sld" onclick="tgFiltro('sld')" style="font-size:12px;padding:6px 14px;border-radius:9px;border:1.5px solid #D97706;background:none;color:#B45309;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap">Saldo</button>
@@ -1508,6 +1509,7 @@ async function doLogin(){
   let aba=localStorage.getItem('idealize_tab')||'k';
   const btnAba=document.getElementById('t-'+aba);
   if(!btnAba||btnAba.style.display==='none')aba='k';
+  pintarBotaoOrdem();
   sw(aba);
   loadData(true);
 }
@@ -2677,6 +2679,36 @@ function blocoOculos(c,s){
 }
 
 // ── BUSCA ─────────────────────────────────────────
+// Ordem dos cards dentro de cada coluna.
+// 'normal'  = mais recentes primeiro (como sempre foi)
+// 'antigos' = quem está há mais tempo PARADO NAQUELA COLUNA vem primeiro.
+//             Usa c.ts, que é a hora em que o card entrou na coluna atual —
+//             e não a data de criação da OS.
+let ordemKan=localStorage.getItem('idealize_ordem')||'normal';
+
+function tgOrdem(){
+  ordemKan=(ordemKan==='antigos')?'normal':'antigos';
+  try{localStorage.setItem('idealize_ordem',ordemKan);}catch(e){}
+  pintarBotaoOrdem();
+  rnKan();
+}
+function pintarBotaoOrdem(){
+  const b=document.getElementById('btn-ord');
+  if(!b)return;
+  const on=ordemKan==='antigos';
+  b.textContent=on?'Mais antigos ↓':'Mais antigos';
+  b.style.cssText='font-size:12px;padding:6px 14px;border-radius:9px;cursor:pointer;'
+    +'font-family:inherit;font-weight:'+(on?'700':'500')+';white-space:nowrap;'
+    +(on?'border:1.5px solid #0F1923;background:#0F1923;color:#fff'
+        :'border:1.5px solid var(--bo);background:none;color:var(--mu)');
+}
+
+function ordenarColuna(lista){
+  if(ordemKan!=='antigos')return lista;
+  // menor ts = entrou na coluna há mais tempo = aparece primeiro
+  return lista.slice().sort((a,b)=>(a.ts||a.tsCreated||0)-(b.ts||b.tsCreated||0));
+}
+
 function tgFiltro(tipo){
   filtroAtivo=filtroAtivo===tipo?'':tipo;
   filtroUrg=filtroAtivo==='urg';
@@ -4114,7 +4146,7 @@ function rnKan(){
     if(ci===5)return; // Entregue vai para Histórico
     const cs=R.se.includes(ci);
     const col=document.createElement('div');col.className='co'+(ci===5?' co-en':'')+(!cs?' co-lk':'');
-    const cc=ST.cards.filter(c=>c.col===ci);t+=cc.length;
+    const cc=ordenarColuna(ST.cards.filter(c=>c.col===ci));t+=cc.length;
     cc.forEach(c=>{const h=el(c.ts);if(h>=48&&ci!==5)al++;if(ci===5)en++;});
     const lk=!cs?'<span style="font-size:12px;opacity:.5">🔒</span>':'';
     col.innerHTML=`<div class="ch"><span class="cn">${name}</span><div style="display:flex;align-items:center;gap:5px">${lk}<span class="cc">${cc.length}</span></div></div>`;
