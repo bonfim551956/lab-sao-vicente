@@ -1499,12 +1499,7 @@ async function doLogin(){
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
   const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
-  document.getElementById('t-e').style.display=(R&&R.es)?'block':'none';
-  document.getElementById('t-fc').style.display=(R&&R.ed)?'block':'none';
-  document.getElementById('t-pj').style.display=(R&&R.ed)?'block':'none';
-  document.getElementById('t-sd').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-  document.getElementById('t-cr').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-  document.getElementById('t-ig').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
+  aplicarAbas();
   // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
   let aba=localStorage.getItem('idealize_tab')||'k';
   const btnAba=document.getElementById('t-'+aba);
@@ -1513,8 +1508,27 @@ async function doLogin(){
   sw(aba);
   loadData(true);
 }
+// Mostra e esconde as abas conforme o perfil. Chamada no login, na sessão
+// restaurada e no logout -- assim nunca sobra aba do usuário anterior.
+function aplicarAbas(){
+  const mostra=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?'block':'none';};
+  if(!U||!R){
+    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us'].forEach(id=>mostra(id,false));
+    return;
+  }
+  const fin=!!(R.ed||R.r==='posvendas');
+  mostra('t-e',  !!R.es);
+  mostra('t-fc', !!R.ed);
+  mostra('t-pj', !!R.ed);
+  mostra('t-sd', fin);
+  mostra('t-cr', fin);
+  mostra('t-ig', fin);
+  mostra('t-us', U.r==='supervisor');
+}
+
 function doLogout(){
   U=null;R=null;_ultimoTs=0;_sincronizando=false;ST.cards=[];ST.estoque={};
+  aplicarAbas();
   localStorage.removeItem('idealize_session');
   document.getElementById('as').style.display='none';
   document.getElementById('ls').style.display='flex';
@@ -4785,14 +4799,7 @@ document.addEventListener('keydown',e=>{
     const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
     const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
     const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
-    document.getElementById('t-e').style.display=(R&&R.es)?'block':'none';
-    document.getElementById('t-fc').style.display=(R&&R.ed)?'block':'none';
-    document.getElementById('t-pj').style.display=(R&&R.ed)?'block':'none';
-    document.getElementById('t-sd').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-    document.getElementById('t-cr').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-    document.getElementById('t-ig').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
-    const tus=document.getElementById('t-us');
-    if(tus)tus.style.display=(U.r==='supervisor')?'block':'none';
+    aplicarAbas();
     let aba=localStorage.getItem('idealize_tab')||'k';
     const btnAba=document.getElementById('t-'+aba);
     if(!btnAba||btnAba.style.display==='none')aba='k';
