@@ -381,10 +381,12 @@ textarea {
         <button class="tab" id="t-e" onclick="sw('e')" style="display:none">Estoque</button>
         <button class="tab" id="t-fc" onclick="sw('fc')" style="display:none">Fechamento</button>
         <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
+        <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
       </div>
       <div class="av" id="av"></div>
       <span class="nn" id="nn"></span>
       <span class="rb" id="nr"></span>
+      <button class="blo" style="background:none;border:1.5px solid rgba(255,255,255,.35);color:#fff" onclick="opMinhaSenha()" title="Trocar minha senha">Senha</button>
       <button class="blo" onclick="doLogout()">Sair</button>
     </div>
   </nav>
@@ -541,6 +543,26 @@ textarea {
   </div>
 
 
+
+
+  <div id="uss" class="rm" style="display:none">
+    <div class="rh">
+      <span class="rt">Usuários</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--mu);cursor:pointer">
+          <input type="checkbox" id="us-inativos" onchange="rnUsuarios()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--v)"/>
+          Mostrar inativos
+        </label>
+        <button onclick="opUsuario(null)" style="font-size:13px;font-weight:800;font-family:inherit;padding:9px 20px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--v),var(--vm));color:#fff;cursor:pointer">+ Novo usuário</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border:1px solid var(--bo);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:500">
+      A senha não fica guardada em lugar nenhum — nem eu nem você conseguimos ver a senha de alguém.
+      Se o funcionário esquecer, o caminho é definir uma nova.
+      Quem sai da empresa deve ser <b>desativado</b>, nunca apagado: assim tudo que ele fez continua no histórico.
+    </div>
+    <div class="tw"><div id="us-body"><div class="er">Carregando...</div></div></div>
+  </div>
 
   <div id="fcs" class="rm" style="display:none">
     <div class="rh">
@@ -1099,6 +1121,37 @@ textarea {
 
 <!-- Modal Entrega: valor recebido e forma de pagamento -->
 
+
+<div class="mb" id="usm" style="display:none">
+  <div class="md" style="max-width:460px">
+    <div class="mh"><span id="us-tit">Novo usuário</span><button class="mx" onclick="clsUsuario()">&#10005;</button></div>
+    <input type="hidden" id="us-id"/>
+    <div class="mf"><label>Nome completo <span style="color:var(--re)">*</span></label>
+      <input id="us-nome" placeholder="Ex: Thayna Souza"/></div>
+    <div class="mf"><label>Usuário para login <span style="color:var(--re)">*</span></label>
+      <input id="us-login" placeholder="Ex: thayna" autocomplete="off"/>
+      <div style="font-size:10px;color:var(--mu);margin-top:4px">Sem espaço nem acento. É o que a pessoa digita para entrar.</div></div>
+    <div class="mf"><label>Perfil <span style="color:var(--re)">*</span></label>
+      <select id="us-perfil"></select>
+      <div id="us-perfil-desc" style="font-size:10px;color:var(--mu);margin-top:4px"></div></div>
+    <div class="mf"><label id="us-senha-lb">Senha <span style="color:var(--re)">*</span></label>
+      <input id="us-senha" type="text" placeholder="Mínimo 6 caracteres" autocomplete="new-password"/></div>
+    <div class="mft">
+      <button class="bc" onclick="clsUsuario()">Cancelar</button>
+      <button class="bsv" onclick="svUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="mb" id="senham" style="display:none">
+  <div class="md" style="max-width:400px">
+    <div class="mh"><span>Trocar minha senha</span><button class="mx" onclick="clsMinhaSenha()">&#10005;</button></div>
+    <div class="mf"><label>Senha atual <span style="color:var(--re)">*</span></label><input id="sn-atual" type="password"/></div>
+    <div class="mf"><label>Nova senha <span style="color:var(--re)">*</span></label><input id="sn-nova" type="password" placeholder="Mínimo 6 caracteres"/></div>
+    <div class="mf"><label>Repita a nova senha <span style="color:var(--re)">*</span></label><input id="sn-nova2" type="password"/></div>
+    <div class="mft"><button class="bc" onclick="clsMinhaSenha()">Cancelar</button><button class="bsv" onclick="svMinhaSenha()">Trocar senha</button></div>
+  </div>
+</div>
 <div class="mb" id="mtm" style="display:none">
   <div class="md" style="max-width:420px">
     <div class="mh"><span id="mt-tit">Metas do ciclo</span><button class="mx" onclick="clsMetas()">&#10005;</button></div>
@@ -1157,6 +1210,26 @@ if(location.hostname.endsWith('.vercel.app')&&location.hostname!==DOMINIO_OFICIA
 const SB_URL='https://xxmrdadnchxdsfinvzsp.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4bXJkYWRuY2h4ZHNmaW52enNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MzI2NDgsImV4cCI6MjA5OTAwODY0OH0.vq3SGXJjmqJ68rcl-nplayx4L_xhy7VMtOAkbvlsep8';
 const ESTINIT={"-0.25_0.00":{"esf":-0.25,"cil":0.0,"qty":4},"-0.25_-0.25":{"esf":-0.25,"cil":-0.25,"qty":5},"-0.25_-0.50":{"esf":-0.25,"cil":-0.5,"qty":5},"-0.25_-0.75":{"esf":-0.25,"cil":-0.75,"qty":4},"-0.25_-1.00":{"esf":-0.25,"cil":-1.0,"qty":5},"-0.25_-1.25":{"esf":-0.25,"cil":-1.25,"qty":4},"-0.25_-1.50":{"esf":-0.25,"cil":-1.5,"qty":4},"-0.25_-1.75":{"esf":-0.25,"cil":-1.75,"qty":3},"-0.25_-2.00":{"esf":-0.25,"cil":-2.0,"qty":4},"-0.50_0.00":{"esf":-0.5,"cil":0.0,"qty":2},"-0.50_-0.25":{"esf":-0.5,"cil":-0.25,"qty":5},"-0.50_-0.50":{"esf":-0.5,"cil":-0.5,"qty":5},"-0.50_-0.75":{"esf":-0.5,"cil":-0.75,"qty":4},"-0.50_-1.00":{"esf":-0.5,"cil":-1.0,"qty":4},"-0.50_-1.25":{"esf":-0.5,"cil":-1.25,"qty":4},"-0.50_-1.50":{"esf":-0.5,"cil":-1.5,"qty":5},"-0.50_-1.75":{"esf":-0.5,"cil":-1.75,"qty":4},"-0.50_-2.00":{"esf":-0.5,"cil":-2.0,"qty":4},"-0.75_0.00":{"esf":-0.75,"cil":0.0,"qty":3},"-0.75_-0.25":{"esf":-0.75,"cil":-0.25,"qty":5},"-0.75_-0.50":{"esf":-0.75,"cil":-0.5,"qty":5},"-0.75_-0.75":{"esf":-0.75,"cil":-0.75,"qty":5},"-0.75_-1.00":{"esf":-0.75,"cil":-1.0,"qty":4},"-0.75_-1.25":{"esf":-0.75,"cil":-1.25,"qty":5},"-0.75_-1.50":{"esf":-0.75,"cil":-1.5,"qty":5},"-0.75_-1.75":{"esf":-0.75,"cil":-1.75,"qty":4},"-0.75_-2.00":{"esf":-0.75,"cil":-2.0,"qty":5},"-1.00_0.00":{"esf":-1.0,"cil":0.0,"qty":4},"-1.00_-0.25":{"esf":-1.0,"cil":-0.25,"qty":5},"-1.00_-0.50":{"esf":-1.0,"cil":-0.5,"qty":5},"-1.00_-0.75":{"esf":-1.0,"cil":-0.75,"qty":5},"-1.00_-1.00":{"esf":-1.0,"cil":-1.0,"qty":5},"-1.00_-1.25":{"esf":-1.0,"cil":-1.25,"qty":5},"-1.00_-1.50":{"esf":-1.0,"cil":-1.5,"qty":4},"-1.00_-1.75":{"esf":-1.0,"cil":-1.75,"qty":5},"-1.00_-2.00":{"esf":-1.0,"cil":-2.0,"qty":5},"-1.25_0.00":{"esf":-1.25,"cil":0.0,"qty":5},"-1.25_-0.25":{"esf":-1.25,"cil":-0.25,"qty":5},"-1.25_-0.50":{"esf":-1.25,"cil":-0.5,"qty":5},"-1.25_-0.75":{"esf":-1.25,"cil":-0.75,"qty":4},"-1.25_-1.00":{"esf":-1.25,"cil":-1.0,"qty":5},"-1.25_-1.25":{"esf":-1.25,"cil":-1.25,"qty":4},"-1.25_-1.50":{"esf":-1.25,"cil":-1.5,"qty":5},"-1.25_-1.75":{"esf":-1.25,"cil":-1.75,"qty":4},"-1.25_-2.00":{"esf":-1.25,"cil":-2.0,"qty":5},"-1.50_0.00":{"esf":-1.5,"cil":0.0,"qty":4},"-1.50_-0.25":{"esf":-1.5,"cil":-0.25,"qty":6},"-1.50_-0.50":{"esf":-1.5,"cil":-0.5,"qty":5},"-1.50_-0.75":{"esf":-1.5,"cil":-0.75,"qty":4},"-1.50_-1.00":{"esf":-1.5,"cil":-1.0,"qty":4},"-1.50_-1.25":{"esf":-1.5,"cil":-1.25,"qty":5},"-1.50_-1.50":{"esf":-1.5,"cil":-1.5,"qty":5},"-1.50_-1.75":{"esf":-1.5,"cil":-1.75,"qty":5},"-1.50_-2.00":{"esf":-1.5,"cil":-2.0,"qty":5},"-1.75_0.00":{"esf":-1.75,"cil":0.0,"qty":4},"-1.75_-0.25":{"esf":-1.75,"cil":-0.25,"qty":5},"-1.75_-0.50":{"esf":-1.75,"cil":-0.5,"qty":4},"-1.75_-0.75":{"esf":-1.75,"cil":-0.75,"qty":5},"-1.75_-1.00":{"esf":-1.75,"cil":-1.0,"qty":5},"-1.75_-1.25":{"esf":-1.75,"cil":-1.25,"qty":5},"-1.75_-1.50":{"esf":-1.75,"cil":-1.5,"qty":5},"-1.75_-1.75":{"esf":-1.75,"cil":-1.75,"qty":5},"-1.75_-2.00":{"esf":-1.75,"cil":-2.0,"qty":4},"-2.00_0.00":{"esf":-2.0,"cil":0.0,"qty":4},"-2.00_-0.25":{"esf":-2.0,"cil":-0.25,"qty":4},"-2.00_-0.50":{"esf":-2.0,"cil":-0.5,"qty":5},"-2.00_-0.75":{"esf":-2.0,"cil":-0.75,"qty":4},"-2.00_-1.00":{"esf":-2.0,"cil":-1.0,"qty":4},"-2.00_-1.25":{"esf":-2.0,"cil":-1.25,"qty":7},"-2.00_-1.50":{"esf":-2.0,"cil":-1.5,"qty":5},"-2.00_-1.75":{"esf":-2.0,"cil":-1.75,"qty":4},"-2.00_-2.00":{"esf":-2.0,"cil":-2.0,"qty":5},"-2.25_0.00":{"esf":-2.25,"cil":0.0,"qty":5},"-2.25_-0.25":{"esf":-2.25,"cil":-0.25,"qty":4},"-2.25_-0.50":{"esf":-2.25,"cil":-0.5,"qty":4},"-2.25_-0.75":{"esf":-2.25,"cil":-0.75,"qty":4},"-2.25_-1.00":{"esf":-2.25,"cil":-1.0,"qty":5},"-2.25_-1.25":{"esf":-2.25,"cil":-1.25,"qty":5},"-2.25_-1.50":{"esf":-2.25,"cil":-1.5,"qty":5},"-2.25_-1.75":{"esf":-2.25,"cil":-1.75,"qty":5},"-2.25_-2.00":{"esf":-2.25,"cil":-2.0,"qty":5},"-2.50_0.00":{"esf":-2.5,"cil":0.0,"qty":5},"-2.50_-0.25":{"esf":-2.5,"cil":-0.25,"qty":4},"-2.50_-0.50":{"esf":-2.5,"cil":-0.5,"qty":5},"-2.50_-0.75":{"esf":-2.5,"cil":-0.75,"qty":5},"-2.50_-1.00":{"esf":-2.5,"cil":-1.0,"qty":5},"-2.50_-1.25":{"esf":-2.5,"cil":-1.25,"qty":5},"-2.50_-1.50":{"esf":-2.5,"cil":-1.5,"qty":5},"-2.50_-1.75":{"esf":-2.5,"cil":-1.75,"qty":5},"-2.50_-2.00":{"esf":-2.5,"cil":-2.0,"qty":4},"-2.75_0.00":{"esf":-2.75,"cil":0.0,"qty":5},"-2.75_-0.25":{"esf":-2.75,"cil":-0.25,"qty":4},"-2.75_-0.50":{"esf":-2.75,"cil":-0.5,"qty":5},"-2.75_-0.75":{"esf":-2.75,"cil":-0.75,"qty":4},"-2.75_-1.00":{"esf":-2.75,"cil":-1.0,"qty":5},"-2.75_-1.25":{"esf":-2.75,"cil":-1.25,"qty":4},"-2.75_-1.50":{"esf":-2.75,"cil":-1.5,"qty":4},"-2.75_-1.75":{"esf":-2.75,"cil":-1.75,"qty":4},"-2.75_-2.00":{"esf":-2.75,"cil":-2.0,"qty":4},"-3.00_0.00":{"esf":-3.0,"cil":0.0,"qty":4},"-3.00_-0.25":{"esf":-3.0,"cil":-0.25,"qty":5},"-3.00_-0.50":{"esf":-3.0,"cil":-0.5,"qty":5},"-3.00_-0.75":{"esf":-3.0,"cil":-0.75,"qty":5},"-3.00_-1.00":{"esf":-3.0,"cil":-1.0,"qty":4},"-3.00_-1.25":{"esf":-3.0,"cil":-1.25,"qty":7},"-3.00_-1.50":{"esf":-3.0,"cil":-1.5,"qty":5},"-3.00_-1.75":{"esf":-3.0,"cil":-1.75,"qty":5},"-3.00_-2.00":{"esf":-3.0,"cil":-2.0,"qty":4},"-3.25_0.00":{"esf":-3.25,"cil":0.0,"qty":5},"-3.25_-0.25":{"esf":-3.25,"cil":-0.25,"qty":7},"-3.25_-0.50":{"esf":-3.25,"cil":-0.5,"qty":5},"-3.25_-0.75":{"esf":-3.25,"cil":-0.75,"qty":5},"-3.25_-1.00":{"esf":-3.25,"cil":-1.0,"qty":5},"-3.25_-1.25":{"esf":-3.25,"cil":-1.25,"qty":4},"-3.25_-1.50":{"esf":-3.25,"cil":-1.5,"qty":4},"-3.25_-1.75":{"esf":-3.25,"cil":-1.75,"qty":4},"-3.25_-2.00":{"esf":-3.25,"cil":-2.0,"qty":5},"-3.50_0.00":{"esf":-3.5,"cil":0.0,"qty":5},"-3.50_-0.25":{"esf":-3.5,"cil":-0.25,"qty":4},"-3.50_-0.50":{"esf":-3.5,"cil":-0.5,"qty":4},"-3.50_-0.75":{"esf":-3.5,"cil":-0.75,"qty":5},"-3.50_-1.00":{"esf":-3.5,"cil":-1.0,"qty":5},"-3.50_-1.25":{"esf":-3.5,"cil":-1.25,"qty":5},"-3.50_-1.50":{"esf":-3.5,"cil":-1.5,"qty":5},"-3.50_-1.75":{"esf":-3.5,"cil":-1.75,"qty":5},"-3.50_-2.00":{"esf":-3.5,"cil":-2.0,"qty":5},"-3.75_0.00":{"esf":-3.75,"cil":0.0,"qty":5},"-3.75_-0.25":{"esf":-3.75,"cil":-0.25,"qty":6},"-3.75_-0.50":{"esf":-3.75,"cil":-0.5,"qty":5},"-3.75_-0.75":{"esf":-3.75,"cil":-0.75,"qty":5},"-3.75_-1.00":{"esf":-3.75,"cil":-1.0,"qty":4},"-3.75_-1.25":{"esf":-3.75,"cil":-1.25,"qty":5},"-3.75_-1.50":{"esf":-3.75,"cil":-1.5,"qty":5},"-3.75_-1.75":{"esf":-3.75,"cil":-1.75,"qty":5},"-3.75_-2.00":{"esf":-3.75,"cil":-2.0,"qty":4},"-4.00_0.00":{"esf":-4.0,"cil":0.0,"qty":5},"-4.00_-0.25":{"esf":-4.0,"cil":-0.25,"qty":5},"-4.00_-0.50":{"esf":-4.0,"cil":-0.5,"qty":5},"-4.00_-0.75":{"esf":-4.0,"cil":-0.75,"qty":4},"-4.00_-1.00":{"esf":-4.0,"cil":-1.0,"qty":4},"-4.00_-1.25":{"esf":-4.0,"cil":-1.25,"qty":4},"-4.00_-1.50":{"esf":-4.0,"cil":-1.5,"qty":5},"-4.00_-1.75":{"esf":-4.0,"cil":-1.75,"qty":5},"-4.00_-2.00":{"esf":-4.0,"cil":-2.0,"qty":5},"0.00_0.00":{"esf":0.0,"cil":0.0,"qty":5},"0.00_-0.25":{"esf":0.0,"cil":-0.25,"qty":4},"0.00_-0.50":{"esf":0.0,"cil":-0.5,"qty":3},"0.00_-0.75":{"esf":0.0,"cil":-0.75,"qty":3},"0.00_-1.00":{"esf":0.0,"cil":-1.0,"qty":0},"0.00_-1.25":{"esf":0.0,"cil":-1.25,"qty":3},"0.00_-1.50":{"esf":0.0,"cil":-1.5,"qty":4},"0.00_-1.75":{"esf":0.0,"cil":-1.75,"qty":5},"0.00_-2.00":{"esf":0.0,"cil":-2.0,"qty":5},"0.25_0.00":{"esf":0.25,"cil":0.0,"qty":4},"0.25_-0.25":{"esf":0.25,"cil":-0.25,"qty":5},"0.25_-0.50":{"esf":0.25,"cil":-0.5,"qty":4},"0.25_-0.75":{"esf":0.25,"cil":-0.75,"qty":5},"0.25_-1.00":{"esf":0.25,"cil":-1.0,"qty":4},"0.25_-1.25":{"esf":0.25,"cil":-1.25,"qty":5},"0.25_-1.50":{"esf":0.25,"cil":-1.5,"qty":5},"0.25_-1.75":{"esf":0.25,"cil":-1.75,"qty":6},"0.25_-2.00":{"esf":0.25,"cil":-2.0,"qty":5},"0.50_0.00":{"esf":0.5,"cil":0.0,"qty":5},"0.50_-0.25":{"esf":0.5,"cil":-0.25,"qty":4},"0.50_-0.50":{"esf":0.5,"cil":-0.5,"qty":5},"0.50_-0.75":{"esf":0.5,"cil":-0.75,"qty":5},"0.50_-1.00":{"esf":0.5,"cil":-1.0,"qty":4},"0.50_-1.25":{"esf":0.5,"cil":-1.25,"qty":5},"0.50_-1.50":{"esf":0.5,"cil":-1.5,"qty":5},"0.50_-1.75":{"esf":0.5,"cil":-1.75,"qty":4},"0.50_-2.00":{"esf":0.5,"cil":-2.0,"qty":4},"0.75_0.00":{"esf":0.75,"cil":0.0,"qty":5},"0.75_-0.25":{"esf":0.75,"cil":-0.25,"qty":3},"0.75_-0.50":{"esf":0.75,"cil":-0.5,"qty":5},"0.75_-0.75":{"esf":0.75,"cil":-0.75,"qty":4},"0.75_-1.00":{"esf":0.75,"cil":-1.0,"qty":5},"0.75_-1.25":{"esf":0.75,"cil":-1.25,"qty":5},"0.75_-1.50":{"esf":0.75,"cil":-1.5,"qty":4},"0.75_-1.75":{"esf":0.75,"cil":-1.75,"qty":5},"0.75_-2.00":{"esf":0.75,"cil":-2.0,"qty":4},"1.00_0.00":{"esf":1.0,"cil":0.0,"qty":4},"1.00_-0.25":{"esf":1.0,"cil":-0.25,"qty":5},"1.00_-0.50":{"esf":1.0,"cil":-0.5,"qty":5},"1.00_-0.75":{"esf":1.0,"cil":-0.75,"qty":5},"1.00_-1.00":{"esf":1.0,"cil":-1.0,"qty":4},"1.00_-1.25":{"esf":1.0,"cil":-1.25,"qty":4},"1.00_-1.50":{"esf":1.0,"cil":-1.5,"qty":5},"1.00_-1.75":{"esf":1.0,"cil":-1.75,"qty":4},"1.00_-2.00":{"esf":1.0,"cil":-2.0,"qty":5},"1.25_0.00":{"esf":1.25,"cil":0.0,"qty":2},"1.25_-0.25":{"esf":1.25,"cil":-0.25,"qty":5},"1.25_-0.50":{"esf":1.25,"cil":-0.5,"qty":4},"1.25_-0.75":{"esf":1.25,"cil":-0.75,"qty":4},"1.25_-1.00":{"esf":1.25,"cil":-1.0,"qty":5},"1.25_-1.25":{"esf":1.25,"cil":-1.25,"qty":5},"1.25_-1.50":{"esf":1.25,"cil":-1.5,"qty":5},"1.25_-1.75":{"esf":1.25,"cil":-1.75,"qty":4},"1.25_-2.00":{"esf":1.25,"cil":-2.0,"qty":5},"1.50_0.00":{"esf":1.5,"cil":0.0,"qty":4},"1.50_-0.25":{"esf":1.5,"cil":-0.25,"qty":3},"1.50_-0.50":{"esf":1.5,"cil":-0.5,"qty":5},"1.50_-0.75":{"esf":1.5,"cil":-0.75,"qty":5},"1.50_-1.00":{"esf":1.5,"cil":-1.0,"qty":4},"1.50_-1.25":{"esf":1.5,"cil":-1.25,"qty":3},"1.50_-1.50":{"esf":1.5,"cil":-1.5,"qty":4},"1.50_-1.75":{"esf":1.5,"cil":-1.75,"qty":5},"1.50_-2.00":{"esf":1.5,"cil":-2.0,"qty":4},"1.75_0.00":{"esf":1.75,"cil":0.0,"qty":0},"1.75_-0.25":{"esf":1.75,"cil":-0.25,"qty":4},"1.75_-0.50":{"esf":1.75,"cil":-0.5,"qty":3},"1.75_-0.75":{"esf":1.75,"cil":-0.75,"qty":4},"1.75_-1.00":{"esf":1.75,"cil":-1.0,"qty":5},"1.75_-1.25":{"esf":1.75,"cil":-1.25,"qty":5},"1.75_-1.50":{"esf":1.75,"cil":-1.5,"qty":5},"1.75_-1.75":{"esf":1.75,"cil":-1.75,"qty":5},"1.75_-2.00":{"esf":1.75,"cil":-2.0,"qty":4},"2.00_0.00":{"esf":2.0,"cil":0.0,"qty":4},"2.00_-0.25":{"esf":2.0,"cil":-0.25,"qty":5},"2.00_-0.50":{"esf":2.0,"cil":-0.5,"qty":5},"2.00_-0.75":{"esf":2.0,"cil":-0.75,"qty":5},"2.00_-1.00":{"esf":2.0,"cil":-1.0,"qty":4},"2.00_-1.25":{"esf":2.0,"cil":-1.25,"qty":4},"2.00_-1.50":{"esf":2.0,"cil":-1.5,"qty":5},"2.00_-1.75":{"esf":2.0,"cil":-1.75,"qty":5},"2.00_-2.00":{"esf":2.0,"cil":-2.0,"qty":5},"2.25_0.00":{"esf":2.25,"cil":0.0,"qty":5},"2.25_-0.25":{"esf":2.25,"cil":-0.25,"qty":4},"2.25_-0.50":{"esf":2.25,"cil":-0.5,"qty":5},"2.25_-0.75":{"esf":2.25,"cil":-0.75,"qty":5},"2.25_-1.00":{"esf":2.25,"cil":-1.0,"qty":5},"2.25_-1.25":{"esf":2.25,"cil":-1.25,"qty":4},"2.25_-1.50":{"esf":2.25,"cil":-1.5,"qty":3},"2.25_-1.75":{"esf":2.25,"cil":-1.75,"qty":4},"2.25_-2.00":{"esf":2.25,"cil":-2.0,"qty":5},"2.50_0.00":{"esf":2.5,"cil":0.0,"qty":5},"2.50_-0.25":{"esf":2.5,"cil":-0.25,"qty":4},"2.50_-0.50":{"esf":2.5,"cil":-0.5,"qty":5},"2.50_-0.75":{"esf":2.5,"cil":-0.75,"qty":4},"2.50_-1.00":{"esf":2.5,"cil":-1.0,"qty":5},"2.50_-1.25":{"esf":2.5,"cil":-1.25,"qty":5},"2.50_-1.50":{"esf":2.5,"cil":-1.5,"qty":4},"2.50_-1.75":{"esf":2.5,"cil":-1.75,"qty":5},"2.50_-2.00":{"esf":2.5,"cil":-2.0,"qty":4},"2.75_0.00":{"esf":2.75,"cil":0.0,"qty":3},"2.75_-0.25":{"esf":2.75,"cil":-0.25,"qty":6},"2.75_-0.50":{"esf":2.75,"cil":-0.5,"qty":5},"2.75_-0.75":{"esf":2.75,"cil":-0.75,"qty":4},"2.75_-1.00":{"esf":2.75,"cil":-1.0,"qty":4},"2.75_-1.25":{"esf":2.75,"cil":-1.25,"qty":4},"2.75_-1.50":{"esf":2.75,"cil":-1.5,"qty":4},"2.75_-1.75":{"esf":2.75,"cil":-1.75,"qty":5},"2.75_-2.00":{"esf":2.75,"cil":-2.0,"qty":5},"3.00_0.00":{"esf":3.0,"cil":0.0,"qty":3},"3.00_-0.25":{"esf":3.0,"cil":-0.25,"qty":4},"3.00_-0.50":{"esf":3.0,"cil":-0.5,"qty":5},"3.00_-0.75":{"esf":3.0,"cil":-0.75,"qty":4},"3.00_-1.00":{"esf":3.0,"cil":-1.0,"qty":5},"3.00_-1.25":{"esf":3.0,"cil":-1.25,"qty":5},"3.00_-1.50":{"esf":3.0,"cil":-1.5,"qty":5},"3.00_-1.75":{"esf":3.0,"cil":-1.75,"qty":5},"3.00_-2.00":{"esf":3.0,"cil":-2.0,"qty":5},"3.25_0.00":{"esf":3.25,"cil":0.0,"qty":5},"3.25_-0.25":{"esf":3.25,"cil":-0.25,"qty":5},"3.25_-0.50":{"esf":3.25,"cil":-0.5,"qty":4},"3.25_-0.75":{"esf":3.25,"cil":-0.75,"qty":4},"3.25_-1.00":{"esf":3.25,"cil":-1.0,"qty":5},"3.25_-1.25":{"esf":3.25,"cil":-1.25,"qty":5},"3.25_-1.50":{"esf":3.25,"cil":-1.5,"qty":4},"3.25_-1.75":{"esf":3.25,"cil":-1.75,"qty":4},"3.25_-2.00":{"esf":3.25,"cil":-2.0,"qty":5},"3.50_0.00":{"esf":3.5,"cil":0.0,"qty":4},"3.50_-0.25":{"esf":3.5,"cil":-0.25,"qty":5},"3.50_-0.50":{"esf":3.5,"cil":-0.5,"qty":5},"3.50_-0.75":{"esf":3.5,"cil":-0.75,"qty":5},"3.50_-1.00":{"esf":3.5,"cil":-1.0,"qty":5},"3.50_-1.25":{"esf":3.5,"cil":-1.25,"qty":4},"3.50_-1.50":{"esf":3.5,"cil":-1.5,"qty":5},"3.50_-1.75":{"esf":3.5,"cil":-1.75,"qty":4},"3.50_-2.00":{"esf":3.5,"cil":-2.0,"qty":6},"3.75_0.00":{"esf":3.75,"cil":0.0,"qty":5},"3.75_-0.25":{"esf":3.75,"cil":-0.25,"qty":5},"3.75_-0.50":{"esf":3.75,"cil":-0.5,"qty":5},"3.75_-0.75":{"esf":3.75,"cil":-0.75,"qty":4},"3.75_-1.00":{"esf":3.75,"cil":-1.0,"qty":5},"3.75_-1.25":{"esf":3.75,"cil":-1.25,"qty":4},"3.75_-1.50":{"esf":3.75,"cil":-1.5,"qty":5},"3.75_-1.75":{"esf":3.75,"cil":-1.75,"qty":5},"3.75_-2.00":{"esf":3.75,"cil":-2.0,"qty":6},"4.00_0.00":{"esf":4.0,"cil":0.0,"qty":6},"4.00_-0.25":{"esf":4.0,"cil":-0.25,"qty":5},"4.00_-0.50":{"esf":4.0,"cil":-0.5,"qty":5},"4.00_-0.75":{"esf":4.0,"cil":-0.75,"qty":5},"4.00_-1.00":{"esf":4.0,"cil":-1.0,"qty":5},"4.00_-1.25":{"esf":4.0,"cil":-1.25,"qty":5},"4.00_-1.50":{"esf":4.0,"cil":-1.5,"qty":4},"4.00_-1.75":{"esf":4.0,"cil":-1.75,"qty":7},"4.00_-2.00":{"esf":4.0,"cil":-2.0,"qty":5}};
+
+// Unidade deste arquivo. O gerador das lojas troca junto com o resto.
+const UNIDADE='saovicente';
+
+// ── SENHAS ──────────────────────────────────────────────────────────────────
+// A senha nunca é guardada. O que vai para o banco é um hash PBKDF2-SHA256
+// com 150.000 repetições e um sal aleatório por usuário. Do hash não se
+// volta para a senha — nem lendo a tabela inteira.
+const PBKDF2_ITER=150000;
+function hex(b){return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+function deHex(s){const a=new Uint8Array(s.length/2);for(let i=0;i<a.length;i++)a[i]=parseInt(s.substr(i*2,2),16);return a;}
+function novoSal(){return hex(crypto.getRandomValues(new Uint8Array(16)));}
+async function hashSenha(senha,sal){
+  const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:deHex(sal),iterations:PBKDF2_ITER,hash:'SHA-256'},k,256);
+  return hex(bits);
+}
+async function conferirSenha(senha,sal,guardado){
+  try{return (await hashSenha(senha,sal))===guardado;}catch(e){return false;}
+}
 
 const US=[
   {u:'diego',p:'idealize2025#@!',n:'Diego',r:'supervisor',un:'saovicente'},
@@ -1377,18 +1450,47 @@ async function saveEstoque(){}
 document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('lu').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lp').focus();});
 
-function doLogin(){
+// O login consulta a tabela "usuarios". Enquanto a loja não tiver ninguém
+// cadastrado lá, vale a lista do código -- é o que permite virar sem deixar
+// ninguém de fora. Criado o primeiro usuário no banco, a lista para de valer.
+function erroLogin(msg){
+  ['lu','lp'].forEach(id=>document.getElementById(id).classList.add('err'));
+  const em=document.getElementById('em');
+  if(em){em.textContent=msg||'Usuário ou senha incorretos';em.classList.add('show');}
+  const c=document.getElementById('lc');c.classList.add('sk');setTimeout(()=>c.classList.remove('sk'),400);
+}
+
+async function doLogin(){
   const u=document.getElementById('lu').value.trim().toLowerCase();
   const p=document.getElementById('lp').value;
-  const f=US.find(x=>x.u===u&&x.p===p);
-  if(!f){
-    ['lu','lp'].forEach(id=>document.getElementById(id).classList.add('err'));
-    document.getElementById('em').classList.add('show');
-    const c=document.getElementById('lc');c.classList.add('sk');setTimeout(()=>c.classList.remove('sk'),400);
-    return;
+  if(!u||!p){erroLogin('Preencha usuário e senha');return;}
+  ['lu','lp'].forEach(id=>document.getElementById(id).classList.remove('err'));
+  const em=document.getElementById('em');if(em)em.classList.remove('show');
+
+  let f=null, temBanco=false;
+  try{
+    const cad=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&select=id&limit=1');
+    temBanco=!!(cad&&cad.length);
+    const linhas=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&usuario=eq.'+encodeURIComponent(u));
+    const reg=linhas&&linhas[0];
+    if(reg){
+      if(!reg.ativo){erroLogin('Usuário inativo. Fale com o supervisor.');return;}
+      if(await conferirSenha(p,reg.salt,reg.senha_hash)){
+        f={u:reg.usuario,n:reg.nome,r:reg.perfil,un:reg.unidade,id:reg.id,tk:reg.senha_hash};
+        sbPatch('usuarios',{ultimo_acesso:new Date().toISOString()},{id:reg.id}).catch(()=>{});
+      }
+    }
+  }catch(e){ /* banco indisponível: cai na lista do código */ }
+
+  if(!f&&!temBanco){
+    const c=US.find(x=>x.u===u&&x.p===p);
+    if(c)f={u:c.u,n:c.n,r:c.r,un:c.un,id:null,tk:null};
   }
+  if(!f){erroLogin('Usuário ou senha incorretos');return;}
+
   U=f;R=RS[U.r];
-  localStorage.setItem('idealize_session',JSON.stringify({u:U.u,p:U.p}));
+  // guarda um comprovante do login, nunca a senha
+  try{localStorage.setItem('idealize_session',JSON.stringify({u:U.u,tk:U.tk||null,r:U.r,n:U.n,un:U.un,id:U.id||null}));}catch(e){}
   document.getElementById('ls').style.display='none';
   document.getElementById('as').style.display='flex';
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
@@ -1421,14 +1523,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',pj:'pjs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',pj:'pjs',us:'uss',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','pj'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','pj','us'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -1445,6 +1547,7 @@ function sw(tab){
   if(tab==='pz')rnPrazos();
   if(tab==='fc')rnFech();
   if(tab==='pj')rnProj();
+  if(tab==='us')rnUsuarios();
   if(tab==='sd')rnSaldos();
   if(tab==='cr')rnCr();
   if(tab==='ig')rnIG();
@@ -1607,6 +1710,152 @@ async function svReneg(){
     setSy('ok','Contrato renegociado — '+horaAgora());
   }catch(e){alert('Erro ao renegociar: '+e.message);}
   finally{if(btn){btn.textContent='Confirmar renegociação';btn.disabled=false;}}
+}
+
+
+// ── USUÁRIOS ────────────────────────────────────────────────────────────────
+// Só o supervisor entra aqui. Ninguém é apagado: quem sai da empresa é
+// desativado, e assim o histórico do que fez continua íntegro.
+let usLista=[];
+
+const PERFIS_DESC={
+  supervisor:'Acesso total, inclusive esta tela.',
+  gerente:'Cria OS, movimenta Pedido e Avisado, vê os financeiros.',
+  adm:'Cria OS, movimenta Pedido e Avisado, vê os financeiros.',
+  montagem:'Só Ag. montagem e Em montagem. Não vê financeiro.',
+  posvendas:'Só visualização dos serviços, do crediário e dos saldos.'
+};
+
+async function rnUsuarios(){
+  const body=document.getElementById('us-body');
+  const verInativos=document.getElementById('us-inativos').checked;
+  try{
+    usLista=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&order=ativo.desc,nome.asc')||[];
+  }catch(e){body.innerHTML='<div class="er">Erro ao buscar: '+e.message+'</div>';return;}
+
+  const lista=usLista.filter(u=>verInativos||u.ativo);
+  if(!lista.length){
+    body.innerHTML='<div class="er" style="padding:2rem">Nenhum usuário cadastrado nesta loja.<br>'
+      +'<span style="font-size:11px">Enquanto não houver nenhum, o login usa a lista antiga do sistema.</span></div>';
+    return;
+  }
+  const fmt=t=>t?new Date(t).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  body.innerHTML=`<table><thead><tr>
+      <th>Nome</th><th>Usuário</th><th>Perfil</th><th>Último acesso</th><th>Situação</th><th>Ações</th>
+    </tr></thead><tbody>${lista.map(u=>`<tr${u.ativo?'':' style="background:#FAFAF8;opacity:.7"'}>
+      <td style="font-weight:700">${u.nome}${u.usuario===(U&&U.u)?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:var(--vl);color:var(--v);font-weight:800">VOCÊ</span>':''}</td>
+      <td style="color:var(--mu)">${u.usuario}</td>
+      <td><span class="rb ${(RS[u.perfil]||{}).c||''}" style="font-size:10px">${(RS[u.perfil]||{}).l||u.perfil}</span></td>
+      <td style="color:var(--mu);font-size:11px;white-space:nowrap">${fmt(u.ultimo_acesso)}</td>
+      <td>${u.ativo
+        ?'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;background:#F0FDF4;color:#16A34A">ATIVO</span>'
+        :'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;background:#FEF2F2;color:#B91C1C">INATIVO</span>'
+         +'<div style="font-size:9px;color:var(--mu);margin-top:2px">'+fmt(u.desativado_em)+'</div>'}</td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="bex" onclick="opUsuario('${u.id}')">Editar</button>
+        ${u.ativo
+          ? (u.usuario===(U&&U.u) ? '' : '<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="tgAtivo(\''+u.id+'\',false)">Desativar</button>')
+          : '<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="tgAtivo(\''+u.id+'\',true)">Reativar</button>'}
+      </div></td></tr>`).join('')}</tbody></table>`;
+}
+
+function opUsuario(id){
+  const u=id?usLista.find(x=>x.id===id):null;
+  document.getElementById('us-tit').textContent=u?('Editar — '+u.nome):'Novo usuário';
+  document.getElementById('us-id').value=id||'';
+  document.getElementById('us-nome').value=u?u.nome:'';
+  document.getElementById('us-login').value=u?u.usuario:'';
+  const sel=document.getElementById('us-perfil');
+  sel.innerHTML=Object.keys(RS).map(p=>'<option value="'+p+'">'+RS[p].l+'</option>').join('');
+  sel.value=u?u.perfil:'montagem';
+  sel.onchange=()=>{document.getElementById('us-perfil-desc').textContent=PERFIS_DESC[sel.value]||'';};
+  sel.onchange();
+  document.getElementById('us-senha').value='';
+  document.getElementById('us-senha-lb').innerHTML=u
+    ? 'Nova senha <span style="color:var(--mu);font-weight:400">(deixe vazio para manter a atual)</span>'
+    : 'Senha <span style="color:var(--re)">*</span>';
+  document.getElementById('us-login').disabled=!!u;   // o login não muda depois de criado
+  document.getElementById('usm').style.display='flex';
+}
+function clsUsuario(){document.getElementById('usm').style.display='none';}
+
+async function svUsuario(){
+  const id=document.getElementById('us-id').value;
+  const nome=UP(document.getElementById('us-nome').value.trim());
+  const login=document.getElementById('us-login').value.trim().toLowerCase();
+  const perfil=document.getElementById('us-perfil').value;
+  const senha=document.getElementById('us-senha').value;
+
+  if(!nome){alert('Preencha o nome.');return;}
+  if(!/^[a-z0-9._-]{3,}$/.test(login)){alert('O usuário deve ter ao menos 3 caracteres, sem espaço nem acento.');return;}
+  if(!id&&senha.length<6){alert('A senha precisa de ao menos 6 caracteres.');return;}
+  if(id&&senha&&senha.length<6){alert('A senha precisa de ao menos 6 caracteres.');return;}
+  if(!id&&usLista.some(u=>u.usuario===login)){alert('Já existe um usuário "'+login+'" nesta loja.');return;}
+
+  const btn=document.querySelector('#usm .bsv');
+  if(btn){btn.textContent='Salvando...';btn.disabled=true;}
+  try{
+    if(id){
+      const dados={nome,perfil};
+      if(senha){const sal=novoSal();dados.salt=sal;dados.senha_hash=await hashSenha(senha,sal);}
+      await sbPatch('usuarios',dados,{id});
+    }else{
+      const sal=novoSal();
+      await sbUpsert('usuarios',{
+        id:'usr_'+UNIDADE+'_'+login, unidade:UNIDADE, usuario:login, nome, perfil,
+        salt:sal, senha_hash:await hashSenha(senha,sal),
+        ativo:true, criado_por:U.n, criado_em:new Date().toISOString()});
+    }
+    clsUsuario();await rnUsuarios();
+    setSy('ok','Usuário salvo — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+  finally{if(btn){btn.textContent='Salvar';btn.disabled=false;}}
+}
+
+async function tgAtivo(id,ativar){
+  const u=usLista.find(x=>x.id===id);if(!u)return;
+  if(!ativar&&!confirm('Desativar '+u.nome+'?\n\nEle perde o acesso na hora, mas continua no histórico '
+    +'de tudo que já fez. Dá para reativar depois.'))return;
+  try{
+    await sbPatch('usuarios', ativar
+      ? {ativo:true, desativado_em:null, desativado_por:null}
+      : {ativo:false, desativado_em:new Date().toISOString(), desativado_por:U.n}, {id});
+    await rnUsuarios();
+    setSy('ok',(ativar?'Usuário reativado':'Usuário desativado')+' — '+horaAgora());
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ── TROCAR A PRÓPRIA SENHA ──────────────────────────────────────────────────
+function opMinhaSenha(){
+  if(!U||!U.id){alert('Este acesso ainda usa a lista antiga do sistema.\nPeça ao supervisor para cadastrar você na aba Usuários.');return;}
+  ['sn-atual','sn-nova','sn-nova2'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('senham').style.display='flex';
+  setTimeout(()=>document.getElementById('sn-atual').focus(),90);
+}
+function clsMinhaSenha(){document.getElementById('senham').style.display='none';}
+
+async function svMinhaSenha(){
+  const atual=document.getElementById('sn-atual').value;
+  const nova=document.getElementById('sn-nova').value;
+  const nova2=document.getElementById('sn-nova2').value;
+  if(nova.length<6){alert('A nova senha precisa de ao menos 6 caracteres.');return;}
+  if(nova!==nova2){alert('As duas senhas novas não são iguais.');return;}
+  const btn=document.querySelector('#senham .bsv');
+  if(btn){btn.textContent='Trocando...';btn.disabled=true;}
+  try{
+    const linhas=await sbGet('usuarios','id=eq.'+encodeURIComponent(U.id));
+    const reg=linhas&&linhas[0];
+    if(!reg)throw new Error('Usuário não encontrado.');
+    if(!await conferirSenha(atual,reg.salt,reg.senha_hash)){alert('A senha atual está incorreta.');return;}
+    const sal=novoSal(), h=await hashSenha(nova,sal);
+    await sbPatch('usuarios',{salt:sal,senha_hash:h},{id:U.id});
+    U.tk=h;
+    try{localStorage.setItem('idealize_session',JSON.stringify({u:U.u,tk:h,r:U.r,n:U.n,un:U.un,id:U.id}));}catch(e){}
+    clsMinhaSenha();
+    setSy('ok','Senha trocada — '+horaAgora());
+    alert('Senha trocada. Use a nova no próximo acesso.');
+  }catch(e){alert('Erro: '+e.message);}
+  finally{if(btn){btn.textContent='Trocar senha';btn.disabled=false;}}
 }
 
 // ── FECHAMENTO DE CAIXA ─────────────────────────────────────────────────────
@@ -4460,7 +4709,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'mtm':()=>clsMetas(), 'cr-reneg-modal':()=>clsReneg()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
@@ -4477,16 +4726,46 @@ document.addEventListener('keydown',e=>{
   if(fecharModalTopo()){e.preventDefault();e.stopPropagation();}
 });
 
-// Restaura sessão salva
-(function(){
+// Restaura a sessão salva. Confere o comprovante contra o banco: se a senha
+// foi trocada ou o usuário desativado, o acesso cai na hora.
+(async function(){
   try{
     const saved=localStorage.getItem('idealize_session');
-    if(saved){
-      const {u,p}=JSON.parse(saved);
-      document.getElementById('lu').value=u;
-      document.getElementById('lp').value=p;
-      doLogin();
+    if(!saved)return;
+    const s=JSON.parse(saved);
+    if(!s||!s.u)return;
+    if(s.tk){
+      const linhas=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&usuario=eq.'+encodeURIComponent(s.u));
+      const reg=linhas&&linhas[0];
+      if(!reg||!reg.ativo||reg.senha_hash!==s.tk){localStorage.removeItem('idealize_session');return;}
+      U={u:reg.usuario,n:reg.nome,r:reg.perfil,un:reg.unidade,id:reg.id,tk:reg.senha_hash};
+    }else{
+      const c=US.find(x=>x.u===s.u);
+      if(!c){localStorage.removeItem('idealize_session');return;}
+      U={u:c.u,n:c.n,r:c.r,un:c.un,id:null,tk:null};
     }
+    R=RS[U.r];
+    document.getElementById('lu').value=U.u;
+    document.getElementById('ls').style.display='none';
+    document.getElementById('as').style.display='flex';
+    document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
+    document.getElementById('nn').textContent=UP(U.n);
+    const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
+    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+    const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
+    document.getElementById('t-e').style.display=(R&&R.es)?'block':'none';
+    document.getElementById('t-fc').style.display=(R&&R.ed)?'block':'none';
+    document.getElementById('t-pj').style.display=(R&&R.ed)?'block':'none';
+    document.getElementById('t-sd').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
+    document.getElementById('t-cr').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
+    document.getElementById('t-ig').style.display=(R&&(R.ed||R.r==='posvendas'))?'block':'none';
+    const tus=document.getElementById('t-us');
+    if(tus)tus.style.display=(U.r==='supervisor')?'block':'none';
+    let aba=localStorage.getItem('idealize_tab')||'k';
+    const btnAba=document.getElementById('t-'+aba);
+    if(!btnAba||btnAba.style.display==='none')aba='k';
+    sw(aba);
+    loadData(true);
   }catch(e){localStorage.removeItem('idealize_session');}
 })();
 
