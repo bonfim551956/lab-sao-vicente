@@ -841,7 +841,7 @@ textarea {
       <div class="os-col">
         <div class="os-sec">Pagamento</div>
         <div class="os-2">
-          <div class="mf"><label>Valor da venda</label>
+          <div class="mf"><label id="fvenda-lb">Valor da venda <span style="color:var(--re)">*</span></label>
             <input id="fvenda" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
           <div class="mf"><label>Valor recebido</label>
             <input id="frecebido" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
@@ -1666,6 +1666,7 @@ function tgUrgente(checked){
   document.getElementById('fprazo').value=dataBR(d);
 }
 function tgG(v){
+  pintarValorVenda();
   const obsWrap=document.getElementById('obs-wrap');
   if(obsWrap)obsWrap.style.display=v&&v.startsWith('gar')?'block':'none';
   const a=lerOculosForm();
@@ -3996,7 +3997,22 @@ function tgForma2(){
   calcSaldo();
 }
 
+// Garantia normalmente não tem valor a cobrar, então o campo fica opcional.
+// Nos demais tipos o valor é obrigatório: é ele que forma o faturamento do dia.
+function vendaOpcional(){
+  const t=document.getElementById('ft').value||'';
+  return t.startsWith('gar');
+}
+function pintarValorVenda(){
+  const lb=document.getElementById('fvenda-lb');
+  if(!lb)return;
+  lb.innerHTML=vendaOpcional()
+    ? 'Valor da venda <span style="color:var(--mu);font-weight:400">(opcional)</span>'
+    : 'Valor da venda <span style="color:var(--re)">*</span>';
+}
+
 function calcSaldo(){
+  pintarValorVenda();
   const venda=num(document.getElementById('fvenda').value);
   const rec=num(document.getElementById('frecebido').value)+num(document.getElementById('frecebido2').value);
   const saldo=Math.round((venda-rec)*100)/100;
@@ -4322,7 +4338,12 @@ async function svOS(){
   const now=Date.now();
   const prazo=document.getElementById('fprazo').value;
   const urgente=document.getElementById('furgente').checked;
-  const valorVenda=num(document.getElementById('fvenda').value);
+  const vv=document.getElementById('fvenda').value;
+  if(!vendaOpcional()&&(vv===''||num(vv)<=0)){
+    alert('Informe o valor da venda.');
+    document.getElementById('fvenda').focus();return;
+  }
+  const valorVenda=num(vv);
   const valorRecebido=num(document.getElementById('frecebido').value);
   const valorRecebido2=num(document.getElementById('frecebido2').value);
   const formaPag=document.getElementById('fforma').value||null;
