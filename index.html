@@ -56,6 +56,26 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 #as{display:none;flex-direction:column;min-height:100vh;}
 
 /* ── NAVBAR ── */
+
+/* modal da OS: duas colunas no computador, uma no celular */
+.mo-os{width:760px;max-width:94vw;}
+.os-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}
+.os-col{min-width:0;}
+.os-2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+.os-sec{font-size:11px;font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.07em;
+  padding-bottom:5px;margin-bottom:10px;border-bottom:1.5px solid var(--bo);}
+.os-chk{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--re);
+  text-transform:uppercase;letter-spacing:.04em;cursor:pointer;margin-bottom:10px;}
+.os-chk input{width:18px;height:18px;cursor:pointer;accent-color:var(--re);}
+.os-add{font-size:11px;font-weight:700;font-family:inherit;padding:6px 12px;border-radius:8px;
+  border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer;margin-bottom:10px;}
+.os-saldo{font-size:12px;font-weight:800;border-radius:9px;padding:9px 12px;margin-bottom:10px;display:none;}
+.os-dica{font-size:10px;color:var(--mu);margin-top:4px;}
+@media (max-width:820px){
+  .mo-os{width:100%;}
+  .os-grid{grid-template-columns:1fr;gap:0;}
+  .os-2{grid-template-columns:1fr;}
+}
 .nb-logo{height:34px;width:auto;display:block;opacity:.97;}
 @media (max-width:1024px){.nb-logo{height:30px}}
 .nb{background:var(--v);padding:0 1.5rem;height:var(--nb-h);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;
@@ -778,50 +798,77 @@ textarea {
 </div>
 
 <div class="mb" id="om" style="display:none">
-  <div class="mo" style="width:340px">
+  <div class="mo mo-os">
     <h3 id="om-title">Nova ordem de serviço</h3>
     <div id="nw" class="wb" style="display:none">Sem permissão.</div>
-    <div class="mf"><label>Número da OS</label><input id="fo" placeholder="Ex: OS-0001"/></div>
-    <div class="mf"><label>Cliente</label><input id="fcli" placeholder="Nome do cliente"/></div>
-    <div class="mf"><label>WhatsApp <span style="color:var(--mu);font-weight:400">(para avisar quando ficar pronto)</span></label><input id="ftel" placeholder="(13) 99999-9999" maxlength="16" inputmode="numeric" oninput="mascTel(this)"/></div>
-    <div class="mf"><label>Data da venda <span style="color:var(--re)">*</span></label><input id="fdt" type="date"/></div>
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end;margin-bottom:10px">
-      <div class="mf" style="margin:0"><label>Prazo de entrega</label><input id="fprazo" type="date"/></div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:2px">
-        <label style="font-size:11px;font-weight:600;color:var(--re);text-transform:uppercase;letter-spacing:.04em">Urgente</label>
-        <input type="checkbox" id="furgente" onchange="tgUrgente(this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--re)"/>
+
+    <div class="os-grid">
+      <!-- coluna esquerda: quem é a venda -->
+      <div class="os-col">
+        <div class="os-sec">Dados da venda</div>
+        <div class="mf"><label>Número da OS <span style="color:var(--re)">*</span></label><input id="fo" placeholder="Ex: 2254429"/></div>
+        <div class="mf"><label>Cliente</label><input id="fcli" placeholder="Nome do cliente"/></div>
+        <div class="mf"><label>WhatsApp <span style="color:var(--mu);font-weight:400">(para o aviso de pronto)</span></label>
+          <input id="ftel" placeholder="(13) 99999-9999" maxlength="16" inputmode="numeric" oninput="mascTel(this)"/></div>
+        <div class="os-2">
+          <div class="mf"><label>Data da venda <span style="color:var(--re)">*</span></label><input id="fdt" type="date"/></div>
+          <div class="mf"><label>Prazo de entrega</label><input id="fprazo" type="date"/></div>
+        </div>
+        <div class="mf"><label>Tipo de serviço</label>
+          <select id="ft" onchange="tgG(this.value)">
+            <option value="venda">Venda — Pedido</option>
+            <option value="hora" selected>Venda — Hora</option>
+            <option value="gar-hora">Garantia — Hora</option>
+            <option value="gar-armacao">Garantia — Armação</option>
+            <option value="gar-pedido">Garantia — Pedido</option>
+            <option value="passagem">Passagem</option>
+          </select>
+        </div>
+        <label class="os-chk">
+          <input type="checkbox" id="furgente" onchange="tgUrgente(this.checked)"/>
+          <span>Urgente</span>
+        </label>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:2px">
-        <label style="font-size:11px;font-weight:600;color:#B45309;text-transform:uppercase;letter-spacing:.04em">Saldo</label>
-        <input type="checkbox" id="fsaldo" onchange="tgSaldo(this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:#D97706"/>
+
+      <!-- coluna direita: quanto e como -->
+      <div class="os-col">
+        <div class="os-sec">Pagamento</div>
+        <div class="os-2">
+          <div class="mf"><label>Valor da venda</label>
+            <input id="fvenda" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
+          <div class="mf"><label>Valor recebido</label>
+            <input id="frecebido" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
+        </div>
+        <div class="mf"><label>Forma de pagamento</label><select id="fforma" onchange="calcSaldo()"></select></div>
+        <button type="button" id="btn-forma2" onclick="tgForma2()" class="os-add">+ 2ª forma de pagamento</button>
+        <div id="fforma2-wrap" style="display:none">
+          <div class="os-2">
+            <div class="mf"><label>2ª forma</label><select id="fforma2"></select></div>
+            <div class="mf"><label>Valor</label>
+              <input id="frecebido2" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
+          </div>
+        </div>
+        <div id="fsaldo-box" class="os-saldo"></div>
+        <div class="mf" id="fretirada-wrap" style="display:none">
+          <label>A receber na retirada <span style="color:var(--re)">*</span></label>
+          <input id="fretirada" type="number" step="0.01" min="0" placeholder="0,00"/>
+          <div class="os-dica">Obrigatório em Asaas e Multicrediário. Pode ser zero.</div>
+        </div>
       </div>
     </div>
-    <div class="mf" id="fsaldo-wrap" style="display:none">
-      <label>Valor do saldo <span style="color:var(--re)">*</span></label>
-      <input id="fsaldov" type="number" step="0.01" min="0" placeholder="0,00"/>
-    </div>
-    <div class="mf"><label>Tipo de serviço</label>
-      <select id="ft" onchange="tgG(this.value)">
-        <option value="venda">Venda — Pedido</option>
-        <option value="hora" selected>Venda — Hora</option>
-        <option value="gar-hora">Garantia — Hora</option>
-        <option value="gar-armacao">Garantia — Armação</option>
-        <option value="gar-pedido">Garantia — Pedido</option>
-        <option value="passagem">Passagem</option>
-      </select>
-    </div>
+
+    <div class="os-sec" style="margin-top:2px">Óculos</div>
     <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
-      <div class="mf" style="margin:0;flex:1"><label>Quantidade de óculos</label>
+      <div class="mf" style="margin:0;flex:1"><label>Quantidade</label>
         <select id="fqtd" onchange="rnOculos(+this.value)">
-          <option value="1">1 óculos</option>
-          <option value="2">2 óculos</option>
-          <option value="3">3 óculos</option>
-          <option value="4">4 óculos</option>
+          <option value="1">1 óculos</option><option value="2">2 óculos</option>
+          <option value="3">3 óculos</option><option value="4">4 óculos</option>
         </select>
       </div>
-      <button type="button" id="btn-add-oculos" onclick="addOculos()" style="font-size:12px;font-weight:700;font-family:inherit;padding:10px 14px;border-radius:10px;border:2px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer;white-space:nowrap">+ Adicionar óculos</button>
+      <button type="button" id="btn-add-oculos" onclick="addOculos()" class="os-add" style="margin:0;padding:10px 14px">+ Adicionar óculos</button>
     </div>
     <div id="oculos-wrap"></div>
+
     <div id="obs-wrap" style="display:none">
       <div class="mf"><label>Motivo da garantia <span style="color:var(--re)">*</span></label>
         <select id="fobs">
@@ -1120,6 +1167,22 @@ textarea {
 
 <!-- Modelo do contrato ASAAS, guardado em base64 (nao executa aqui) -->
 
+
+<!-- Número do pedido, ao mover de Venda para Pedido -->
+<div class="mb" id="pedm" style="display:none">
+  <div class="md" style="max-width:430px">
+    <div class="mh"><span id="ped-tit">Número do pedido</span><button class="mx" onclick="clsPedNum()">&#10005;</button></div>
+    <input type="hidden" id="ped-id"/>
+    <div style="font-size:12px;color:var(--mu);background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:500">
+      Informe o número do pedido feito ao fornecedor. Um campo para cada óculos desta OS.
+    </div>
+    <div id="ped-campos"></div>
+    <div class="mft">
+      <button class="bc" onclick="clsPedNum()">Cancelar</button>
+      <button class="bsv" onclick="svPedNum()">Confirmar</button>
+    </div>
+  </div>
+</div>
 <!-- Modal Entrega: valor recebido e forma de pagamento -->
 
 
@@ -1244,7 +1307,7 @@ const RS={
   posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
-const CF=['Pedido','Aguardando montagem','Em montagem','Pronto','Avisado','Entregue']; // mantido para histórico
+const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
 const CS=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado'];
 const COM_GRAU=['hora','gar-hora','gar-estoque'];
 const COM_BAIXA=['hora','gar-hora','gar-estoque'];
@@ -1324,7 +1387,7 @@ let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 // financeira, premio), nem em datas, numeros, ids ou senhas.
 function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
 function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
-const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','entregaForma','entregaForma2'];
+const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','entregaForma','entregaForma2','formaPag','formaPag2'];
 function upCard(c){
   upCampos(c,CAMPOS_OS);
   if(Array.isArray(c.pedidos))c.pedidos.forEach(o=>upCampos(o,['ped']));
@@ -1346,6 +1409,8 @@ function mapCard(r){return upCard({
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,
+  valorVenda:r.valor_venda,valorRecebido:r.valor_recebido,valorRecebido2:r.valor_recebido2,
+  formaPag:r.forma_pag,formaPag2:r.forma_pag2,aReceber:r.a_receber,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
   history:r.history||[],ts:r.ts,tsCreated:r.ts_created
 });}
@@ -1436,6 +1501,11 @@ async function saveCard(c){
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
       entrega_forma2:c.entregaForma2||null,
       saldo:!!c.saldo,saldo_valor:(c.saldoValor===0||c.saldoValor)?c.saldoValor:null,
+      valor_venda:(c.valorVenda===0||c.valorVenda)?c.valorVenda:null,
+      valor_recebido:(c.valorRecebido===0||c.valorRecebido)?c.valorRecebido:null,
+      valor_recebido2:(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:null,
+      forma_pag:c.formaPag||null,forma_pag2:c.formaPag2||null,
+      a_receber:(c.aReceber===0||c.aReceber)?c.aReceber:null,
       obs_alert:!!c.obsAlert,pedidos:c.pedidos||[],
       history:c.history||[],ts:c.ts,ts_created:c.tsCreated
     });
@@ -1581,11 +1651,6 @@ function fG(e,c){if(e==null)return'—';const ev=(e>0?'+':'')+Number(e).toFixed(
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
 function tGL(t){const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem'};return m[t]||t;}
 function tGC(t){if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
-function tgSaldo(marcado){
-  document.getElementById('fsaldo-wrap').style.display=marcado?'block':'none';
-  if(!marcado){document.getElementById('fsaldov').value='';}
-  else{setTimeout(()=>document.getElementById('fsaldov').focus(),80);}
-}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -3882,25 +3947,111 @@ async function svRf(){
 function onSrch(v){srch=v.trim().toLowerCase();document.getElementById('sc').className='sc'+(srch?' show':'');rnKan();if(srch)window.scrollTo({top:0,behavior:'smooth'});}
 function clrSrch(){srch='';document.getElementById('si').value='';document.getElementById('sc').className='sc';rnKan();}
 
+
+
+// ── PAGAMENTO NA CRIAÇÃO DA OS ──────────────────────────────────────────────
+// O saldo deixou de ser caixinha marcada: é a conta valor da venda menos o
+// que foi recebido. Some a chance de marcar saldo e esquecer o valor.
+// Asaas e Multicrediário pedem quanto ainda será recebido na retirada.
+const FIN_RETIRADA=['Asaas','Link Asaas','Multicrediário'];
+
+function tgForma2(){
+  const w=document.getElementById('fforma2-wrap');
+  const abrir=w.style.display==='none';
+  w.style.display=abrir?'block':'none';
+  document.getElementById('btn-forma2').textContent=abrir?'− Remover 2ª forma':'+ 2ª forma de pagamento';
+  if(!abrir){document.getElementById('fforma2').value='';document.getElementById('frecebido2').value='';}
+  calcSaldo();
+}
+
+function calcSaldo(){
+  const venda=num(document.getElementById('fvenda').value);
+  const rec=num(document.getElementById('frecebido').value)+num(document.getElementById('frecebido2').value);
+  const saldo=Math.round((venda-rec)*100)/100;
+  const box=document.getElementById('fsaldo-box');
+
+  if(!venda&&!rec){box.style.display='none';}
+  else if(saldo>0.001){
+    box.style.display='block';
+    box.style.cssText+=';background:#FEF3C7;border:1px solid #FCD34D;color:#92400E';
+    box.textContent='Saldo a receber: R$ '+saldo.toFixed(2);
+  }else if(saldo<-0.001){
+    box.style.display='block';
+    box.style.cssText+=';background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C';
+    box.textContent='Recebido R$ '+Math.abs(saldo).toFixed(2)+' a mais que o valor da venda. Confira.';
+  }else{
+    box.style.display='block';
+    box.style.cssText+=';background:#F0FDF4;border:1px solid #BBF7D0;color:#16A34A';
+    box.textContent='Pago integralmente. Sem saldo.';
+  }
+
+  // Asaas e Multicrediário: quanto ainda entra na retirada
+  const f1=document.getElementById('fforma').value;
+  const f2=document.getElementById('fforma2').value;
+  const precisa=FIN_RETIRADA.includes(f1)||FIN_RETIRADA.includes(f2);
+  const w=document.getElementById('fretirada-wrap');
+  w.style.display=precisa?'block':'none';
+  if(!precisa)document.getElementById('fretirada').value='';
+}
+
+// ── NÚMERO DO PEDIDO ────────────────────────────────────────────────────────
+// Pedido para o fornecedor. Só faz sentido em Venda—Pedido e Garantia—Pedido:
+// Hora e Passagem usam lente do estoque, não têm pedido.
+const TEM_PEDIDO=['venda','gar-pedido'];
+
+function opPedNum(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  const ocs=ocDoCard(c);
+  document.getElementById('ped-id').value=id;
+  document.getElementById('ped-tit').textContent='Número do pedido — OS '+(c.os||'');
+  document.getElementById('ped-campos').innerHTML=ocs.map((o,i)=>
+    '<div class="mf">'
+    +'<label>'+(ocs.length>1?('Óculos '+(i+1)):'Número do pedido')+' <span style="color:var(--re)">*</span></label>'
+    +'<input id="pn_'+i+'" value="'+(o.ped||'')+'" placeholder="Ex: 115438859"/></div>').join('');
+  document.getElementById('pedm').style.display='flex';
+  setTimeout(()=>{const e=document.getElementById('pn_0');if(e)e.focus();},90);
+}
+function clsPedNum(){document.getElementById('pedm').style.display='none';}
+
+async function svPedNum(){
+  const id=document.getElementById('ped-id').value;
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  const ocs=ocDoCard(c).slice();
+  for(let i=0;i<ocs.length;i++){
+    const el=document.getElementById('pn_'+i);
+    const v=UP((el?el.value:'').trim());
+    if(!v){alert('Preencha o número do pedido'+(ocs.length>1?(' do óculos '+(i+1)):'')+'.');if(el)el.focus();return;}
+    ocs[i]={...ocs[i],ped:v};
+  }
+  c.pedidos=ocs;c.ped=ocs[0].ped;
+  clsPedNum();
+  await mvCardExec(id,null,null);
+}
+
 function mvCard(id){
   const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
   if(c.col>=5)return;
   if(!R.mv.includes(c.col)){alert('Sem permissão para mover desta coluna.');return;}
-  if(c.col===0&&COM_GRAU.includes(c.tipo)&&ocDoCard(c).some(o=>o.esfOD==null||o.esfOE==null)){
-    alert('Preencha o grau (OD e OE) de todos os óculos antes de mover para Ag. montagem.');return;
-  }
-  if(c.col===4){
-    // Sem saldo, nada a receber: entrega direto, registrando "Sem saldo".
-    // Com saldo, abre a janela pedindo valor e forma de pagamento.
-    if(c.saldo){opEntrega(id);return;}
-    c.entregaValor=0;c.entregaForma='Sem saldo';
-    c.entregaValor2=null;c.entregaForma2=null;
-  }
-  if(c.col===0){
+
+  // Venda -> Pedido: pede o número do pedido ao fornecedor
+  if(c.col===0&&TEM_PEDIDO.includes(c.tipo)){opPedNum(id);return;}
+
+  // Pedido -> Montagem: escolhe o laboratório e dá baixa no estoque
+  if(c.col===1){
+    if(COM_GRAU.includes(c.tipo)&&ocDoCard(c).some(o=>o.esfOD==null||o.esfOE==null)){
+      alert('Preencha o grau (OD e OE) de todos os óculos antes de mover para Montagem.');return;
+    }
     mvPendId=id;
     document.getElementById('flab').value='';
     document.getElementById('labm').style.display='flex';
     return;
+  }
+
+  // Avisado -> Entregue: sem saldo entrega direto; com saldo pede o pagamento
+  if(c.col===4){
+    if(c.saldo){opEntrega(id);return;}
+    c.entregaValor=0;c.entregaForma='Sem saldo';
+    c.entregaValor2=null;c.entregaForma2=null;
   }
   mvCardExec(id,null,null);
 }
@@ -3910,10 +4061,12 @@ async function mvCardExec(id,lab,obsmv){
   if(obsmv)c.obsmv=obsmv;
   const from=c.col;c.col=from+1;c.ts=Date.now();
   if(!c.history)c.history=[];
+  // "montou" = saiu de Montagem para Pronto
   const mc=from===2;
   const isGarMc=from===2&&c.tipo&&c.tipo.startsWith('gar');
   const isPassagem=from===2&&c.tipo==='passagem';
-  const baixa=from===0&&COM_BAIXA.includes(c.tipo);
+  // a lente sai do estoque ao ENTRAR na Montagem (Pedido -> Montagem)
+  const baixa=from===1&&COM_BAIXA.includes(c.tipo);
   const ent=(from===4)?{entregaValor:c.entregaValor,entregaForma:c.entregaForma}:{};
   c.history.push({u:U.n,r:U.r,from,to:c.col,at:Date.now(),mc,garantia:isGarMc,passagem:isPassagem,...ent});
   if(baixa){
@@ -4003,9 +4156,12 @@ function opOs(){
   const d=new Date();d.setDate(d.getDate()+10);
   document.getElementById('fprazo').value=dataBR(d);
   document.getElementById('furgente').checked=false;
-  document.getElementById('fsaldo').checked=false;
-  document.getElementById('fsaldov').value='';
-  tgSaldo(false);
+  ['fvenda','frecebido','frecebido2','fretirada'].forEach(i=>document.getElementById(i).value='');
+  opcoesFormas(document.getElementById('fforma'));
+  opcoesFormas(document.getElementById('fforma2'));
+  document.getElementById('fforma2-wrap').style.display='block';tgForma2();
+  document.getElementById('fsaldo-box').style.display='none';
+  document.getElementById('fretirada-wrap').style.display='none';
   rnOculos(1,[{}]);
   tgG('venda');
   document.getElementById('om').style.display='flex';
@@ -4023,9 +4179,17 @@ function opEdit(id){
   document.getElementById('fdt').value=c.dtVenda||hojeBR();
   document.getElementById('fprazo').value=c.prazo||'';
   document.getElementById('furgente').checked=!!c.urgente;
-  document.getElementById('fsaldo').checked=!!c.saldo;
-  document.getElementById('fsaldov').value=(c.saldoValor===0||c.saldoValor)?c.saldoValor:'';
-  tgSaldo(!!c.saldo);
+  opcoesFormas(document.getElementById('fforma'));
+  opcoesFormas(document.getElementById('fforma2'));
+  document.getElementById('fvenda').value=(c.valorVenda===0||c.valorVenda)?c.valorVenda:'';
+  document.getElementById('frecebido').value=(c.valorRecebido===0||c.valorRecebido)?c.valorRecebido:'';
+  document.getElementById('fforma').value=c.formaPag||'';
+  document.getElementById('fforma2-wrap').style.display=(c.formaPag2||c.valorRecebido2)?'none':'block';
+  tgForma2();
+  document.getElementById('fforma2').value=c.formaPag2||'';
+  document.getElementById('frecebido2').value=(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:'';
+  document.getElementById('fretirada').value=(c.aReceber===0||c.aReceber)?c.aReceber:'';
+  calcSaldo();
   document.getElementById('ft').value=c.tipo||'venda';
   document.getElementById('fobs').value=c.obs||'';
   document.getElementById('fresp-gar').value=c.respGar||'';
@@ -4080,13 +4244,28 @@ async function svOS(){
   const now=Date.now();
   const prazo=document.getElementById('fprazo').value;
   const urgente=document.getElementById('furgente').checked;
-  const saldo=document.getElementById('fsaldo').checked;
-  const sv=document.getElementById('fsaldov').value;
-  const saldoValor=saldo&&sv!==''?parseFloat(sv):null;
-  if(saldo&&(saldoValor===null||isNaN(saldoValor)||saldoValor<=0)){
-    alert('Informe o valor do saldo.');
-    document.getElementById('fsaldov').focus();return;
+  const valorVenda=num(document.getElementById('fvenda').value);
+  const valorRecebido=num(document.getElementById('frecebido').value);
+  const valorRecebido2=num(document.getElementById('frecebido2').value);
+  const formaPag=document.getElementById('fforma').value||null;
+  const formaPag2=document.getElementById('fforma2').value||null;
+  if((valorRecebido||valorRecebido2)&&!formaPag){
+    alert('Selecione a forma de pagamento.');document.getElementById('fforma').focus();return;
   }
+  if(valorRecebido2&&!formaPag2){
+    alert('Selecione a 2ª forma de pagamento.');document.getElementById('fforma2').focus();return;
+  }
+  // saldo deixa de ser marcado na mão: é o que falta receber
+  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2)*100)/100;
+  const saldo=saldoValor>0.001;
+
+  const precisaRet=FIN_RETIRADA.includes(formaPag)||FIN_RETIRADA.includes(formaPag2);
+  const ret=document.getElementById('fretirada').value;
+  if(precisaRet&&ret===''){
+    alert('Informe quanto será recebido na retirada.\nPode ser zero, mas precisa ser preenchido.');
+    document.getElementById('fretirada').focus();return;
+  }
+  const aReceber=precisaRet?num(ret):null;
   const obsTxt=document.getElementById('fobs-txt').value.trim();
   const osCompra=document.getElementById('foscompra').value.trim();
   const p0=oculos[0];
@@ -4094,14 +4273,14 @@ async function svOS(){
   if(editId){
     const ce=ST.cards.find(x=>x.id===editId);
     if(ce){
-      const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',saldo:'Saldo',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
-      const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',saldo:saldo?('Sim'+(saldoValor?' R$ '+saldoValor.toFixed(2):'')):'Não',obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
+      const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',saldo:'Saldo',valorVenda:'Vl. Venda',valorRecebido:'Vl. Recebido',formaPag:'Forma pag.',aReceber:'A receber',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
+      const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',saldo:saldo?('Sim R$ '+saldoValor.toFixed(2)):'Não',valorVenda,valorRecebido,formaPag,aReceber,obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
       const ocAntigos=ocDoCard(ce);
-      const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim'+(ce.saldoValor?' R$ '+Number(ce.saldoValor).toFixed(2):'')):'Não',obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
+      const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim R$ '+Number(ce.saldoValor||0).toFixed(2)):'Não',valorVenda:ce.valorVenda,valorRecebido:ce.valorRecebido,formaPag:ce.formaPag,aReceber:ce.aReceber,obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
       const grauMudou=JSON.stringify(ocAntigos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]))!==JSON.stringify(oculos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]));
       if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
-      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldoValor;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
+      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=valorRecebido;ce.valorRecebido2=valorRecebido2||null;ce.formaPag=formaPag;ce.formaPag2=formaPag2;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
       ce.pedidos=oculos;
       ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
@@ -4113,7 +4292,7 @@ async function svOS(){
     }
     return;
   }
-  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor,obs,respGar,receita,obsTxt,osCompra,
+  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
   const isVenda=tipo==='venda'||tipo==='hora';
@@ -4755,7 +4934,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
