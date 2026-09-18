@@ -1416,6 +1416,7 @@ function mapCard(r){return upCard({
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,
+  horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
   valorVenda:r.valor_venda,valorRecebido:r.valor_recebido,valorRecebido2:r.valor_recebido2,
   formaPag:r.forma_pag,formaPag2:r.forma_pag2,aReceber:r.a_receber,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
@@ -1508,6 +1509,7 @@ async function saveCard(c){
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
       entrega_forma2:c.entregaForma2||null,
       saldo:!!c.saldo,saldo_valor:(c.saldoValor===0||c.saldoValor)?c.saldoValor:null,
+      hora_pronto:!!c.horaPronto,hora_pronto_em:c.horaProntoEm||null,hora_pronto_por:c.horaProntoPor||null,
       valor_venda:(c.valorVenda===0||c.valorVenda)?c.valorVenda:null,
       valor_recebido:(c.valorRecebido===0||c.valorRecebido)?c.valorRecebido:null,
       valor_recebido2:(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:null,
@@ -2710,7 +2712,9 @@ function lerOculosForm(){
   for(let i=0;i<4;i++){
     if(!document.getElementById('fp_'+i))break;
     const g=id=>{const e=document.getElementById(id+'_'+i);return e?e.value:'';};
-    out.push({ped:g('fp'),esfOD:g('fod'),cilOD:g('fcd'),esfOE:g('foe'),cilOE:g('fce')});
+    const chk=document.getElementById('oh_'+i);
+    out.push({ped:g('fp'),esfOD:g('fod'),cilOD:g('fcd'),esfOE:g('foe'),cilOE:g('fce'),
+              hora:chk?chk.checked:undefined});
   }
   return out;
 }
@@ -2729,11 +2733,18 @@ function rnOculos(n,dados){
   for(let i=0;i<n;i++){
     const d=atuais[i]||{};
     const v=x=>(d[x]===0||d[x])?d[x]:'';
+    const ehHora=(d.hora===true)||(d.hora===undefined&&COM_BAIXA.includes(tipo));
     const pedVal=semPed?tipo.toUpperCase():v('ped');
     html+=`<div style="border:1.5px solid ${n>1?'var(--v)':'var(--bo)'};border-radius:12px;padding:10px;margin-bottom:10px;background:${n>1?'var(--vl)':'var(--bg)'}">
-      ${n>1?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      ${n>1?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <span style="font-size:11px;font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.07em">Óculos ${i+1}</span>
-        ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#0D7A75;cursor:pointer" title="Lente do estoque: sai na hora e não entra no pedido ao fornecedor">
+            <input type="checkbox" id="oh_${i}" ${ehHora?'checked':''} onchange="edOculosHora(${i},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#0D7A75"/>
+            HORA
+          </label>
+          ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
+        </div>
       </div>`:''}
       <div class="mf" style="margin-bottom:${comGrau?'10px':'0'};${mostraPed?'':'display:none'}">
         <label>Número do pedido</label>
@@ -2755,6 +2766,11 @@ function rnOculos(n,dados){
   if(btn){btn.disabled=n>=4;btn.style.opacity=n>=4?'.35':'1';btn.style.cursor=n>=4?'not-allowed':'pointer';}
 }
 function addOculos(){if(ocQtd<4)rnOculos(ocQtd+1);}
+function edOculosHora(i,marcado){
+  const a=lerOculosForm();
+  if(a[i])a[i].hora=marcado;
+  rnOculos(ocQtd,a);
+}
 function removerOculos(i){const a=lerOculosForm();a.splice(i,1);rnOculos(ocQtd-1,a);}
 
 // Monta o card resumido de cada oculos no kanban
@@ -2763,11 +2779,13 @@ function blocoOculos(c,s){
   return ocs.map((o,i)=>{
     const grau=(o.esfOD!=null)?`<div class="cg">OD ${fG(o.esfOD,o.cilOD)} · OE ${fG(o.esfOE,o.cilOE)}</div>`:'';
     const tit=ocs.length>1?`<div class="cg" style="font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.06em;margin-top:${i?7:4}px">Óculos ${i+1}</div>`:'';
-    const semNum=!o.ped&&c.col===0&&TEM_PEDIDO.includes(c.tipo);
+    const hora=ocs.length>1&&ocEhHora(c,o);
+    const semNum=!o.ped&&c.col===0&&ocPrecisaPedido(c,o);
     const linha=semNum
       ? `<div class="cp" style="color:#B45309;font-weight:700">pedido a fazer</div>`
       : `<div class="cp">${hl(o.ped||'—',s||'')}</div>`;
-    return tit+linha+grau;
+    const selo=hora?`<span style="font-size:8px;font-weight:800;padding:1px 5px;border-radius:4px;background:var(--vl);color:#0D7A75;margin-left:4px">HORA</span>`:'';
+    return tit.replace('</div>',selo+'</div>')+linha+grau;
   }).join('');
 }
 
@@ -4013,15 +4031,40 @@ function calcSaldo(){
 // Hora e Passagem usam lente do estoque, não têm pedido.
 const TEM_PEDIDO=['venda','gar-pedido'];
 
+// Numa OS com mais de um óculos, cada um pode seguir um caminho:
+// um sai na HORA com lente do estoque, outro precisa de PEDIDO ao fornecedor.
+// Sem a marcação, vale o tipo da OS.
+function ocEhHora(c,o){
+  if(o&&o.hora===true)return true;
+  if(o&&o.hora===false)return false;
+  return COM_BAIXA.includes(c.tipo);
+}
+// precisa de número de pedido: leva lente e não é do estoque
+// OS mista: tem óculos que sai do estoque e óculos que depende do fornecedor.
+// Só nesses casos faz sentido avisar o cliente antes do card chegar em Pronto.
+function osMista(c){
+  const ocs=ocDoCard(c);
+  if(ocs.length<2)return false;
+  return ocs.some(o=>ocEhHora(c,o))&&ocs.some(o=>ocPrecisaPedido(c,o));
+}
+function ocPrecisaPedido(c,o){
+  const temLente=!['passagem','gar-armacao'].includes(c.tipo);
+  return temLente&&!ocEhHora(c,o);
+}
+
 function opPedNum(id){
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   const ocs=ocDoCard(c);
   document.getElementById('ped-id').value=id;
   document.getElementById('ped-tit').textContent='Número do pedido — OS '+(c.os||'');
-  document.getElementById('ped-campos').innerHTML=ocs.map((o,i)=>
-    '<div class="mf">'
-    +'<label>'+(ocs.length>1?('Óculos '+(i+1)):'Número do pedido')+' <span style="color:var(--re)">*</span></label>'
-    +'<input id="pn_'+i+'" value="'+(o.ped||'')+'" placeholder="Ex: 115438859"/></div>').join('');
+  document.getElementById('ped-campos').innerHTML=ocs.map((o,i)=>{
+    if(!ocPrecisaPedido(c,o))
+      return '<div class="mf"><label>'+(ocs.length>1?('Óculos '+(i+1)):'Este óculos')+'</label>'
+        +'<div style="font-size:12px;font-weight:700;color:#0D7A75;background:var(--vl);border-radius:8px;padding:8px 11px">'
+        +'HORA — lente do estoque, sem pedido</div></div>';
+    return '<div class="mf">'
+      +'<label>'+(ocs.length>1?('Óculos '+(i+1)):'Número do pedido')+' <span style="color:var(--re)">*</span></label>'
+      +'<input id="pn_'+i+'" value="'+(o.ped||'')+'" placeholder="Ex: 115438859"/></div>';}).join('');
   document.getElementById('pedm').style.display='flex';
   setTimeout(()=>{const e=document.getElementById('pn_0');if(e)e.focus();},90);
 }
@@ -4033,8 +4076,9 @@ async function svPedNum(){
   const ocs=ocDoCard(c).slice();
   for(let i=0;i<ocs.length;i++){
     const el=document.getElementById('pn_'+i);
-    const v=UP((el?el.value:'').trim());
-    if(!v){alert('Preencha o número do pedido'+(ocs.length>1?(' do óculos '+(i+1)):'')+'.');if(el)el.focus();return;}
+    if(!el)continue;                       // óculos de hora: não tem campo
+    const v=UP(el.value.trim());
+    if(!v){alert('Preencha o número do pedido'+(ocs.length>1?(' do óculos '+(i+1)):'')+'.');el.focus();return;}
     ocs[i]={...ocs[i],ped:v};
   }
   c.pedidos=ocs;c.ped=ocs[0].ped;
@@ -4047,8 +4091,9 @@ function mvCard(id){
   if(c.col>=5)return;
   if(!R.mv.includes(c.col)){alert('Sem permissão para mover desta coluna.');return;}
 
-  // Venda -> Pedido: pede o número do pedido ao fornecedor
-  if(c.col===0&&TEM_PEDIDO.includes(c.tipo)){opPedNum(id);return;}
+  // Venda -> Pedido: pede o número só dos óculos que vão ao fornecedor.
+  // Se todos saem do estoque, passa direto.
+  if(c.col===0&&ocDoCard(c).some(o=>ocPrecisaPedido(c,o))){opPedNum(id);return;}
 
   // Pedido -> Montagem: escolhe o laboratório e dá baixa no estoque
   if(c.col===1){
@@ -4069,6 +4114,22 @@ function mvCard(id){
   }
   mvCardExec(id,null,null);
 }
+// Marca que o óculos de hora já está pronto. O card continua onde está,
+// porque o outro óculos ainda depende do fornecedor.
+async function marcarHoraPronto(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
+  if(!R.mv||!R.mv.length){alert('Sem permissão.');return;}
+  if(!confirm('Marcar que o óculos de HORA desta OS já está pronto?\n\n'
+    +'O card continua na coluna atual, porque o outro óculos ainda depende do pedido.\n'
+    +'O botão do WhatsApp fica liberado para avisar o cliente.'))return;
+  c.horaPronto=true;c.horaProntoEm=Date.now();c.horaProntoPor=U.n;
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,horaPronto:true});
+  rnKan();
+  await saveCard(c);
+  setSy('ok','Óculos de hora marcado como pronto — '+horaAgora());
+}
+
 async function mvCardExec(id,lab,obsmv){
   const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
   if(lab)c.lab=lab;
@@ -4080,13 +4141,15 @@ async function mvCardExec(id,lab,obsmv){
   const isGarMc=from===2&&c.tipo&&c.tipo.startsWith('gar');
   const isPassagem=from===2&&c.tipo==='passagem';
   // a lente sai do estoque ao ENTRAR na Montagem (Pedido -> Montagem)
-  const baixa=from===1&&COM_BAIXA.includes(c.tipo);
+  // dá baixa ao entrar na Montagem, só dos óculos que saem do estoque
+  const baixa=from===1;
   const ent=(from===4)?{entregaValor:c.entregaValor,entregaForma:c.entregaForma}:{};
   c.history.push({u:U.n,r:U.r,from,to:c.col,at:Date.now(),mc,garantia:isGarMc,passagem:isPassagem,...ent});
   if(baixa){
     // 1 oculos = 2 lentes (OD + OE). 2 oculos = 4 lentes, e assim por diante.
     const lentes=[];
-    ocDoCard(c).forEach(o=>{lentes.push([o.esfOD,o.cilOD||0]);lentes.push([o.esfOE,o.cilOE||0]);});
+    ocDoCard(c).filter(o=>ocEhHora(c,o)).forEach(o=>{
+      lentes.push([o.esfOD,o.cilOD||0]);lentes.push([o.esfOE,o.cilOE||0]);});
     for(const [e,cl] of lentes){
       if(e===null||e===undefined)continue;
       const k=eK(e,cl);
@@ -4148,7 +4211,7 @@ function opH(id){
   const l=document.getElementById('hl');
   if(!c.history||!c.history.length){l.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Sem movimentações.</div>';}
   else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`:'';
-const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">avisou pelo WhatsApp</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
+const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">avisou pelo WhatsApp</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
   document.getElementById('hm').style.display='flex';
 }
 function clsH(){document.getElementById('hm').style.display='none';}
@@ -4238,6 +4301,7 @@ async function svOS(){
       alert('Preencha todos os graus do óculos '+(i+1)+' (Esf. OD, Cil. OD, Esf. OE, Cil. OE).');return;
     }
     oculos.push({
+      hora:(b.hora===undefined)?undefined:!!b.hora,
       ped,
       esfOD:b.esfOD!==''&&b.esfOD!=null?parseFloat(b.esfOD):null,
       cilOD:b.cilOD!==''&&b.cilOD!=null?parseFloat(b.cilOD):0,
@@ -4377,7 +4441,7 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(ci>=3&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
