@@ -960,7 +960,7 @@ textarea {
     <h3 id="emt">Adicionar lente</h3>
     <input type="hidden" id="eid"/>
     <div class="mf"><label>Esférico <span style="color:var(--re)">*</span></label><input id="fes" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
-    <div class="mf"><label>Cilíndrico <span style="color:var(--mu);font-weight:400">(padrão 0.00)</span></label><input id="fci" type="number" step="0.25" placeholder="0.00"/></div>
+    <div class="mf"><label>Cilíndrico <span style="color:var(--mu);font-weight:400">(padrão 0.00)</span></label><input id="fci" type="number" step="0.25" max="0" placeholder="0.00" oninput="travarCil(this)"/></div>
     <div class="mf" id="est-modo-wrap" style="display:none">
       <label>Operação</label>
       <div style="display:flex;gap:6px">
@@ -1657,6 +1657,20 @@ function fd(ts){const d=new Date(ts);return d.toLocaleDateString('pt-BR')+' '+d.
 function itd(ts){const d=new Date(ts),n=new Date();return d.getDate()===n.getDate()&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();}
 function hl(t,s){if(!s)return t;const i=t.toLowerCase().indexOf(s.toLowerCase());if(i<0)return t;return t.slice(0,i)+'<mark style="background:#FEF08A;border-radius:2px;padding:0 1px">'+t.slice(i,i+s.length)+'</mark>'+t.slice(i+s.length);}
 function fG(e,c){if(e==null)return'—';const ev=(e>0?'+':'')+Number(e).toFixed(2);const cv=c&&c!==0?(c>0?' +':' ')+Number(c).toFixed(2)+' cil':'';return ev+cv;}
+// O cilíndrico é sempre negativo ou zero. Grau positivo aqui é sinal de
+// digitação sem o sinal de menos, então corrigimos em vez de recusar.
+function normCil(v){
+  if(v===''||v===null||v===undefined)return v;
+  const n=parseFloat(v);
+  if(isNaN(n))return v;
+  return n>0 ? -n : n;
+}
+function travarCil(el){
+  if(!el)return;
+  const n=parseFloat(el.value);
+  if(!isNaN(n)&&n>0)el.value=(-n).toFixed(2);
+}
+
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
 function tGL(t){const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem'};return m[t]||t;}
 function tGC(t){if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
@@ -2756,11 +2770,11 @@ function rnOculos(n,dados){
       ${grauAqui?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div style="grid-column:1/-1;font-size:10px;font-weight:800;color:#0D7A75;margin-bottom:2px">${ehHora&&!comGrau?'GRAU DA LENTE DO ESTOQUE — usado para dar baixa':'GRAU'}</div>
         <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod_${i}" value="${v('esfOD')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
-        <div class="mf" style="margin:0"><label>Cil. OD <span style="color:var(--re)">*</span></label><input id="fcd_${i}" value="${v('cilOD')}" type="number" step="0.25" placeholder="Ex: -0.50"/></div>
+        <div class="mf" style="margin:0"><label>Cil. OD <span style="color:var(--re)">*</span></label><input id="fcd_${i}" value="${v('cilOD')}" type="number" step="0.25" max="0" placeholder="Ex: -0.50" oninput="travarCil(this)"/></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="mf" style="margin:0"><label>Esf. OE <span style="color:var(--re)">*</span></label><input id="foe_${i}" value="${v('esfOE')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
-        <div class="mf" style="margin:0"><label>Cil. OE <span style="color:var(--re)">*</span></label><input id="fce_${i}" value="${v('cilOE')}" type="number" step="0.25" placeholder="Ex: -0.50"/></div>
+        <div class="mf" style="margin:0"><label>Cil. OE <span style="color:var(--re)">*</span></label><input id="fce_${i}" value="${v('cilOE')}" type="number" step="0.25" max="0" placeholder="Ex: -0.50" oninput="travarCil(this)"/></div>
       </div>`:''}
     </div>`;
   }
@@ -4328,9 +4342,9 @@ async function svOS(){
       hora:(b.hora===undefined)?undefined:!!b.hora,
       ped,
       esfOD:b.esfOD!==''&&b.esfOD!=null?parseFloat(b.esfOD):null,
-      cilOD:b.cilOD!==''&&b.cilOD!=null?parseFloat(b.cilOD):0,
+      cilOD:b.cilOD!==''&&b.cilOD!=null?normCil(parseFloat(b.cilOD)):0,
       esfOE:b.esfOE!==''&&b.esfOE!=null?parseFloat(b.esfOE):null,
-      cilOE:b.cilOE!==''&&b.cilOE!=null?parseFloat(b.cilOE):0
+      cilOE:b.cilOE!==''&&b.cilOE!=null?normCil(parseFloat(b.cilOE)):0
     });
   }
   if(!oculos.length){alert('Adicione ao menos um óculos.');return;}
@@ -4772,7 +4786,7 @@ function setModoEst(m){
 async function svEst(){
   const eid=document.getElementById('eid').value;
   const e=parseFloat(document.getElementById('fes').value);
-  const cVal=document.getElementById('fci').value;const c=cVal!==''?parseFloat(cVal):0;
+  const cVal=document.getElementById('fci').value;const c=cVal!==''?normCil(parseFloat(cVal)):0;
   const q=parseInt(document.getElementById('fq').value);
   if(isNaN(e)){alert('Preencha o grau esférico.');return;}
   const corrigir=(modoEst==='fix')&&R&&R.aj;
