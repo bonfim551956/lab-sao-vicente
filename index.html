@@ -2735,6 +2735,8 @@ function rnOculos(n,dados){
     const d=atuais[i]||{};
     const v=x=>(d[x]===0||d[x])?d[x]:'';
     const ehHora=(d.hora===true)||(d.hora===undefined&&COM_BAIXA.includes(tipo));
+    // grau aparece quando o tipo pede, ou quando este óculos sai do estoque
+    const grauAqui=comGrau||ehHora;
     const pedVal=semPed?tipo.toUpperCase():v('ped');
     html+=`<div style="border:1.5px solid ${n>1?'var(--v)':'var(--bo)'};border-radius:12px;padding:10px;margin-bottom:10px;background:${n>1?'var(--vl)':'var(--bg)'}">
       ${n>1?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -2747,11 +2749,12 @@ function rnOculos(n,dados){
           ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
         </div>
       </div>`:''}
-      <div class="mf" style="margin-bottom:${comGrau?'10px':'0'};${mostraPed?'':'display:none'}">
+      <div class="mf" style="margin-bottom:${grauAqui?'10px':'0'};${mostraPed?'':'display:none'}">
         <label>Número do pedido</label>
         <input id="fp_${i}" value="${pedVal}" placeholder="Ex: 115438859"/>
       </div>
-      ${comGrau?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+      ${grauAqui?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+        <div style="grid-column:1/-1;font-size:10px;font-weight:800;color:#0D7A75;margin-bottom:2px">${ehHora&&!comGrau?'GRAU DA LENTE DO ESTOQUE — usado para dar baixa':'GRAU'}</div>
         <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod_${i}" value="${v('esfOD')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
         <div class="mf" style="margin:0"><label>Cil. OD <span style="color:var(--re)">*</span></label><input id="fcd_${i}" value="${v('cilOD')}" type="number" step="0.25" placeholder="Ex: -0.50"/></div>
       </div>
@@ -4113,8 +4116,10 @@ function mvCard(id){
 
   // Pedido -> Montagem: escolhe o laboratório e dá baixa no estoque
   if(c.col===1){
-    if(COM_GRAU.includes(c.tipo)&&ocDoCard(c).some(o=>o.esfOD==null||o.esfOE==null)){
-      alert('Preencha o grau (OD e OE) de todos os óculos antes de mover para Montagem.');return;
+    // sem grau não há baixa: exige de quem sai do estoque
+    const semGrau=ocDoCard(c).some(o=>(COM_GRAU.includes(c.tipo)||ocEhHora(c,o))&&(o.esfOD==null||o.esfOE==null));
+    if(semGrau){
+      alert('Preencha o grau (OD e OE) dos óculos que saem do estoque antes de mover para Montagem.');return;
     }
     mvPendId=id;
     document.getElementById('flab').value='';
@@ -4313,8 +4318,11 @@ async function svOS(){
     const b=brutos[i];
     // sem exigência: o número entra depois, ao mover de Venda para Pedido
     const ped=semPed?tipo.toUpperCase():UP((b.ped||'').trim());
-    if(comGrau&&(b.esfOD===''||b.cilOD===''||b.esfOE===''||b.cilOE==='')){
-      alert('Preencha todos os graus do óculos '+(i+1)+' (Esf. OD, Cil. OD, Esf. OE, Cil. OE).');return;
+    const ehHoraB=(b.hora===true)||(b.hora===undefined&&COM_BAIXA.includes(tipo));
+    const precisaGrau=comGrau||ehHoraB;
+    if(precisaGrau&&(b.esfOD===''||b.cilOD===''||b.esfOE===''||b.cilOE==='')){
+      alert('Preencha todos os graus do óculos '+(i+1)+' (Esf. OD, Cil. OD, Esf. OE, Cil. OE).'
+        +(ehHoraB&&!comGrau?'\n\nEste óculos está marcado como HORA: o grau é o que dá baixa no estoque.':''));return;
     }
     oculos.push({
       hora:(b.hora===undefined)?undefined:!!b.hora,
