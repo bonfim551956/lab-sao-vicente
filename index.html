@@ -2722,6 +2722,9 @@ function rnOculos(n,dados){
   const tipo=document.getElementById('ft').value;
   const comGrau=COM_GRAU.includes(tipo);
   const semPed=SEM_PEDIDO.includes(tipo);
+  // o número do pedido só aparece ao editar uma OS que já tem o número.
+  // No cadastro ele não existe ainda: sai quando a OS vai para a coluna Pedido.
+  const mostraPed=!semPed&&!!editId&&(atuais||[]).some(o=>o&&o.ped);
   let html='';
   for(let i=0;i<n;i++){
     const d=atuais[i]||{};
@@ -2732,9 +2735,9 @@ function rnOculos(n,dados){
         <span style="font-size:11px;font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.07em">Óculos ${i+1}</span>
         ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
       </div>`:''}
-      <div class="mf" style="margin-bottom:${comGrau?'10px':'0'};${semPed?'display:none':''}">
-        <label>Número do pedido${i===0?' <span style="color:var(--re)">*</span>':''}</label>
-        <input id="fp_${i}" value="${pedVal}" placeholder="Ex: PED-001"/>
+      <div class="mf" style="margin-bottom:${comGrau?'10px':'0'};${mostraPed?'':'display:none'}">
+        <label>Número do pedido</label>
+        <input id="fp_${i}" value="${pedVal}" placeholder="Ex: 115438859"/>
       </div>
       ${comGrau?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod_${i}" value="${v('esfOD')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
@@ -2760,7 +2763,11 @@ function blocoOculos(c,s){
   return ocs.map((o,i)=>{
     const grau=(o.esfOD!=null)?`<div class="cg">OD ${fG(o.esfOD,o.cilOD)} · OE ${fG(o.esfOE,o.cilOE)}</div>`:'';
     const tit=ocs.length>1?`<div class="cg" style="font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.06em;margin-top:${i?7:4}px">Óculos ${i+1}</div>`:'';
-    return tit+`<div class="cp">${hl(o.ped||'—',s||'')}</div>`+grau;
+    const semNum=!o.ped&&c.col===0&&TEM_PEDIDO.includes(c.tipo);
+    const linha=semNum
+      ? `<div class="cp" style="color:#B45309;font-weight:700">pedido a fazer</div>`
+      : `<div class="cp">${hl(o.ped||'—',s||'')}</div>`;
+    return tit+linha+grau;
   }).join('');
 }
 
@@ -4225,8 +4232,8 @@ async function svOS(){
   const oculos=[];
   for(let i=0;i<brutos.length;i++){
     const b=brutos[i];
-    const ped=semPed?tipo.toUpperCase():(b.ped||'').trim();
-    if(!ped){alert('Preencha o número do pedido do óculos '+(i+1)+'.');return;}
+    // sem exigência: o número entra depois, ao mover de Venda para Pedido
+    const ped=semPed?tipo.toUpperCase():UP((b.ped||'').trim());
     if(comGrau&&(b.esfOD===''||b.cilOD===''||b.esfOE===''||b.cilOE==='')){
       alert('Preencha todos os graus do óculos '+(i+1)+' (Esf. OD, Cil. OD, Esf. OE, Cil. OE).');return;
     }
