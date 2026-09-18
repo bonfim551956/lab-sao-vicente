@@ -30,13 +30,25 @@ const {
                           // coisa (ou ausente) = só o aviso de pronto.
 } = Object.fromEntries(Object.entries(process.env).map(([k, v]) => [k, limpo(v)]));
 
-const COLUNAS = ['Pedido', 'Ag. montagem', 'Em montagem', 'Pronto', 'Avisado', 'Entregue'];
+const COLUNAS = ['Venda', 'Pedido', 'Montagem', 'Pronto', 'Avisado', 'Entregue'];
 const MINUTOS_ENTRE_ENVIOS = 10;   // trava contra clique repetido
 
 function texto(card) {
   const nome = String(card.cliente || '').trim();
   // sem nome cadastrado, a frase se ajusta em vez de deixar buraco
   const emNome = nome ? ` em nome de: ${nome}` : '';
+
+  // OS mista: um óculos saiu do estoque e já está pronto, o outro ainda
+  // depende do fornecedor. A mensagem precisa deixar isso claro.
+  if (Number(card.col) < 3 && card.hora_pronto) {
+    return 'Olá, tudo bem?\n'
+      + `Somos das Óticas Idealize 🕶️ e temos uma ÓTIMA NOTÍCIA: `
+      + `um dos óculos da sua Ordem de Serviço nº ${card.os}${emNome} já está pronto `
+      + `para retirada! 😉\n`
+      + 'O outro ainda está em produção e avisamos assim que ficar pronto.\n'
+      + 'Estamos abertos de segunda a sexta das 9h às 19h, '
+      + 'e aos sábados e feriados das 9h às 15h.';
+  }
   return 'Olá, tudo bem?\n'
        + `Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, `
        + `seu óculos da Ordem de Serviço nº ${card.os}${emNome} já está pronto! 😉\n`
@@ -115,7 +127,7 @@ module.exports = async (req, res) => {
 
     // ── busca a OS no banco (é o servidor quem decide os dados) ────────────
     const achados = await sb(`os_cards?id=eq.${encodeURIComponent(id)}`
-      + `&select=id,unidade,os,col,cliente,telefone,history`);
+      + `&select=id,unidade,os,col,cliente,telefone,history,hora_pronto`);
     const card = achados && achados[0];
     if (!card) return res.status(404).json({ erro: 'OS não encontrada.' });
 
@@ -123,9 +135,10 @@ module.exports = async (req, res) => {
     if (LOJA_UNIDADE && card.unidade !== LOJA_UNIDADE) {
       return res.status(403).json({ erro: 'Esta OS é de outra unidade.' });
     }
-    if (Number(card.col) < 3) {
+    if (Number(card.col) < 3 && !card.hora_pronto) {
       return res.status(400).json({
-        erro: `A OS ainda está em "${COLUNAS[card.col] || card.col}". O aviso só vale a partir de Pronto.`,
+        erro: `A OS ainda está em "${COLUNAS[card.col] || card.col}". O aviso só vale a partir de Pronto`
+          + ` — ou quando o óculos de hora for marcado como pronto.`,
       });
     }
     const fone = numero(card.telefone);
