@@ -914,7 +914,7 @@ textarea {
 
 <div class="mb" id="labm" style="display:none">
   <div class="md" style="max-width:420px">
-    <div class="mh"><span>Enviar para Ag. montagem</span><button class="mx" onclick="clsLab()">&#10005;</button></div>
+    <div class="mh"><span>Enviar para Montagem</span><button class="mx" onclick="clsLab()">&#10005;</button></div>
     <div class="mf"><label>Laboratório <span style="color:var(--re)">*</span></label>
       <select id="flab">
         <option value="">Selecione...</option>
@@ -1315,7 +1315,7 @@ const RS={
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
-const CS=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado'];
+const CS=['Venda','Pedido','Montagem','Pronto','Avisado'];
 const COM_GRAU=['hora','gar-hora','gar-estoque'];
 const COM_BAIXA=['hora','gar-hora','gar-estoque'];
 
@@ -1576,7 +1576,7 @@ async function doLogin(){
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
   document.getElementById('nn').textContent=UP(U.n);
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Venda, Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Venda, Pedido e Avisado.',montagem:'Montagem — acesso a Pedido, Montagem e Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
   aplicarAbas();
   // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
@@ -1825,9 +1825,9 @@ let usLista=[];
 
 const PERFIS_DESC={
   supervisor:'Acesso total, inclusive esta tela.',
-  gerente:'Cria OS, movimenta Pedido e Avisado, vê os financeiros.',
-  adm:'Cria OS, movimenta Pedido e Avisado, vê os financeiros.',
-  montagem:'Só Ag. montagem e Em montagem. Não vê financeiro.',
+  gerente:'Cria OS, movimenta Venda, Pedido e Avisado, vê os financeiros.',
+  adm:'Cria OS, movimenta Venda, Pedido e Avisado, vê os financeiros.',
+  montagem:'Só Pedido, Montagem e Pronto. Não vê financeiro.',
   posvendas:'Só visualização dos serviços, do crediário e dos saldos.'
 };
 
@@ -3421,7 +3421,7 @@ function expGarPDF(){
     <div class="kpi"><div class="kpi-label">Gar. Pedido</div><div class="kpi-val">${garR.filter(r=>r.tipo==='gar-pedido').length}</div></div>
     <div class="kpi"><div class="kpi-label">Gar. Armação</div><div class="kpi-val">${garR.filter(r=>r.tipo==='gar-armacao').length}</div></div>
   </div>`;
-  const CF2=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const CF2=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   const tabela=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp.</th><th>OS Compra</th><th>Status</th><th>Data</th></tr></thead>
   <tbody>${garR.map((r,i)=>`<tr><td>${i+1}</td><td><b>${r.os}</b></td><td>${r.ped}</td><td>${tGL(r.tipo)}</td><td>${r.obs||'—'}</td><td>${r.respGar||'—'}</td><td>${r.osCompra||'—'}</td><td>${CF2[r.col]||'—'}</td><td>${fd(r.at)}</td></tr>`).join('')}</tbody></table>`;
   abrirPDF('Relatório de Garantias', kpis+tabela);
@@ -3430,7 +3430,7 @@ function expGarPDF(){
 // PDF Refeitos
 function expRefPDF(){
   if(!refR.length){alert('Nenhum dado para exportar.');return;}
-  const CF2=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const CF2=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="kpi-label">Total Refeitos</div><div class="kpi-val">${refR.length}</div></div>
   </div>`;
@@ -3442,7 +3442,7 @@ function expRefPDF(){
 // PDF Prazos
 function expPrazosPDF(){
   if(!prazosData.length){alert('Nenhum dado para exportar.');return;}
-  const CF2=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const CF2=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="kpi-label">Total</div><div class="kpi-val">${prazosData.length}</div></div>
     <div class="kpi"><div class="kpi-label">Atrasadas</div><div class="kpi-val" style="color:#DC2626">${prazosData.filter(c=>c._diff<0).length}</div></div>
@@ -4539,7 +4539,7 @@ function rnGar(){
   }
   const b=document.getElementById('gb2');
   if(!garR.length){b.innerHTML='<div class="er">Nenhuma garantia neste período.</div>';return;}
-  const status=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const status=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   b.innerHTML=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp. Garantia</th><th>Receita</th><th>Observação</th><th>Lançado por</th><th>Status</th><th>Data</th></tr></thead><tbody>${garR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td style="font-weight:600">${r.os}</td><td>${r.ped}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="bgr">${tGL(r.tipo)}</span></td><td style="color:var(--mu);font-size:12px">${r.obs}</td><td style="color:var(--mu)">${r.respGar}</td><td style="color:var(--mu)">${r.receita}</td><td style="color:var(--mu);font-size:12px">${r.obsTxt}</td><td style="color:var(--mu)">${r.u}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg);border:1px solid var(--bo)">${status[r.col]||'—'}</span></td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
 }
 
@@ -4597,7 +4597,7 @@ function rnRef(){
   document.getElementById('rf4').textContent=refR.filter(r=>r.tipo==='passagem').length;
   const b=document.getElementById('r2b');
   if(!refR.length){b.innerHTML='<div class="er">Nenhum refeito neste período.</div>';return;}
-  const status=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const status=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   b.innerHTML=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Dt. Venda</th><th>OD Esf/Cil</th><th>OE Esf/Cil</th><th>Lab</th><th>Motivo do Refazer</th><th>Refeito por</th><th>Status</th><th>Data</th></tr></thead><tbody>${refR.map((r,i)=>`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td style="font-weight:600">${r.os}</td><td>${r.ped}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(r.tipo)}">${tGL(r.tipo)}</span></td><td style="color:var(--mu)">${r.dtVenda!=='—'?r.dtVenda.split('-').reverse().join('/'):r.dtVenda}</td><td style="color:var(--mu)">${r.esfOD}/${r.cilOD}</td><td style="color:var(--mu)">${r.esfOE}/${r.cilOE}</td><td style="color:var(--mu)">${r.lab}</td><td style="color:#DC2626;font-weight:500">${r.motivo}</td><td style="color:var(--mu)">${r.u}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg);border:1px solid var(--bo)">${status[r.col]||'—'}</span></td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`).join('')}</tbody></table>`;
 }
 
@@ -4631,7 +4631,7 @@ function rnPrazos(){
   // Ordena prazo mais próximo primeiro (atrasadas primeiro)
   prazosData.sort((a,b)=>a._dp-b._dp);
 
-  const cols=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const cols=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   document.getElementById('pz0').textContent=prazosData.length;
   document.getElementById('pz1').textContent=prazosData.filter(c=>c._diff===0).length;
   document.getElementById('pz2').textContent=prazosData.filter(c=>c._diff===1).length;
@@ -4670,7 +4670,7 @@ function rnPrazos(){
 
 function expPrazosCSV(){
   if(!prazosData.length){alert('Nenhum dado.');return;}
-  const cols=['Pedido','Ag. montagem','Em montagem','Pronto','Avisado','Entregue'];
+  const cols=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   const csv=['OS,Pedido,Tipo,Dt.Venda,Prazo,Situacao,Coluna,Urgente',...prazosData.map(c=>{
     const sit=c._diff<0?'ATRASADA '+Math.abs(c._diff)+'d':c._diff===0?'VENCE HOJE':c._diff===1?'VENCE AMANHA':'Em '+c._diff+' dias';
     return[c.os,c.ped||'',tGL(c.tipo),c.dtVenda||'',c.prazo,sit,cols[c.col]||'',c.urgente?'SIM':'NÃO'].join(',');
@@ -5097,7 +5097,7 @@ document.addEventListener('keydown',e=>{
     document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
     document.getElementById('nn').textContent=UP(U.n);
     const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Pedido e Avisado.',montagem:'Montagem — acesso a Ag. montagem e Em montagem.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Venda, Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Venda, Pedido e Avisado.',montagem:'Montagem — acesso a Pedido, Montagem e Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
     const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
     aplicarAbas();
     let aba=localStorage.getItem('idealize_tab')||'k';
