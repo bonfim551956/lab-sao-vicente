@@ -599,6 +599,7 @@ textarea {
         <input type="date" id="fc-data" onchange="rnFech()" style="font-size:13px;font-weight:700;padding:7px 11px;border:1.5px solid var(--v);border-radius:9px;background:var(--w);color:var(--tx);font-family:inherit;outline:none"/>
         <span id="fc-status" style="font-size:11px;font-weight:700;padding:6px 12px;border-radius:9px"></span>
         <button class="bex" onclick="expFcPDF()" style="background:#FEF3E2;color:#C05E0A;border-color:rgba(245,154,42,.3)">PDF</button>
+        <button id="fc-excluir" onclick="excluirFech()" style="display:none;font-size:12px;font-weight:700;font-family:inherit;padding:8px 14px;border-radius:10px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">Excluir fechamento</button>
         <button onclick="svFech()" style="font-size:13px;font-weight:800;font-family:inherit;padding:9px 20px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--v),var(--vm));color:#fff;cursor:pointer">Salvar fechamento</button>
       </div>
     </div>
@@ -1401,8 +1402,20 @@ let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 // financeira, premio), nem em datas, numeros, ids ou senhas.
 function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
 function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
-const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','entregaForma','entregaForma2','formaPag','formaPag2'];
+const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente'];
+// O que já foi gravado em maiúsculas volta ao formato da lista, senão
+// continuaria fora da soma por forma de pagamento.
+function formaCanon(f){
+  if(!f)return f;
+  const alvo=String(f).trim().toLocaleUpperCase('pt-BR');
+  const achou=FORMAS.find(x=>x.toLocaleUpperCase('pt-BR')===alvo);
+  return achou||f;
+}
+
 function upCard(c){
+  ['formaPag','formaPag2','entregaForma','entregaForma2'].forEach(k=>{
+    if(c[k])c[k]=formaCanon(c[k]);
+  });
   upCampos(c,CAMPOS_OS);
   if(Array.isArray(c.pedidos))c.pedidos.forEach(o=>upCampos(o,['ped']));
   if(Array.isArray(c.history))c.history.forEach(h=>{
@@ -1981,6 +1994,10 @@ async function svMinhaSenha(){
 // RANKING = o que foi VENDIDO hoje.  CAIXA = o que ENTROU hoje.
 // São coisas diferentes: uma venda antiga quitada hoje entra no caixa e não no ranking.
 let fcVendas=[], fcEntregas=[], fcSalvo=null, fcDiaCarregado=null, _fcTimer=null, fcTravado=false;
+// Linhas que vieram do sistema e o supervisor removeu. Sem guardar isso,
+// a linha voltaria sozinha na próxima sincronização.
+let fcRemovidos=[];
+function podeExcluirFech(){return U&&U.r==='supervisor';}
 const rs=v=>'R$ '+Number(v||0).toFixed(2);
 const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
 
@@ -2013,7 +2030,9 @@ function entregasDoDia(dia){
 function juntar(lista,novos){
   const porId=new Set(lista.map(x=>x.cardId).filter(Boolean));
   const porOs=new Set(lista.map(x=>UP(String(x.os||'').trim())).filter(Boolean));
-  const faltam=novos.filter(n=>!porId.has(n.cardId)&&!porOs.has(UP(String(n.os||'').trim())));
+  const fora=new Set(fcRemovidos||[]);
+  const faltam=novos.filter(n=>!fora.has(n.cardId)&&!porId.has(n.cardId)
+    &&!porOs.has(UP(String(n.os||'').trim())));
   return {lista:lista.concat(faltam), novos:faltam.length};
 }
 
@@ -2029,8 +2048,9 @@ async function rnFech(){
   // Fechamento já salvo é documento: não se recarrega sozinho, senão a lista
   // duplicaria a cada abertura. Quem quiser atualizar usa o botão.
   fcTravado=!!salvo;
-  fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:vendasDoDia(dia);
-  fcEntregas=(salvo&&Array.isArray(salvo.entregas))?salvo.entregas:entregasDoDia(dia);
+  fcRemovidos=(salvo&&Array.isArray(salvo.removidos))?salvo.removidos:[];
+  fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:vendasDoDia(dia).filter(v=>!fcRemovidos.includes(v.cardId));
+  fcEntregas=(salvo&&Array.isArray(salvo.entregas))?salvo.entregas:entregasDoDia(dia).filter(e=>!fcRemovidos.includes(e.cardId));
 
   const st=document.getElementById('fc-status');
   st.textContent=salvo?('Fechado por '+(salvo.fechado_por||'—')):'Ainda não fechado';
@@ -2046,6 +2066,7 @@ async function rnFech(){
   if(rasc&&rasc.em>salvoEm){
     if(Array.isArray(rasc.vendas))fcVendas=rasc.vendas;
     if(Array.isArray(rasc.entregas))fcEntregas=rasc.entregas;
+    if(Array.isArray(rasc.removidos))fcRemovidos=rasc.removidos;
     if(rasc.google)document.getElementById('fc-google').value=rasc.google;
     if(rasc.obs)document.getElementById('fc-obs').value=rasc.obs;
     marcarRascunho(true);
@@ -2054,6 +2075,8 @@ async function rnFech(){
     if(rasc)apagarRascunho(dia);
   }
   pintarTrava();
+  const bx=document.getElementById('fc-excluir');
+  if(bx)bx.style.display=(salvo&&podeExcluirFech())?'inline-block':'none';
   rnFechLinhas();
 }
 
@@ -2094,7 +2117,7 @@ function salvarRascunho(){
   _fcTimer=setTimeout(()=>{
     try{
       localStorage.setItem(chaveRascunho(fcDiaCarregado),JSON.stringify({
-        em:Date.now(), por:U?U.n:'', vendas:fcVendas, entregas:fcEntregas,
+        em:Date.now(), por:U?U.n:'', vendas:fcVendas, entregas:fcEntregas, removidos:fcRemovidos,
         google:document.getElementById('fc-google').value,
         obs:document.getElementById('fc-obs').value}));
       marcarRascunho(true);
@@ -2114,7 +2137,16 @@ function addVendaAvulsa(){
   fcVendas.push({os:'',descricao:'',valorTotal:'',forma1:'',pago1:'',forma2:'',pago2:'',_avulsa:true});
   salvarRascunho();rnFechLinhas();focar('v_'+(fcVendas.length-1)+'_descricao');
 }
-function delVenda(i){fcVendas.splice(i,1);salvarRascunho();rnFechLinhas();}
+function delVenda(i){
+  const v=fcVendas[i];
+  if(v&&v._auto){
+    if(!podeExcluirFech()){alert('Só o supervisor pode remover uma linha que veio do sistema.');return;}
+    if(!confirm('Remover a OS '+(v.os||'')+' do fechamento deste dia?\n\n'
+      +'A OS continua no quadro. Ela só deixa de contar neste caixa, e não volta sozinha.'))return;
+    if(v.cardId)fcRemovidos.push(v.cardId);
+  }
+  fcVendas.splice(i,1);salvarRascunho();rnFechLinhas();
+}
 function edVenda(i,c,v){fcVendas[i][c]=v;salvarRascunho();totFech();}
 function tgVenda2(i){
   fcVendas[i]._dois=!fcVendas[i]._dois;
@@ -2125,7 +2157,16 @@ function addEntrega(){
   fcEntregas.push({os:'',cliente:'',forma:'',valor:'',forma2:'',valor2:'',_manual:true});
   salvarRascunho();rnFechLinhas();focar('e_'+(fcEntregas.length-1)+'_os');
 }
-function delEntrega(i){fcEntregas.splice(i,1);salvarRascunho();rnFechLinhas();}
+function delEntrega(i){
+  const e=fcEntregas[i];
+  if(e&&!e._manual){
+    if(!podeExcluirFech()){alert('Só o supervisor pode remover um recebimento que veio do sistema.');return;}
+    if(!confirm('Remover o recebimento da OS '+(e.os||'')+' deste fechamento?\n\n'
+      +'A entrega continua registrada na OS. Ela só deixa de contar neste caixa.'))return;
+    if(e.cardId)fcRemovidos.push(e.cardId);
+  }
+  fcEntregas.splice(i,1);salvarRascunho();rnFechLinhas();
+}
 function edEnt(i,c,v){fcEntregas[i][c]=v;salvarRascunho();totFech();}
 function tgEnt2(i){fcEntregas[i]._dois=true;rnFechLinhas();focar('e_'+i+'_forma2');}
 
@@ -2157,8 +2198,11 @@ function rnFechLinhas(){
       const auto=!!v._auto;
       return '<div style="border-bottom:1px solid var(--bo);padding:7px 0'
         +(auto?';background:#FBFDFC':(v._avulsa?';background:#EFF6FF':''))+'">'
-      +(auto?'<div style="font-size:9px;font-weight:800;color:#0D7A75;letter-spacing:.04em;margin-bottom:3px">DO SISTEMA'
-             +(v.cliente?' · '+v.cliente:'')+'</div>'
+      +(auto?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+             +'<span style="font-size:9px;font-weight:800;color:#0D7A75;letter-spacing:.04em">DO SISTEMA'
+             +(v.cliente?' · '+v.cliente:'')+'</span>'
+             +(podeExcluirFech()?'<button onclick="delVenda('+i+')" title="Remover deste fechamento" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button>':'')
+             +'</div>'
             :'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
              +'<span style="font-size:9px;font-weight:800;color:#1D4ED8;letter-spacing:.04em">VENDA AVULSA</span>'
              +'<button onclick="delVenda('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button></div>')
@@ -2199,7 +2243,11 @@ function rnFechLinhas(){
       +(e._manual?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
         +'<span style="font-size:9px;font-weight:800;color:#1D4ED8;letter-spacing:.04em">LANÇADA À MÃO</span>'
         +'<button onclick="delEntrega('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button></div>'
-        :(anterior?'<div style="font-size:9px;font-weight:800;color:#92400E;letter-spacing:.04em;margin-bottom:3px">VENDA DE '+dtBR(e.dtVenda)+'</div>':''))
+        :'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+          +'<span style="font-size:9px;font-weight:800;color:'+(anterior?'#92400E':'var(--mu)')+';letter-spacing:.04em">'
+          +(anterior?('VENDA DE '+dtBR(e.dtVenda)):'DO SISTEMA')+'</span>'
+          +(podeExcluirFech()?'<button onclick="delEntrega('+i+')" title="Remover deste fechamento" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button>':'')
+          +'</div>')
       +'<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center">'
       +(e._manual
         ? '<div>'+inp(e.os,"edEnt("+i+",'os',this.value)","Nº OS",'e_'+i+'_os')
@@ -2267,6 +2315,7 @@ async function svFech(){
   const reg={id:idFech(dia),unidade:U.un,data:dia,
     vendas:fcVendas.filter(v=>v.os||v.descricao||num(v.valorTotal)||num(v.pago1)).map(limpa),
     entregas:fcEntregas.map(limpa),
+    removidos:fcRemovidos,
     ranking:t.ranking,caixa:t.caixa,qtd_vendas:t.qtd,
     google_avaliacoes:parseInt(document.getElementById('fc-google').value)||0,
     obs:UP(document.getElementById('fc-obs').value.trim())||null,
@@ -2277,6 +2326,25 @@ async function svFech(){
     setSy('ok','Fechamento salvo — '+horaAgora());
     await rnFech();
   }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+// Apaga o fechamento salvo do dia. A tela volta a montar a partir das OS.
+async function excluirFech(){
+  if(!podeExcluirFech()){alert('Só o supervisor pode excluir um fechamento.');return;}
+  const dia=document.getElementById('fc-data').value;
+  if(!fcSalvo){alert('Este dia ainda não foi fechado.');return;}
+  if(!confirm('Excluir o fechamento de '+dtBR(dia)+'?\n\n'
+    +'Fechado por: '+(fcSalvo.fechado_por||'—')+'\n'
+    +'Caixa: '+rs(fcSalvo.caixa)+'\n\n'
+    +'O dia sai da Projeção e a tela volta a montar a partir das OS.\n'
+    +'Esta ação não tem volta.'))return;
+  try{
+    await sbDelete('fechamento_caixa',{id:idFech(dia)});
+    apagarRascunho(dia);
+    fcDiaCarregado=null;
+    await rnFech();
+    setSy('ok','Fechamento excluído — '+horaAgora());
+  }catch(e){alert('Erro ao excluir: '+e.message);}
 }
 
 function expFcPDF(){
