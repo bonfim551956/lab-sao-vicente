@@ -4322,12 +4322,24 @@ function opEdit(id){
 
 async function svOS(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
-  const os=document.getElementById('fo').value.trim();
+  const os=UP(document.getElementById('fo').value.trim());
   const cliente=UP(document.getElementById('fcli').value.trim());
   const telefone=document.getElementById('ftel').value.trim();
   const tipo=document.getElementById('ft').value;
   const dtVenda=document.getElementById('fdt').value;
   if(!os||!dtVenda){alert('Preencha o número da OS e a data da venda.');return;}
+
+  // não pode existir duas OS com o mesmo número na mesma loja
+  const repetida=ST.cards.find(x=>x.id!==editId&&UP(String(x.os||'').trim())===os);
+  if(repetida){
+    alert('Já existe a OS '+os+' nesta loja.\n\n'
+      +'Ela está em: '+(CF[repetida.col]||'?')
+      +(repetida.cliente?('\nCliente: '+repetida.cliente):'')
+      +'\n\nConfira o número antes de salvar.');
+    document.getElementById('fo').focus();
+    document.getElementById('fo').select();
+    return;
+  }
 
   const comGrau=COM_GRAU.includes(tipo);
   const semPed=SEM_PEDIDO.includes(tipo);
