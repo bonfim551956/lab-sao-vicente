@@ -148,7 +148,12 @@ module.exports = async (req, res) => {
 
     // ── evita disparo duplicado por clique repetido ────────────────────────
     const historico = Array.isArray(card.history) ? card.history : [];
-    const ultimo = historico.filter(h => h && h.whats).map(h => h.at || 0).sort((a, b) => b - a)[0];
+    // a trava contra clique repetido vale dentro da mesma etapa: ter avisado
+    // o óculos de hora não pode bloquear o aviso do pedido completo
+    const parcialAgora = Number(card.col) < 3;
+    const ultimo = historico
+      .filter(h => h && h.whats && (!!h.parcial) === parcialAgora)
+      .map(h => h.at || 0).sort((a, b) => b - a)[0];
     if (ultimo && Date.now() - ultimo < MINUTOS_ENTRE_ENVIOS * 60000) {
       const faltam = Math.ceil((MINUTOS_ENTRE_ENVIOS * 60000 - (Date.now() - ultimo)) / 60000);
       return res.status(429).json({
@@ -183,6 +188,8 @@ module.exports = async (req, res) => {
       r: (corpo.perfil || ''),
       from: card.col, to: card.col, at: Date.now(),
       mc: false, whats: true, auto: true,
+      // parcial = aviso do óculos de hora, antes do pedido completo ficar pronto
+      parcial: Number(card.col) < 3,
       zapId: resposta.messageId || resposta.id || null,
     });
     // A MENSAGEM JÁ SAIU. Se gravar o histórico falhar, não devolvemos erro:
