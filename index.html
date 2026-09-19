@@ -2325,7 +2325,14 @@ async function svFech(){
     apagarRascunho(dia);
     setSy('ok','Fechamento salvo — '+horaAgora());
     await rnFech();
-  }catch(e){alert('Erro ao salvar: '+e.message);}
+  }catch(e){
+    if(String(e.message||'').includes('removidos')){
+      alert('Falta rodar no Supabase o arquivo 19_fechamento_removidos.sql.\n\n'
+        +'Sem a coluna "removidos", o que você excluir volta na próxima abertura.');
+    }else{
+      alert('Erro ao salvar: '+e.message);
+    }
+  }
 }
 
 // Apaga o fechamento salvo do dia. A tela volta a montar a partir das OS.
