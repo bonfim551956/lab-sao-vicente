@@ -1211,7 +1211,8 @@ textarea {
         <div class="os-sec">Produto</div>
         <div class="mf"><label>Produto <span style="color:var(--re)">*</span></label>
           <input id="av-desc" placeholder="Ex: Óculos de sol Ray-Ban"/></div>
-        <div class="mf"><label>Cliente</label><input id="av-cli" placeholder="Opcional"/></div>
+        <div class="mf"><label>Cliente <span style="color:var(--re)">*</span></label>
+          <input id="av-cli" placeholder="Nome do cliente"/></div>
         <div class="mf"><label>Nº da OS <span style="color:var(--re)">*</span></label>
           <input id="av-os" placeholder="Ex: 2254429"/></div>
       </div>
@@ -4268,6 +4269,7 @@ async function svAvulsa(){
   const forma2=document.getElementById('av-forma2').value;
 
   if(!desc){alert('Informe o produto.');document.getElementById('av-desc').focus();return;}
+  if(!cliente){alert('Informe o cliente.');document.getElementById('av-cli').focus();return;}
   if(valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
   if(!os){alert('Informe o número da OS.');document.getElementById('av-os').focus();return;}
   if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
