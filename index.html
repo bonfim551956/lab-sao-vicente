@@ -2656,7 +2656,12 @@ function waLink(c){
   return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
 }
 
-function jaAvisado(c){return (c.history||[]).some(h=>h.whats);}
+function jaAvisado(c){
+  const avisos=(c.history||[]).filter(h=>h.whats);
+  if(!avisos.length)return false;
+  const parcialAgora=c.col<3;                 // ainda é o aviso do óculos de hora?
+  return avisos.some(h=>(!!h.parcial)===parcialAgora);
+}
 
 // Tenta enviar sozinho pelo Z-API. Se o servidor nao responder (arquivo
 // aberto localmente, internet fora, Z-API desconectado), avisa e passa a
@@ -2681,7 +2686,7 @@ async function avisarWhats(id){
     delete _waManual[id];
     if(abrirWhatsManual(c)){
       if(!c.history)c.history=[];
-      c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,whats:true});
+      c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,whats:true,parcial:c.col<3});
       rnKan();await saveCard(c);
     }
     return;
@@ -4246,7 +4251,7 @@ function opH(id){
   const l=document.getElementById('hl');
   if(!c.history||!c.history.length){l.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Sem movimentações.</div>';}
   else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`:'';
-const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">avisou pelo WhatsApp</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
+const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">'+(h.parcial?'avisou pelo WhatsApp — óculos de hora':'avisou pelo WhatsApp')+'</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
   document.getElementById('hm').style.display='flex';
 }
 function clsH(){document.getElementById('hm').style.display='none';}
