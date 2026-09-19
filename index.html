@@ -2504,8 +2504,9 @@ function expPjPDF(){
   const ciclo=document.getElementById('pj-ciclo').value;
   const [ano,mes]=ciclo.split('-');
   abrirPDF('Projeção do Ciclo — '+mes+'/'+ano,
-    '<div class="kpis"></div>'
-    +document.getElementById('pj-kpis').outerHTML.replace(/class="rs2"/g,'class="kpi"')
+    document.getElementById('pj-kpis').outerHTML
+      .replace('class="rsum"','class="kpis"')
+      .replace(/class="rs2"/g,'class="kpi"')
     +'<h3 style="font-size:12px;margin:12px 0 4px">Dia a dia</h3>'
     +document.getElementById('pj-body').innerHTML);
 }
@@ -3469,7 +3470,10 @@ function abrirPDF(titulo, conteudoHTML, imprimir){
     td{padding:6px 8px;border-bottom:1px solid #E2E8F0}
     tr:hover{background:#F8FAFC}
     .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-    .kpi{background:#F0F4F8;border-radius:8px;padding:10px 14px;min-width:110px}
+    .kpi{background:#F0F4F8;border-radius:8px;padding:10px 14px;min-width:110px;flex:1 1 150px}
+.kpi .rl{font-size:8pt;color:#64748B;text-transform:uppercase;letter-spacing:.4pt;font-weight:700;margin-bottom:3px}
+.kpi .rv{font-size:13pt;font-weight:800;color:#0F1923;line-height:1.2}
+.kpi .rv.v{color:#16A34A}.kpi .rv.i{color:#1D4ED8}.kpi .rv.d{color:#B91C1C}.kpi .rv.w{color:#92400E}
     .kpi-label{font-size:9px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
     .kpi-val{font-size:20px;font-weight:800;color:#1BA8A0;margin-top:2px}
     .badge{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:700}
