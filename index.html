@@ -179,6 +179,13 @@ button[id="btn-nova-os"]{
   transition:all .2s !important;
 }
 button[id="btn-nova-os"]:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(27,168,160,.4) !important;}
+button[id="btn-avulsa"]{
+  background:linear-gradient(135deg,#1D4ED8 0%,#1E40AF 100%) !important;
+  border:none !important;border-radius:12px !important;
+  box-shadow:0 4px 14px rgba(29,78,216,.28) !important;
+  font-weight:700 !important;letter-spacing:.02em !important;transition:all .2s !important;
+}
+button[id="btn-avulsa"]:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(29,78,216,.38) !important;}
 
 /* ── REPORTS ── */
 #rs,#es,#gs,#r2s{display:none;flex-direction:column;flex:1;}
@@ -449,7 +456,7 @@ textarea {
       <div class="li"><div class="ld" style="background:#F59E0B"></div>Entre 24h e 48h</div>
       <div class="li"><div class="ld" style="background:#16A34A"></div>Dentro do prazo</div>
     </div>
-    <button class="add" id="btn-nova-os" style="max-width:200px;margin-bottom:.75rem;border-style:solid;background:var(--v);color:#fff;border-color:var(--v);font-weight:600;font-size:13px;padding:9px 18px;border-radius:9px" onclick="opOs()">+ Nova OS</button><div class="bd" id="bd"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem"><button class="add" id="btn-nova-os" style="max-width:200px;border-style:solid;background:var(--v);color:#fff;border-color:var(--v);font-weight:600;font-size:13px;padding:9px 18px;border-radius:9px" onclick="opOs()">+ Nova OS</button><button class="add" id="btn-avulsa" style="max-width:220px;border-style:solid;background:#1D4ED8;color:#fff;border-color:#1D4ED8;font-weight:600;font-size:13px;padding:9px 18px;border-radius:9px" onclick="opAvulsa()">+ Venda avulsa</button></div><button style="display:none"</button><div class="bd" id="bd"></div>
   </div>
 
   <div id="rs" class="rm" style="display:none">
@@ -1184,6 +1191,41 @@ textarea {
 
 
 <!-- Número do pedido, ao mover de Venda para Pedido -->
+
+<!-- Venda avulsa: produto que não passa pelo laboratório -->
+<div class="mb" id="avm" style="display:none">
+  <div class="md" style="max-width:520px">
+    <div class="mh"><span>Venda avulsa</span><button class="mx" onclick="clsAvulsa()">&#10005;</button></div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-weight:500">
+      Óculos de sol, armação, acessório. Não passa pelo laboratório: entra já como entregue,
+      conta no faturamento do dia e fica no Histórico.
+    </div>
+    <div class="mf"><label>Produto <span style="color:var(--re)">*</span></label>
+      <input id="av-desc" placeholder="Ex: Óculos de sol Ray-Ban"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="mf"><label>Cliente</label><input id="av-cli" placeholder="Opcional"/></div>
+      <div class="mf"><label>Nº da OS</label><input id="av-os" placeholder="Opcional"/></div>
+      <div class="mf"><label>Valor da venda <span style="color:var(--re)">*</span></label>
+        <input id="av-valor" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcAvulsa()"/></div>
+      <div class="mf"><label>Valor recebido <span style="color:var(--re)">*</span></label>
+        <input id="av-rec" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcAvulsa()"/></div>
+    </div>
+    <div class="mf"><label>Forma de pagamento <span style="color:var(--re)">*</span></label><select id="av-forma"></select></div>
+    <button type="button" id="av-btn2" onclick="tgAvulsa2()" class="os-add">+ 2ª forma de pagamento</button>
+    <div id="av-wrap2" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="mf"><label>2ª forma</label><select id="av-forma2"></select></div>
+        <div class="mf"><label>Valor</label>
+          <input id="av-rec2" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcAvulsa()"/></div>
+      </div>
+    </div>
+    <div id="av-saldo" class="os-saldo"></div>
+    <div class="mft">
+      <button class="bc" onclick="clsAvulsa()">Cancelar</button>
+      <button class="bsv" onclick="svAvulsa()">Registrar venda</button>
+    </div>
+  </div>
+</div>
 <div class="mb" id="pedm" style="display:none">
   <div class="md" style="max-width:430px">
     <div class="mh"><span id="ped-tit">Número do pedido</span><button class="mx" onclick="clsPedNum()">&#10005;</button></div>
@@ -1402,7 +1444,7 @@ let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 // financeira, premio), nem em datas, numeros, ids ou senhas.
 function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
 function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
-const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente'];
+const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','descricao'];
 // O que já foi gravado em maiúsculas volta ao formato da lista, senão
 // continuaria fora da soma por forma de pagamento.
 function formaCanon(f){
@@ -1432,7 +1474,7 @@ function mapCard(r){return upCard({
   obsTxt:r.obs_txt,osCompra:r.os_compra,
   esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
-  cliente:r.cliente,telefone:r.telefone,
+  cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,
@@ -1523,7 +1565,7 @@ async function saveCard(c){
       esf_od:c.esfOD!=null?c.esfOD:null,cil_od:c.cilOD!=null?c.cilOD:null,
       esf_oe:c.esfOE!=null?c.esfOE:null,cil_oe:c.cilOE!=null?c.cilOE:null,
       refeito:!!c.refeito,motivo_refeito:c.motivoRefeito||null,
-      cliente:c.cliente||null,telefone:c.telefone||null,
+      cliente:c.cliente||null,telefone:c.telefone||null,descricao:c.descricao||null,
       entrega_valor:(c.entregaValor===0||c.entregaValor)?c.entregaValor:null,
       entrega_forma:c.entregaForma||null,
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
@@ -1692,8 +1734,8 @@ function travarCil(el){
 }
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
-function tGL(t){const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem'};return m[t]||t;}
-function tGC(t){if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
+function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem'};return m[t]||t;}
+function tGC(t){if(t==='avulsa')return'bvd';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -2006,7 +2048,7 @@ function idFech(d){return 'fc_'+(U.un)+'_'+d;}
 // ── o que o sistema traz sozinho ───────────────────────────────────────────
 function vendasDoDia(dia){
   return ST.cards.filter(c=>c.dtVenda===dia).map(c=>({
-    cardId:c.id, os:c.os||'', cliente:c.cliente||'',
+    cardId:c.id, os:c.descricao||c.os||'', cliente:c.cliente||'',
     tipo:c.tipo, valorTotal:num(c.valorVenda),
     forma1:c.formaPag||(num(c.valorVenda)?'':'Garantia'), pago1:num(c.valorRecebido),
     forma2:c.formaPag2||'', pago2:num(c.valorRecebido2),
@@ -2017,6 +2059,7 @@ function entregasDoDia(dia){
   const ini=new Date(dia+'T00:00:00').getTime(), fim=new Date(dia+'T23:59:59').getTime();
   const out=[];
   ST.cards.forEach(c=>{
+    if(c.tipo==='avulsa')return;          // já entra como venda do dia
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
     out.push({cardId:c.id, os:c.os||'', cliente:c.cliente||'', dtVenda:c.dtVenda||'',
@@ -4160,6 +4203,84 @@ function calcSaldo(){
   if(!precisa)document.getElementById('fretirada').value='';
 }
 
+
+// ── VENDA AVULSA ────────────────────────────────────────────────────────────
+// Produto pronto, sem laboratório: nasce direto em Entregue. Entra no
+// faturamento do dia e no Histórico, e é encontrada na busca como qualquer OS.
+function opAvulsa(){
+  if(!R||!R.ca){alert('Sem permissão para registrar vendas.');return;}
+  ['av-desc','av-cli','av-os','av-valor','av-rec','av-rec2'].forEach(i=>document.getElementById(i).value='');
+  opcoesFormas(document.getElementById('av-forma'));
+  opcoesFormas(document.getElementById('av-forma2'));
+  document.getElementById('av-wrap2').style.display='block';tgAvulsa2();
+  document.getElementById('av-saldo').style.display='none';
+  document.getElementById('avm').style.display='flex';
+  setTimeout(()=>document.getElementById('av-desc').focus(),90);
+}
+function clsAvulsa(){document.getElementById('avm').style.display='none';}
+function tgAvulsa2(){
+  const w=document.getElementById('av-wrap2');
+  const abrir=w.style.display==='none';
+  w.style.display=abrir?'block':'none';
+  document.getElementById('av-btn2').textContent=abrir?'− Remover 2ª forma':'+ 2ª forma de pagamento';
+  if(!abrir){document.getElementById('av-forma2').value='';document.getElementById('av-rec2').value='';}
+  calcAvulsa();
+}
+function calcAvulsa(){
+  const v=num(document.getElementById('av-valor').value);
+  const r=num(document.getElementById('av-rec').value)+num(document.getElementById('av-rec2').value);
+  const box=document.getElementById('av-saldo');
+  const s=Math.round((v-r)*100)/100;
+  if(!v&&!r){box.style.display='none';return;}
+  box.style.display='block';
+  if(s>0.001){box.style.cssText+=';background:#FEF3C7;border:1px solid #FCD34D;color:#92400E';
+    box.textContent='Saldo a receber: R$ '+s.toFixed(2);}
+  else if(s<-0.001){box.style.cssText+=';background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C';
+    box.textContent='Recebido R$ '+Math.abs(s).toFixed(2)+' a mais que o valor. Confira.';}
+  else{box.style.cssText+=';background:#F0FDF4;border:1px solid #BBF7D0;color:#16A34A';
+    box.textContent='Pago integralmente.';}
+}
+
+async function svAvulsa(){
+  if(!R||!R.ca){alert('Sem permissão.');return;}
+  const desc=UP(document.getElementById('av-desc').value.trim());
+  const cliente=UP(document.getElementById('av-cli').value.trim());
+  let os=UP(document.getElementById('av-os').value.trim());
+  const valor=num(document.getElementById('av-valor').value);
+  const rec=num(document.getElementById('av-rec').value);
+  const rec2=num(document.getElementById('av-rec2').value);
+  const forma=document.getElementById('av-forma').value;
+  const forma2=document.getElementById('av-forma2').value;
+
+  if(!desc){alert('Informe o produto.');document.getElementById('av-desc').focus();return;}
+  if(valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
+  if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
+  if(rec2&&!forma2){alert('Selecione a 2ª forma de pagamento.');return;}
+
+  // sem número informado, gera um para a venda ficar identificável
+  if(!os)os='AV'+String(Date.now()).slice(-8);
+  if(ST.cards.some(x=>UP(String(x.os||'').trim())===os)){
+    alert('Já existe a OS '+os+' nesta loja.');return;
+  }
+
+  const now=Date.now();
+  const saldoV=Math.round((valor-rec-rec2)*100)/100;
+  const c={id:'os_'+now, os, cliente, descricao:desc, tipo:'avulsa',
+    ped:'', pedidos:[], dtVenda:hojeBR(), prazo:hojeBR(), urgente:false,
+    valorVenda:valor, valorRecebido:rec, valorRecebido2:rec2||null,
+    formaPag:forma, formaPag2:forma2||null,
+    saldo:saldoV>0.001, saldoValor:saldoV>0.001?saldoV:null,
+    col:5, ts:now, tsCreated:now, unidade:U.un||UNIDADE,
+    history:[{u:U.n,r:U.r,from:-1,to:5,at:now,mc:false,venda:true,avulsa:true}]};
+  ST.cards.unshift(c);
+  clsAvulsa();rnKan();
+  try{
+    await saveCard(c);
+    setSy('ok','Venda avulsa registrada — '+horaAgora());
+    if(document.getElementById('fcs').style.display!=='none')sincEntregasFech();
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
 // ── NÚMERO DO PEDIDO ────────────────────────────────────────────────────────
 // Pedido para o fornecedor. Só faz sentido em Venda—Pedido e Garantia—Pedido:
 // Hora e Passagem usam lente do estoque, não têm pedido.
@@ -5175,7 +5296,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
