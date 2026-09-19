@@ -1310,9 +1310,9 @@ const US=[
 ];
 const RS={
   supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,ce:true,es:true,ed:true,rf:true,aj:true,wa:true},
-  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4,5],ca:true,cd:false,ce:true,es:true,ed:true,rf:true,aj:false,wa:true},
+  adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4],ca:true,cd:false,ce:true,es:true,ed:true,rf:true,aj:false,wa:true},
   posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
-  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[1,2,3],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
+  montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[2],ca:false,cd:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
 const CS=['Venda','Pedido','Montagem','Pronto','Avisado'];
@@ -1576,7 +1576,7 @@ async function doLogin(){
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
   document.getElementById('nn').textContent=UP(U.n);
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Venda, Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Venda, Pedido e Avisado.',montagem:'Montagem — acesso a Pedido, Montagem e Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
   aplicarAbas();
   // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
@@ -1825,9 +1825,9 @@ let usLista=[];
 
 const PERFIS_DESC={
   supervisor:'Acesso total, inclusive esta tela.',
-  gerente:'Cria OS, movimenta Venda, Pedido e Avisado, vê os financeiros.',
-  adm:'Cria OS, movimenta Venda, Pedido e Avisado, vê os financeiros.',
-  montagem:'Só Pedido, Montagem e Pronto. Não vê financeiro.',
+  gerente:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
+  adm:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
+  montagem:'Move apenas de Montagem para Pronto. Não vê financeiro.',
   posvendas:'Só visualização dos serviços, do crediário e dos saldos.'
 };
 
@@ -5102,7 +5102,7 @@ document.addEventListener('keydown',e=>{
     document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
     document.getElementById('nn').textContent=UP(U.n);
     const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta Venda, Pedido e Avisado.',gerente:'Gerente — cria OS e movimenta Venda, Pedido e Avisado.',montagem:'Montagem — acesso a Pedido, Montagem e Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
     const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
     aplicarAbas();
     let aba=localStorage.getItem('idealize_tab')||'k';
