@@ -4570,7 +4570,10 @@ function rnKan(){
       if(ci!==5){if(h>=48){tc='tal';ccl='al';}else if(h>=24){tc='twn';ccl='wn';}}
       const lh=c.history&&c.history.length?c.history[c.history.length-1]:null;
       const lu=lh?lh.u:'—';
-      const cm=R.mv.includes(ci)&&ci<5&&R.mv.includes(ci+1);
+      // mv é a lista de colunas DE ONDE a pessoa pode mover.
+      // Antes exigia permissão também na coluna de destino, o que escondia
+      // o botão Pedido -> Montagem do administrativo, já que Montagem é da montagem.
+      const cm=R.mv.includes(ci)&&ci<5;
       const nl=ci===4?'✓ Entregar':ci<4?'→ '+CS[ci+1]:'';
       if(filtroAtivo==='urg'&&!c.urgente)return;
       if(filtroAtivo==='gar'&&!(c.tipo&&c.tipo.startsWith('gar')))return;
