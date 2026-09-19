@@ -45,16 +45,16 @@ function texto(card) {
     return 'Olá, tudo bem?\n'
       + `Somos das Óticas Idealize 🕶️ e temos uma ÓTIMA NOTÍCIA: `
       + `um dos óculos da sua Ordem de Serviço nº ${card.os}${emNome} já está pronto `
-      + `para retirada! 😉\n`
-      + 'O outro ainda está em produção e avisamos assim que ficar pronto.\n'
-      + 'Estamos abertos de segunda a sexta das 9h às 19h, '
-      + 'e aos sábados e feriados das 9h às 15h.';
+      + `para retirada! 😉\n\n`
+      + 'O outro ainda está em produção e avisamos assim que ficar pronto.\n\n'
+      + '*_Estamos abertos de segunda a sexta das 9h às 19h, '
+      + 'e aos sábados e feriados das 9h às 15h._*';
   }
   return 'Olá, tudo bem?\n'
        + `Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, `
-       + `seu óculos da Ordem de Serviço nº ${card.os}${emNome} já está pronto! 😉\n`
-       + 'Estamos abertos de segunda a sexta das 9h às 19h, '
-       + 'e aos sábados e feriados das 9h às 15h.';
+       + `seu óculos da Ordem de Serviço nº ${card.os}${emNome} já está pronto! 😉\n\n`
+       + '*_Estamos abertos de segunda a sexta das 9h às 19h, '
+       + 'e aos sábados e feriados das 9h às 15h._*';
 }
 
 // (13) 99123-4567 -> 5513991234567
