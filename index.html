@@ -602,6 +602,10 @@ textarea {
         <button onclick="svFech()" style="font-size:13px;font-weight:800;font-family:inherit;padding:9px 20px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--v),var(--vm));color:#fff;cursor:pointer">Salvar fechamento</button>
       </div>
     </div>
+    <div id="fc-trava" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+      <span style="font-size:12px;font-weight:700;color:#166534">Este dia já foi fechado. A lista mostra o que foi salvo e não se atualiza sozinha, para não duplicar lançamentos.</span>
+      <button onclick="recarregarDoSistema()" style="font-size:11px;font-weight:700;font-family:inherit;padding:5px 12px;border-radius:8px;border:1.5px solid #86EFAC;background:var(--w);color:#166534;cursor:pointer;white-space:nowrap">Buscar o que entrou depois</button>
+    </div>
     <div id="fc-rascunho" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:10px;padding:10px 14px;margin-bottom:12px">
       <span style="font-size:12px;font-weight:700;color:#92400E">Há lançamentos deste dia que ainda não foram salvos. Eles ficam guardados neste computador até você clicar em Salvar fechamento.</span>
       <button onclick="descartarRascunho()" style="font-size:11px;font-weight:700;font-family:inherit;padding:5px 12px;border-radius:8px;border:1.5px solid #FCD34D;background:var(--w);color:#92400E;cursor:pointer;white-space:nowrap">Descartar</button>
@@ -610,13 +614,16 @@ textarea {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" id="fc-grade">
       <div class="tw">
         <div class="th2"><span class="tt">Vendas do dia</span>
-          <button class="bex" onclick="addVenda()">+ Linha</button></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:10px;color:var(--mu);font-weight:600">vem das OS do dia</span>
+            <button class="bex" onclick="addVendaAvulsa()">+ Venda avulsa</button>
+          </div></div>
         <div id="fc-vendas" style="padding:10px;max-height:420px;overflow-y:auto"></div>
       </div>
       <div class="tw">
-        <div class="th2"><span class="tt">Entregas do dia</span>
+        <div class="th2"><span class="tt">Recebimentos do dia</span>
           <div style="display:flex;gap:8px;align-items:center">
-            <span style="font-size:10px;color:var(--mu);font-weight:600" title="As entregas do dia vêm do sistema e não são editáveis. Use + Linha para lançar um caso à parte, como Asaas.">vem do sistema · não editável</span>
+            <span style="font-size:10px;color:var(--mu);font-weight:600" title="Entregas do dia que quitaram saldo. Vêm do sistema e não são editáveis.">entregas · vem do sistema</span>
             <button class="bex" onclick="addEntrega()">+ Linha</button>
           </div></div>
         <div id="fc-entregas" style="padding:10px;max-height:420px;overflow-y:auto"></div>
@@ -1964,112 +1971,66 @@ async function svMinhaSenha(){
 }
 
 // ── FECHAMENTO DE CAIXA ─────────────────────────────────────────────────────
-// Vendas: digitadas pelo operador.  Entregas: vêm do sistema, editáveis aqui.
-let fcVendas=[], fcEntregas=[], fcSalvo=null, fcDiaCarregado=null, _fcTimer=null;
+// Três blocos:
+//   1. Vendas do dia        — vêm das OS com data de venda igual ao dia,
+//                             mais as vendas avulsas digitadas (sol, armação).
+//   2. Recebimentos         — entregas do dia que quitaram saldo, mais as
+//                             linhas digitadas (Asaas, boleto que caiu hoje).
+//   3. Receita por forma    — soma dos dois, é o que se confere com a maquininha.
+//
+// RANKING = o que foi VENDIDO hoje.  CAIXA = o que ENTROU hoje.
+// São coisas diferentes: uma venda antiga quitada hoje entra no caixa e não no ranking.
+let fcVendas=[], fcEntregas=[], fcSalvo=null, fcDiaCarregado=null, _fcTimer=null, fcTravado=false;
+const rs=v=>'R$ '+Number(v||0).toFixed(2);
+const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
 
-// ── RASCUNHO ────────────────────────────────────────────────────────────────
-// Tudo que é digitado fica guardado no próprio navegador a cada meio segundo.
-// Se a página for atualizada, o computador desligar ou o navegador fechar,
-// nada se perde: ao reabrir aquele dia o rascunho volta.
-// Só sai do navegador quando o fechamento é salvo.
-function chaveRascunho(dia){return 'idealize_fech_'+(U?U.un:'')+'_'+dia;}
+function idFech(d){return 'fc_'+(U.un)+'_'+d;}
 
-function salvarRascunho(){
-  if(!fcDiaCarregado)return;
-  clearTimeout(_fcTimer);
-  _fcTimer=setTimeout(()=>{
-    try{
-      localStorage.setItem(chaveRascunho(fcDiaCarregado),JSON.stringify({
-        em:Date.now(), por:U?U.n:'',
-        vendas:fcVendas, entregas:fcEntregas,
-        google:document.getElementById('fc-google').value,
-        obs:document.getElementById('fc-obs').value
-      }));
-      marcarRascunho(true);
-    }catch(e){}
-  },500);
+// ── o que o sistema traz sozinho ───────────────────────────────────────────
+function vendasDoDia(dia){
+  return ST.cards.filter(c=>c.dtVenda===dia).map(c=>({
+    cardId:c.id, os:c.os||'', cliente:c.cliente||'',
+    tipo:c.tipo, valorTotal:num(c.valorVenda),
+    forma1:c.formaPag||(num(c.valorVenda)?'':'Garantia'), pago1:num(c.valorRecebido),
+    forma2:c.formaPag2||'', pago2:num(c.valorRecebido2),
+    _auto:true
+  }));
 }
-function lerRascunho(dia){
-  try{const r=localStorage.getItem(chaveRascunho(dia));return r?JSON.parse(r):null;}catch(e){return null;}
-}
-function apagarRascunho(dia){
-  try{localStorage.removeItem(chaveRascunho(dia));}catch(e){}
-  marcarRascunho(false);
-}
-function marcarRascunho(tem){
-  const el=document.getElementById('fc-rascunho');
-  if(el)el.style.display=tem?'flex':'none';
-}
-function descartarRascunho(){
-  if(!confirm('Descartar os lançamentos não salvos deste dia?\nEle volta a mostrar o último fechamento salvo.'))return;
-  apagarRascunho(fcDiaCarregado);
-  fcDiaCarregado=null;
-  rnFech();
-}
-
-// Entregas daquele dia, lidas dos cards em memória
 function entregasDoDia(dia){
   const ini=new Date(dia+'T00:00:00').getTime(), fim=new Date(dia+'T23:59:59').getTime();
   const out=[];
   ST.cards.forEach(c=>{
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
-    out.push({os:c.os||'',cliente:c.cliente||'',
-      forma:c.entregaForma||'Sem saldo',valor:num(c.entregaValor),
-      forma2:c.entregaForma2||'',valor2:num(c.entregaValor2)});
+    out.push({cardId:c.id, os:c.os||'', cliente:c.cliente||'', dtVenda:c.dtVenda||'',
+      forma:c.entregaForma||'Sem saldo', valor:num(c.entregaValor),
+      forma2:c.entregaForma2||'', valor2:num(c.entregaValor2)});
   });
   return out;
 }
 
-// Chamada a cada sincronização. As OS entregues chegam numa segunda etapa,
-// depois que a tela já abriu — sem isto o bloco ficava vazio ao recarregar.
-// Só mexe nas entregas: o que está sendo digitado nas vendas não é tocado.
-function sincEntregasFech(){
-  const cam=document.getElementById('fc-data');
-  if(!cam||!cam.value||fcDiaCarregado!==cam.value)return;
-  const auto=entregasDoDia(cam.value);
-  if(!auto.length)return;
-  const jaTem=new Set(fcEntregas.map(e=>String(e.os||'').trim()).filter(Boolean));
-  const novas=auto.filter(a=>!jaTem.has(String(a.os).trim()));
-  if(!novas.length)return;
-  fcEntregas=fcEntregas.concat(novas);
-  rnFechLinhas();
+// junta o que veio do sistema sem repetir o que já está na lista
+function juntar(lista,novos){
+  const porId=new Set(lista.map(x=>x.cardId).filter(Boolean));
+  const porOs=new Set(lista.map(x=>UP(String(x.os||'').trim())).filter(Boolean));
+  const faltam=novos.filter(n=>!porId.has(n.cardId)&&!porOs.has(UP(String(n.os||'').trim())));
+  return {lista:lista.concat(faltam), novos:faltam.length};
 }
-const rs=v=>'R$ '+Number(v||0).toFixed(2);
-const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
-
-function idFech(d){return 'fc_'+(U.un)+'_'+d;}
 
 async function rnFech(){
   const cam=document.getElementById('fc-data');
   if(!cam.value)cam.value=hojeBR();
   const dia=cam.value;
 
-  const auto=entregasDoDia(dia);
-
-  // garantias lançadas no dia: entram nas vendas com valor zero,
-  // como na planilha. Não contam como venda porque o valor é zero.
-  const garantias=ST.cards.filter(c=>c.dtVenda===dia&&c.tipo&&c.tipo.startsWith('gar'))
-    .map(c=>({os:c.os||'',valorTotal:0,forma1:'Garantia',pago1:0,forma2:'',pago2:'',_auto:true}));
-
-  // fechamento já salvo tem prioridade (o operador pode ter corrigido)
   let salvo=null;
   try{const r=await sbGet('fechamento_caixa','id=eq.'+idFech(dia));salvo=r&&r[0];}catch(e){}
   fcSalvo=salvo||null;
-  fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:[];
-  if(salvo&&Array.isArray(salvo.entregas)&&salvo.entregas.length){
-    // mantém as correções e acrescenta entregas novas que surgiram depois
-    const jaTem=new Set(salvo.entregas.map(e=>e.os));
-    fcEntregas=salvo.entregas.concat(auto.filter(a=>!jaTem.has(a.os)));
-  }else{fcEntregas=auto;}
-  // acrescenta as garantias que ainda não estão na lista
-  const jaTem=new Set(fcVendas.map(v=>String(v.os||'').trim()).filter(Boolean));
-  garantias.forEach(g=>{if(!jaTem.has(String(g.os).trim()))fcVendas.push(g);});
 
-  // sempre deixa uma linha em branco no fim, pronta para o proximo lancamento
-  const ult=fcVendas[fcVendas.length-1];
-  if(!fcVendas.length||(ult&&(ult.os||ult.valorTotal||ult.forma1||ult.pago1)))
-    fcVendas.push({os:'',valorTotal:'',forma1:'',pago1:'',forma2:'',pago2:''});
+  // Fechamento já salvo é documento: não se recarrega sozinho, senão a lista
+  // duplicaria a cada abertura. Quem quiser atualizar usa o botão.
+  fcTravado=!!salvo;
+  fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:vendasDoDia(dia);
+  fcEntregas=(salvo&&Array.isArray(salvo.entregas))?salvo.entregas:entregasDoDia(dia);
 
   const st=document.getElementById('fc-status');
   st.textContent=salvo?('Fechado por '+(salvo.fechado_por||'—')):'Ainda não fechado';
@@ -2079,15 +2040,12 @@ async function rnFech(){
   document.getElementById('fc-obs').value=salvo?(salvo.obs||''):'';
   fcDiaCarregado=dia;
 
-  // rascunho mais recente que o fechamento salvo volta para a tela
+  // rascunho mais recente que o salvo volta para a tela
   const rasc=lerRascunho(dia);
   const salvoEm=salvo&&salvo.updated_at?new Date(salvo.updated_at).getTime():0;
   if(rasc&&rasc.em>salvoEm){
-    if(Array.isArray(rasc.vendas)&&rasc.vendas.length)fcVendas=rasc.vendas;
-    if(Array.isArray(rasc.entregas)&&rasc.entregas.length){
-      const tem=new Set(rasc.entregas.map(e=>String(e.os||'').trim()).filter(Boolean));
-      fcEntregas=rasc.entregas.concat(auto.filter(a=>!tem.has(String(a.os).trim())));
-    }
+    if(Array.isArray(rasc.vendas))fcVendas=rasc.vendas;
+    if(Array.isArray(rasc.entregas))fcEntregas=rasc.entregas;
     if(rasc.google)document.getElementById('fc-google').value=rasc.google;
     if(rasc.obs)document.getElementById('fc-obs').value=rasc.obs;
     marcarRascunho(true);
@@ -2095,151 +2053,208 @@ async function rnFech(){
     marcarRascunho(false);
     if(rasc)apagarRascunho(dia);
   }
+  pintarTrava();
   rnFechLinhas();
 }
 
-function addVenda(){fcVendas.push({os:'',valorTotal:'',forma1:'',pago1:'',forma2:'',pago2:''});rnFechLinhas();}
-function delVenda(i){fcVendas.splice(i,1);salvarRascunho();if(!fcVendas.length)addVenda();else rnFechLinhas();}
-function tgVenda2(i){fcVendas[i]._dois=!fcVendas[i]._dois;
-  if(!fcVendas[i]._dois){fcVendas[i].forma2='';fcVendas[i].pago2='';}
-  rnFechLinhas();focar('v_'+i+'_forma2');}
+function pintarTrava(){
+  const el=document.getElementById('fc-trava');
+  if(!el)return;
+  el.style.display=fcTravado?'flex':'none';
+}
 
-// Guarda onde o cursor estava para nao perder o foco ao redesenhar a lista
+// Recarrega do sistema sem perder o que foi digitado à mão
+async function recarregarDoSistema(){
+  const dia=document.getElementById('fc-data').value;
+  if(!dia)return;
+  const v=juntar(fcVendas,vendasDoDia(dia));
+  const e=juntar(fcEntregas,entregasDoDia(dia));
+  fcVendas=v.lista; fcEntregas=e.lista;
+  salvarRascunho(); rnFechLinhas();
+  alert(v.novos+' venda(s) e '+e.novos+' entrega(s) acrescentadas.\n\n'
+    +'Nada que já estava na lista foi duplicado nem alterado.');
+}
+
+// Sincronização durante o dia: só quando o dia ainda não foi fechado
+function sincEntregasFech(){
+  const cam=document.getElementById('fc-data');
+  if(!cam||!cam.value||fcDiaCarregado!==cam.value||fcTravado)return;
+  const v=juntar(fcVendas,vendasDoDia(cam.value));
+  const e=juntar(fcEntregas,entregasDoDia(cam.value));
+  if(!v.novos&&!e.novos)return;
+  fcVendas=v.lista; fcEntregas=e.lista;
+  rnFechLinhas();
+}
+
+// ── rascunho ───────────────────────────────────────────────────────────────
+function chaveRascunho(dia){return 'idealize_fech_'+(U?U.un:'')+'_'+dia;}
+function salvarRascunho(){
+  if(!fcDiaCarregado)return;
+  clearTimeout(_fcTimer);
+  _fcTimer=setTimeout(()=>{
+    try{
+      localStorage.setItem(chaveRascunho(fcDiaCarregado),JSON.stringify({
+        em:Date.now(), por:U?U.n:'', vendas:fcVendas, entregas:fcEntregas,
+        google:document.getElementById('fc-google').value,
+        obs:document.getElementById('fc-obs').value}));
+      marcarRascunho(true);
+    }catch(e){}
+  },500);
+}
+function lerRascunho(dia){try{const r=localStorage.getItem(chaveRascunho(dia));return r?JSON.parse(r):null;}catch(e){return null;}}
+function apagarRascunho(dia){try{localStorage.removeItem(chaveRascunho(dia));}catch(e){}marcarRascunho(false);}
+function marcarRascunho(tem){const el=document.getElementById('fc-rascunho');if(el)el.style.display=tem?'flex':'none';}
+function descartarRascunho(){
+  if(!confirm('Descartar os lançamentos não salvos deste dia?'))return;
+  apagarRascunho(fcDiaCarregado);fcDiaCarregado=null;rnFech();
+}
+
+// ── edição das linhas ──────────────────────────────────────────────────────
+function addVendaAvulsa(){
+  fcVendas.push({os:'',descricao:'',valorTotal:'',forma1:'',pago1:'',forma2:'',pago2:'',_avulsa:true});
+  salvarRascunho();rnFechLinhas();focar('v_'+(fcVendas.length-1)+'_descricao');
+}
+function delVenda(i){fcVendas.splice(i,1);salvarRascunho();rnFechLinhas();}
+function edVenda(i,c,v){fcVendas[i][c]=v;salvarRascunho();totFech();}
+function tgVenda2(i){
+  fcVendas[i]._dois=!fcVendas[i]._dois;
+  if(!fcVendas[i]._dois){fcVendas[i].forma2='';fcVendas[i].pago2='';}
+  salvarRascunho();rnFechLinhas();focar('v_'+i+'_forma2');
+}
+function addEntrega(){
+  fcEntregas.push({os:'',cliente:'',forma:'',valor:'',forma2:'',valor2:'',_manual:true});
+  salvarRascunho();rnFechLinhas();focar('e_'+(fcEntregas.length-1)+'_os');
+}
+function delEntrega(i){fcEntregas.splice(i,1);salvarRascunho();rnFechLinhas();}
+function edEnt(i,c,v){fcEntregas[i][c]=v;salvarRascunho();totFech();}
+function tgEnt2(i){fcEntregas[i]._dois=true;rnFechLinhas();focar('e_'+i+'_forma2');}
+
 function focar(id){
-  const e=document.getElementById(id);
-  if(!e)return;
+  const e=document.getElementById(id);if(!e)return;
   e.focus();
   if(e.setSelectionRange&&e.type!=='number'){try{e.setSelectionRange(e.value.length,e.value.length);}catch(x){}}
 }
-
-function edVenda(i,c,v){
-  fcVendas[i][c]=v;salvarRascunho();
-  // digitou na ultima linha? abre outra em branco, como na planilha
-  const ultima=(i===fcVendas.length-1);
-  const temAlgo=fcVendas[i].os||fcVendas[i].valorTotal||fcVendas[i].forma1||fcVendas[i].pago1;
-  if(ultima&&temAlgo){
-    fcVendas.push({os:'',valorTotal:'',forma1:'',pago1:'',forma2:'',pago2:''});
-    rnFechLinhas();focar('v_'+i+'_'+c);
-    return;
-  }
-  totFech();
-}
-function edEnt(i,c,v){fcEntregas[i][c]=v;salvarRascunho();totFech();}
-
-// Linha digitada à mão: óculos já entregue com valor ainda a receber,
-// como nos casos de Asaas. Fica marcada para não se confundir com as
-// que vêm do sistema, e sobrevive ao recarregar o fechamento.
-function addEntrega(){
-  fcEntregas.push({os:'',cliente:'',forma:'',valor:'',forma2:'',valor2:'',_manual:true});
-  rnFechLinhas();focar('e_'+(fcEntregas.length-1)+'_os');
-}
-function delEntrega(i){fcEntregas.splice(i,1);salvarRascunho();rnFechLinhas();}
-function tgEnt2(i){fcEntregas[i]._dois=true;rnFechLinhas();focar('e_'+i+'_forma2');}
-
 function selForma(val,onch,id){
   return '<select '+(id?'id="'+id+'" ':'')+'onchange="'+onch+'" style="font-size:11px;padding:5px 6px;border:1.5px solid var(--bo);border-radius:7px;background:var(--bg);color:var(--tx);font-family:inherit;outline:none;width:100%">'
     +'<option value="">-</option>'
-    +FORMAS.map(f=>'<option value="'+f+'"'+(f===val?' selected':'')+'>'+f+'</option>').join('')
-    +'</select>';
+    +FORMAS.map(f=>'<option value="'+f+'"'+(f===val?' selected':'')+'>'+f+'</option>').join('')+'</select>';
 }
 const inp=(val,onch,ph,id)=>'<input '+(id?'id="'+id+'" ':'')+'value="'+(val===0||val?val:'')+'" oninput="'+onch+'" placeholder="'+(ph||'')+'" style="font-size:11px;padding:5px 7px;border:1.5px solid var(--bo);border-radius:7px;background:var(--bg);color:var(--tx);font-family:inherit;outline:none;width:100%">';
 const inpN=(val,onch,id)=>'<input '+(id?'id="'+id+'" ':'')+'type="number" step="0.01" value="'+(val===0||val?val:'')+'" oninput="'+onch+'" placeholder="0,00" style="font-size:11px;padding:5px 7px;border:1.5px solid var(--bo);border-radius:7px;background:var(--bg);color:var(--tx);font-family:inherit;outline:none;width:100%">';
 
 function rnFechLinhas(){
-  const cab='<div style="display:grid;grid-template-columns:1.1fr .9fr 1.1fr .9fr 26px;gap:5px;'
+  // ── bloco 1: vendas ──
+  const cab='<div style="display:grid;grid-template-columns:1.2fr .85fr 1.05fr .85fr 24px;gap:5px;'
     +'font-size:9px;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;padding:0 2px 6px">'
-    +'<div>Nº OS</div><div>Vl. Total</div><div>Forma</div><div>Vl. Pago</div><div></div></div>';
+    +'<div>OS / Item</div><div>Vl. Venda</div><div>Forma</div><div>Vl. Pago</div><div></div></div>';
 
-  document.getElementById('fc-vendas').innerHTML=cab+fcVendas.map((v,i)=>{
-    const saldo=num(v.valorTotal)-num(v.pago1)-num(v.pago2);
-    const mostra2=v._dois||v.forma2||num(v.pago2)>0;
-    const vazia=!(v.os||v.valorTotal||v.forma1||v.pago1);
-    return '<div style="border-bottom:1px solid var(--bo);padding:6px 0'+(vazia?';opacity:.65':'')+(v._auto?';background:#FFFBEB':'')+'">'
-    +(v._auto?'<div style="font-size:9px;font-weight:800;color:#92400E;letter-spacing:.05em;margin-bottom:3px">GARANTIA — VEIO DO SISTEMA</div>':'')
-    +'<div style="display:grid;grid-template-columns:1.1fr .9fr 1.1fr .9fr 26px;gap:5px;align-items:center">'
-    +'<div>'+inp(v.os,"edVenda("+i+",'os',this.value)","OS",'v_'+i+'_os')+'</div>'
-    +'<div>'+inpN(v.valorTotal,"edVenda("+i+",'valorTotal',this.value)",'v_'+i+'_valorTotal')+'</div>'
-    +'<div>'+selForma(v.forma1,"edVenda("+i+",'forma1',this.value)",'v_'+i+'_forma1')+'</div>'
-    +'<div>'+inpN(v.pago1,"edVenda("+i+",'pago1',this.value)",'v_'+i+'_pago1')+'</div>'
-    +(vazia?'<div></div>':'<button onclick="delVenda('+i+')" title="Remover" style="font-size:11px;padding:4px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer">x</button>')
-    +'</div>'
-    +(mostra2
-      ? '<div style="display:grid;grid-template-columns:1.1fr .9fr 1.1fr .9fr 26px;gap:5px;align-items:center;margin-top:5px">'
-        +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div><div></div>'
-        +'<div>'+selForma(v.forma2,"edVenda("+i+",'forma2',this.value)",'v_'+i+'_forma2')+'</div>'
-        +'<div>'+inpN(v.pago2,"edVenda("+i+",'pago2',this.value)",'v_'+i+'_pago2')+'</div>'
-        +'<button onclick="tgVenda2('+i+')" title="Remover 2ª forma" style="font-size:11px;padding:4px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--mu);cursor:pointer">x</button></div>'
-      : (vazia?'':'<button onclick="tgVenda2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma de pagamento</button>'))
-    +(saldo>0.001?'<div style="font-size:10px;font-weight:800;color:#B45309;margin-top:4px">saldo '+rs(saldo)+'</div>':'')
-    +'</div>';}).join('');
+  document.getElementById('fc-vendas').innerHTML=cab+(!fcVendas.length
+    ? '<div class="er" style="padding:1.2rem">Nenhuma venda neste dia.</div>'
+    : fcVendas.map((v,i)=>{
+      const pago=num(v.pago1)+num(v.pago2);
+      const saldo=num(v.valorTotal)-pago;
+      const mostra2=v._dois||v.forma2||num(v.pago2)>0;
+      const auto=!!v._auto;
+      return '<div style="border-bottom:1px solid var(--bo);padding:7px 0'
+        +(auto?';background:#FBFDFC':(v._avulsa?';background:#EFF6FF':''))+'">'
+      +(auto?'<div style="font-size:9px;font-weight:800;color:#0D7A75;letter-spacing:.04em;margin-bottom:3px">DO SISTEMA'
+             +(v.cliente?' · '+v.cliente:'')+'</div>'
+            :'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+             +'<span style="font-size:9px;font-weight:800;color:#1D4ED8;letter-spacing:.04em">VENDA AVULSA</span>'
+             +'<button onclick="delVenda('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button></div>')
+      +'<div style="display:grid;grid-template-columns:1.2fr .85fr 1.05fr .85fr 24px;gap:5px;align-items:center">'
+      +(auto
+        ? '<div style="font-size:12px;font-weight:800">'+(v.os||'—')+'</div>'
+          +'<div style="font-size:12px;font-weight:700;color:#1D4ED8">'+(num(v.valorTotal)?rs(v.valorTotal):'—')+'</div>'
+          +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:var(--bg);color:var(--mu)">'+(v.forma1||'—')+'</span></div>'
+          +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+(pago?rs(pago):'—')+'</div><div></div>'
+        : '<div>'+inp(v.descricao,"edVenda("+i+",'descricao',this.value)","Óculos de sol, armação...",'v_'+i+'_descricao')+'</div>'
+          +'<div>'+inpN(v.valorTotal,"edVenda("+i+",'valorTotal',this.value)",'v_'+i+'_valorTotal')+'</div>'
+          +'<div>'+selForma(v.forma1,"edVenda("+i+",'forma1',this.value)",'v_'+i+'_forma1')+'</div>'
+          +'<div>'+inpN(v.pago1,"edVenda("+i+",'pago1',this.value)",'v_'+i+'_pago1')+'</div><div></div>')
+      +'</div>'
+      +(mostra2
+        ? '<div style="display:grid;grid-template-columns:1.2fr .85fr 1.05fr .85fr 24px;gap:5px;align-items:center;margin-top:4px">'
+          +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div><div></div>'
+          +(auto
+            ? '<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:var(--bg);color:var(--mu)">'+(v.forma2||'—')+'</span></div>'
+              +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+rs(v.pago2)+'</div><div></div>'
+            : '<div>'+selForma(v.forma2,"edVenda("+i+",'forma2',this.value)",'v_'+i+'_forma2')+'</div>'
+              +'<div>'+inpN(v.pago2,"edVenda("+i+",'pago2',this.value)",'v_'+i+'_pago2')+'</div>'
+              +'<button onclick="tgVenda2('+i+')" style="font-size:10px;padding:3px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--mu);cursor:pointer">x</button>')
+          +'</div>'
+        : (auto?'':'<button onclick="tgVenda2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma</button>'))
+      +(saldo>0.001?'<div style="font-size:10px;font-weight:800;color:#B45309;margin-top:4px">saldo '+rs(saldo)+'</div>':'')
+      +'</div>';}).join(''));
 
+  // ── bloco 2: recebimentos ──
   document.getElementById('fc-entregas').innerHTML= !fcEntregas.length
-    ? '<div class="er" style="padding:1.5rem">Nenhuma entrega neste dia.</div>'
+    ? '<div class="er" style="padding:1.2rem">Nenhum recebimento neste dia.</div>'
     : '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;font-size:9px;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;padding:0 2px 6px">'
       +'<div>OS / Cliente</div><div>Forma</div><div>Valor</div></div>'
-      +fcEntregas.map((e,i)=>'<div style="border-bottom:1px solid var(--bo);padding:6px 0'+(e._manual?';background:#EFF6FF':'')+'">'
+      +fcEntregas.map((e,i)=>{
+      const semSaldo=!num(e.valor)&&!num(e.valor2);
+      const anterior=e.dtVenda&&e.dtVenda!==fcDiaCarregado;
+      return '<div style="border-bottom:1px solid var(--bo);padding:6px 0'+(e._manual?';background:#EFF6FF':'')+'">'
       +(e._manual?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
-        +'<span style="font-size:9px;font-weight:800;color:#1D4ED8;letter-spacing:.05em">LANÇADA À MÃO</span>'
-        +'<button onclick="delEntrega('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer">x</button></div>':'')
+        +'<span style="font-size:9px;font-weight:800;color:#1D4ED8;letter-spacing:.04em">LANÇADA À MÃO</span>'
+        +'<button onclick="delEntrega('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button></div>'
+        :(anterior?'<div style="font-size:9px;font-weight:800;color:#92400E;letter-spacing:.04em;margin-bottom:3px">VENDA DE '+dtBR(e.dtVenda)+'</div>':''))
       +'<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center">'
       +(e._manual
         ? '<div>'+inp(e.os,"edEnt("+i+",'os',this.value)","Nº OS",'e_'+i+'_os')
           +'<div style="margin-top:3px">'+inp(e.cliente,"edEnt("+i+",'cliente',this.value)","Cliente",'e_'+i+'_cliente')+'</div></div>'
-        : '<div><div style="font-size:12px;font-weight:800">'+(e.os||'—')+'</div>'
-          +'<div style="font-size:9px;color:var(--mu)">'+(e.cliente||'')+'</div></div>')
-      +(e._manual
-        ? '<div>'+selForma(e.forma,"edEnt("+i+",'forma',this.value)",'e_'+i+'_forma')+'</div>'
+          +'<div>'+selForma(e.forma,"edEnt("+i+",'forma',this.value)",'e_'+i+'_forma')+'</div>'
           +'<div>'+inpN(e.valor,"edEnt("+i+",'valor',this.value)",'e_'+i+'_valor')+'</div>'
-        : (function(){
-            const semSaldo=!num(e.valor)&&!num(e.valor2);
-            return '<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;'
-              +(semSaldo?'background:#F1F5F9;color:#64748B':'background:#F0FDF4;color:#16A34A')+'">'
-              +(semSaldo?'SEM SALDO':(e.forma||'—'))+'</span></div>'
-              +'<div style="font-size:12px;font-weight:800;color:'+(semSaldo?'var(--mu)':'#16A34A')+'">'
-              +(semSaldo?'—':rs(e.valor))+'</div>';
-          })())
+        : '<div><div style="font-size:12px;font-weight:800">'+(e.os||'—')+'</div>'
+          +'<div style="font-size:9px;color:var(--mu)">'+(e.cliente||'')+'</div></div>'
+          +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;'
+          +(semSaldo?'background:#F1F5F9;color:#64748B':'background:#F0FDF4;color:#16A34A')+'">'
+          +(semSaldo?'SEM SALDO':(e.forma||'—'))+'</span></div>'
+          +'<div style="font-size:12px;font-weight:800;color:'+(semSaldo?'var(--mu)':'#16A34A')+'">'+(semSaldo?'—':rs(e.valor))+'</div>')
       +'</div>'
       +(!e._manual
         ? ((e.forma2&&num(e.valor2))
-            ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
-              +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
-              +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:#F0FDF4;color:#16A34A">'+e.forma2+'</span></div>'
-              +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+rs(e.valor2)+'</div></div>'
-            : '')
+          ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
+            +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
+            +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:#F0FDF4;color:#16A34A">'+e.forma2+'</span></div>'
+            +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+rs(e.valor2)+'</div></div>'
+          : '')
         : ((e.forma2||num(e.valor2)>0||e._dois)
           ? '<div style="display:grid;grid-template-columns:1fr 1.1fr .8fr;gap:5px;align-items:center;margin-top:4px">'
             +'<div style="font-size:9px;color:var(--v);font-weight:800;text-align:right;padding-right:4px">2ª FORMA</div>'
             +'<div>'+selForma(e.forma2,"edEnt("+i+",'forma2',this.value)",'e_'+i+'_forma2')+'</div>'
             +'<div>'+inpN(e.valor2,"edEnt("+i+",'valor2',this.value)",'e_'+i+'_valor2')+'</div></div>'
-          : '<button onclick="tgEnt2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma de pagamento</button>'))
-      +'</div>').join('');
+          : '<button onclick="tgEnt2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma</button>'))
+      +'</div>';}).join('');
   totFech();
 }
 
 function totaisFech(){
   const ranking=fcVendas.reduce((s,v)=>s+num(v.valorTotal),0);
   const qtd=fcVendas.filter(v=>num(v.valorTotal)>0).length;
-  const pagoVendas=fcVendas.reduce((s,v)=>s+num(v.pago1)+num(v.pago2),0);
-  const pagoEnt=fcEntregas.reduce((s,e)=>s+num(e.valor)+num(e.valor2),0);
-  // "Sem saldo" e "Garantia" não são dinheiro
   const porForma={};
   const soma=(f,v)=>{if(!f||!v)return;if(f==='Sem saldo'||f==='Garantia')return;porForma[f]=(porForma[f]||0)+v;};
   fcVendas.forEach(v=>{soma(v.forma1,num(v.pago1));soma(v.forma2,num(v.pago2));});
   fcEntregas.forEach(e=>{soma(e.forma,num(e.valor));soma(e.forma2,num(e.valor2));});
+  const recVendas=fcVendas.reduce((s,v)=>s+num(v.pago1)+num(v.pago2),0);
+  const recEntregas=fcEntregas.reduce((s,e)=>s+num(e.valor)+num(e.valor2),0);
   const caixa=Object.values(porForma).reduce((s,v)=>s+v,0);
-  return {ranking,qtd,caixa,pagoVendas,pagoEnt,porForma,ticket:qtd?ranking/qtd:0};
+  return {ranking,qtd,caixa,recVendas,recEntregas,porForma,ticket:qtd?ranking/qtd:0};
 }
 
 function totFech(){
   const t=totaisFech();
   document.getElementById('fc-kpis').innerHTML=`
-    <div class="rs2"><div class="rl">Ranking (vendido)</div><div class="rv i">${rs(t.ranking)}</div></div>
-    <div class="rs2"><div class="rl">Caixa (recebido)</div><div class="rv v">${rs(t.caixa)}</div></div>
+    <div class="rs2"><div class="rl">Ranking (vendido hoje)</div><div class="rv i">${rs(t.ranking)}</div></div>
+    <div class="rs2"><div class="rl">Caixa (entrou hoje)</div><div class="rv v">${rs(t.caixa)}</div></div>
     <div class="rs2"><div class="rl">Vendas</div><div class="rv">${t.qtd}</div></div>
     <div class="rs2"><div class="rl">Ticket médio</div><div class="rv" style="color:var(--vc)">${rs(t.ticket)}</div></div>`;
   const linhas=FORMAS.filter(f=>f!=='Sem saldo'&&f!=='Garantia');
   document.getElementById('fc-consol').innerHTML=`<table><thead><tr><th>Forma de pagamento</th><th>Valor</th></tr></thead><tbody>
     ${linhas.map(f=>`<tr><td>${f}</td><td style="font-weight:${t.porForma[f]?'800':'400'};color:${t.porForma[f]?'#16A34A':'var(--mu)'}">${t.porForma[f]?rs(t.porForma[f]):'—'}</td></tr>`).join('')}
+    <tr><td style="color:var(--mu)">das vendas de hoje</td><td style="color:var(--mu)">${rs(t.recVendas)}</td></tr>
+    <tr><td style="color:var(--mu)">de vendas anteriores</td><td style="color:var(--mu)">${rs(t.recEntregas)}</td></tr>
     <tr style="background:var(--vl)"><td style="font-weight:800">RECEITA TOTAL DO DIA</td><td style="font-weight:800;color:var(--v);font-size:14px">${rs(t.caixa)}</td></tr>
     </tbody></table>`;
 }
@@ -2248,9 +2263,10 @@ async function svFech(){
   const dia=document.getElementById('fc-data').value;
   if(!dia){alert('Escolha a data.');return;}
   const t=totaisFech();
+  const limpa=o=>{const c={...o};delete c._dois;return c;};
   const reg={id:idFech(dia),unidade:U.un,data:dia,
-    vendas:fcVendas.filter(v=>v.os||num(v.valorTotal)||num(v.pago1)).map(v=>{const c={...v};delete c._dois;delete c._auto;return c;}),
-    entregas:fcEntregas,
+    vendas:fcVendas.filter(v=>v.os||v.descricao||num(v.valorTotal)||num(v.pago1)).map(limpa),
+    entregas:fcEntregas.map(limpa),
     ranking:t.ranking,caixa:t.caixa,qtd_vendas:t.qtd,
     google_avaliacoes:parseInt(document.getElementById('fc-google').value)||0,
     obs:UP(document.getElementById('fc-obs').value.trim())||null,
@@ -2271,16 +2287,15 @@ function expFcPDF(){
     <div class="kpi"><div class="kpi-label">Caixa</div><div class="kpi-val">${rs(t.caixa)}</div></div>
     <div class="kpi"><div class="kpi-label">Vendas</div><div class="kpi-val">${t.qtd}</div></div>
     <div class="kpi"><div class="kpi-label">Ticket médio</div><div class="kpi-val">${rs(t.ticket)}</div></div></div>`;
-  const tv=`<h3 style="font-size:12px;margin:10px 0 4px">Vendas</h3><table><thead><tr><th>OS</th><th>Vl. Total</th><th>Forma</th><th>Pago</th><th>2ª forma</th><th>Pago</th></tr></thead><tbody>
-    ${fcVendas.filter(v=>v.os||num(v.valorTotal)).map(v=>`<tr><td>${v.os||'—'}</td><td>${rs(v.valorTotal)}</td><td>${v.forma1||'—'}</td><td>${rs(v.pago1)}</td><td>${v.forma2||'—'}</td><td>${v.pago2?rs(v.pago2):'—'}</td></tr>`).join('')}</tbody></table>`;
-  const te=`<h3 style="font-size:12px;margin:12px 0 4px">Entregas</h3><table><thead><tr><th>OS</th><th>Cliente</th><th>Forma</th><th>Valor</th></tr></thead><tbody>
-    ${fcEntregas.map(e=>`<tr><td>${e.os||'—'}</td><td>${e.cliente||'—'}</td><td>${e.forma||'—'}</td><td>${rs(e.valor)}</td></tr>`).join('')||'<tr><td colspan="4">Nenhuma</td></tr>'}</tbody></table>`;
+  const tv=`<h3 style="font-size:12px;margin:10px 0 4px">Vendas do dia</h3><table><thead><tr><th>OS / Item</th><th>Vl. Venda</th><th>Forma</th><th>Pago</th></tr></thead><tbody>
+    ${fcVendas.map(v=>`<tr><td>${v.os||v.descricao||'—'}</td><td>${rs(v.valorTotal)}</td><td>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}</td><td>${rs(num(v.pago1)+num(v.pago2))}</td></tr>`).join('')||'<tr><td colspan="4">Nenhuma</td></tr>'}</tbody></table>`;
+  const te=`<h3 style="font-size:12px;margin:12px 0 4px">Recebimentos</h3><table><thead><tr><th>OS</th><th>Cliente</th><th>Venda de</th><th>Forma</th><th>Valor</th></tr></thead><tbody>
+    ${fcEntregas.map(e=>`<tr><td>${e.os||'—'}</td><td>${e.cliente||'—'}</td><td>${e.dtVenda?dtBR(e.dtVenda):'—'}</td><td>${e.forma||'—'}</td><td>${rs(num(e.valor)+num(e.valor2))}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum</td></tr>'}</tbody></table>`;
   const tc=`<h3 style="font-size:12px;margin:12px 0 4px">Receita por forma</h3><table><tbody>
     ${Object.entries(t.porForma).map(([f,v])=>`<tr><td>${f}</td><td><b>${rs(v)}</b></td></tr>`).join('')}
     <tr style="background:#E8F7F6"><td><b>TOTAL</b></td><td><b>${rs(t.caixa)}</b></td></tr></tbody></table>`;
   abrirPDF('Fechamento de Caixa — '+dtBR(dia), kpis+tv+te+tc);
 }
-
 
 // ── PROJEÇÃO DO CICLO ───────────────────────────────────────────────────────
 // Monta o ciclo a partir dos fechamentos já salvos. As fórmulas são as
