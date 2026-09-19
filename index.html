@@ -2499,13 +2499,15 @@ async function svMetas(){
   }catch(e){alert('Erro: '+e.message);}
 }
 
+// O PDF leva só os números gerados. As metas ficam na tela, não no papel.
 function expPjPDF(){
   const ciclo=document.getElementById('pj-ciclo').value;
-  abrirPDF('Projeção do Ciclo — '+ciclo,
+  const [ano,mes]=ciclo.split('-');
+  abrirPDF('Projeção do Ciclo — '+mes+'/'+ano,
     '<div class="kpis"></div>'
     +document.getElementById('pj-kpis').outerHTML.replace(/class="rs2"/g,'class="kpi"')
-    +'<h3 style="font-size:12px;margin:12px 0 4px">Metas</h3>'+document.getElementById('pj-metas').innerHTML
-    +'<h3 style="font-size:12px;margin:12px 0 4px">Dia a dia</h3>'+document.getElementById('pj-body').innerHTML);
+    +'<h3 style="font-size:12px;margin:12px 0 4px">Dia a dia</h3>'
+    +document.getElementById('pj-body').innerHTML);
 }
 
 // -- FORMAS DE PAGAMENTO ---------------------------------------------------
