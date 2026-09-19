@@ -34,8 +34,9 @@ const COLUNAS = ['Venda', 'Pedido', 'Montagem', 'Pronto', 'Avisado', 'Entregue']
 const MINUTOS_ENTRE_ENVIOS = 10;   // trava contra clique repetido
 
 function texto(card) {
-  const nome = String(card.cliente || '').trim();
-  // sem nome cadastrado, a frase se ajusta em vez de deixar buraco
+  // Só o primeiro nome: o cadastro guarda o nome completo, mas a mensagem
+  // fica mais natural e mais curta com o primeiro.
+  const nome = String(card.cliente || '').trim().split(/\s+/)[0] || '';
   const emNome = nome ? ` em nome de: ${nome}` : '';
 
   // OS mista: um óculos saiu do estoque e já está pronto, o outro ainda
