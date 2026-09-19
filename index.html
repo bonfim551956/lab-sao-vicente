@@ -2114,6 +2114,28 @@ function entregasDoDia(dia){
 }
 
 // junta o que veio do sistema sem repetir o que já está na lista
+async function parcelasAsaasDoDia(dia){
+  try{
+    const ps=await sbGet('crediario_parcelas',
+      'status=eq.pago&dt_pagamento=eq.'+dia+'&unidade=eq.'+U.un+'&financeira=eq.asaas');
+    if(!ps||!ps.length)return [];
+    const ids=[...new Set(ps.map(p=>p.crediario_id).filter(Boolean))];
+    const info={};
+    if(ids.length){
+      try{
+        const cs=await sbGet('crediario','id=in.('+ids.join(',')+')&select=id,nome,os');
+        (cs||[]).forEach(c=>{info[c.id]={nome:c.nome,os:c.os};});
+      }catch(e){}
+    }
+    return ps.map(p=>{
+      const c=info[p.crediario_id]||{};
+      return {cardId:'parc_'+p.id, os:c.os||'', cliente:UP(c.nome||''), dtVenda:'',
+        forma:'Asaas', valor:num(p.valor), forma2:'', valor2:0,
+        _parcela:true, _numParc:p.numero};
+    });
+  }catch(e){return [];}
+}
+
 function juntar(lista,novos){
   const porId=new Set(lista.map(x=>x.cardId).filter(Boolean));
   const porOs=new Set(lista.map(x=>UP(String(x.os||'').trim())).filter(Boolean));
@@ -2137,7 +2159,10 @@ async function rnFech(){
   fcTravado=!!salvo;
   fcRemovidos=(salvo&&Array.isArray(salvo.removidos))?salvo.removidos:[];
   fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:vendasDoDia(dia).filter(v=>!fcRemovidos.includes(v.cardId));
-  fcEntregas=(salvo&&Array.isArray(salvo.entregas))?salvo.entregas:entregasDoDia(dia).filter(e=>!fcRemovidos.includes(e.cardId));
+  const parcAsaas=await parcelasAsaasDoDia(dia);
+  fcEntregas=(salvo&&Array.isArray(salvo.entregas))
+    ? salvo.entregas
+    : entregasDoDia(dia).concat(parcAsaas).filter(e=>!fcRemovidos.includes(e.cardId));
 
   const st=document.getElementById('fc-status');
   st.textContent=salvo?('Fechado por '+(salvo.fechado_por||'—')):'Ainda não fechado';
@@ -2177,8 +2202,9 @@ function pintarTrava(){
 async function recarregarDoSistema(){
   const dia=document.getElementById('fc-data').value;
   if(!dia)return;
+  const parc=await parcelasAsaasDoDia(dia);
   const v=juntar(fcVendas,vendasDoDia(dia));
-  const e=juntar(fcEntregas,entregasDoDia(dia));
+  const e=juntar(fcEntregas,entregasDoDia(dia).concat(parc));
   fcVendas=v.lista; fcEntregas=e.lista;
   salvarRascunho(); rnFechLinhas();
   alert(v.novos+' venda(s) e '+e.novos+' entrega(s) acrescentadas.\n\n'
@@ -2186,11 +2212,12 @@ async function recarregarDoSistema(){
 }
 
 // Sincronização durante o dia: só quando o dia ainda não foi fechado
-function sincEntregasFech(){
+async function sincEntregasFech(){
   const cam=document.getElementById('fc-data');
   if(!cam||!cam.value||fcDiaCarregado!==cam.value||fcTravado)return;
+  const parc=await parcelasAsaasDoDia(cam.value);
   const v=juntar(fcVendas,vendasDoDia(cam.value));
-  const e=juntar(fcEntregas,entregasDoDia(cam.value));
+  const e=juntar(fcEntregas,entregasDoDia(cam.value).concat(parc));
   if(!v.novos&&!e.novos)return;
   fcVendas=v.lista; fcEntregas=e.lista;
   rnFechLinhas();
@@ -2332,8 +2359,9 @@ function rnFechLinhas(){
         +'<button onclick="delEntrega('+i+')" title="Remover" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button></div>'
         :'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
           +'<span style="font-size:9px;font-weight:800;color:'
-            +(e._saldoAntes?'#16A34A':(anterior?'#92400E':'var(--mu)'))+';letter-spacing:.04em">'
-          +(e._saldoAntes?'SALDO PAGO ANTES DA RETIRADA'
+            +(e._parcela?'#5B21B6':e._saldoAntes?'#16A34A':(anterior?'#92400E':'var(--mu)'))+';letter-spacing:.04em">'
+          +(e._parcela?('PARCELA '+(e._numParc||'')+' — CREDIÁRIO ASAAS')
+            :e._saldoAntes?'SALDO PAGO ANTES DA RETIRADA'
             :(anterior?('VENDA DE '+dtBR(e.dtVenda)):'DO SISTEMA'))+'</span>'
           +(podeExcluirFech()?'<button onclick="delEntrega('+i+')" title="Remover deste fechamento" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button>':'')
           +'</div>')
@@ -3450,6 +3478,8 @@ async function svCrBaixa(){
     clsCrBaixa();
     if(window._crDetId)await opCrDet(window._crDetId);
     await rnCr();
+    // parcela de Asaas entra no caixa do dia; com o fechamento aberto, atualiza já
+    if(document.getElementById('fcs').style.display!=='none')sincEntregasFech();
     setSy('ok','Baixa registrada!');
   }catch(err){alert('Erro: '+err.message);}
 }
