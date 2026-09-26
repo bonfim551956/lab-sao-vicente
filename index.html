@@ -1340,7 +1340,17 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="mf"><label>Nome Completo <span style="color:var(--re)">*</span></label><input id="cr-edit-nome" placeholder="Nome completo"/></div>
       <div class="mf"><label>CPF</label><input id="cr-edit-cpf" placeholder="000.000.000-00" maxlength="14"/></div>
       <div class="mf" id="cr-edit-cep-wrap" style="display:none"><label>CEP do cliente <span style="color:var(--re)">*</span></label><input id="cr-edit-cep" placeholder="00000-000" maxlength="9" oninput="mascCEP(this)"/></div>
-      <div class="mf"><label>OS</label><input id="cr-edit-os" placeholder="Nº da OS"/></div>
+      <div class="mf" style="grid-column:1/-1"><label>OS</label>
+        <input id="cr-edit-os" placeholder="Nº da OS"/>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#92400E;cursor:pointer;margin-top:7px">
+          <input type="checkbox" id="cr-edit-os-fake" onchange="tgOsFakeEdit()" style="width:16px;height:16px;cursor:pointer;accent-color:#D97706"/>
+          OS provisória — o cliente ainda não escolheu o óculos
+        </label>
+        <div id="cr-edit-fake-dica" style="display:none;font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:8px 11px;margin-top:6px;font-weight:500">
+          Marcando aqui, o botão <b>Criar OS</b> aparece no detalhe do contrato.
+          Se o número atual for FAKE ou estiver vazio, o sistema gera um provisório de 8 dígitos.
+        </div>
+      </div>
       <div class="mf"><label>Data da Compra</label><input id="cr-edit-dtcompra" type="date"/></div>
       <div class="mf"><label>Financeira</label>
         <select id="cr-edit-fin" onchange="tgCepEdit()">
@@ -2143,6 +2153,13 @@ function numeroProvisorio(){
   do{ n=String(Math.floor(10000000+Math.random()*90000000)); }while(usados.has(n));
   return n;
 }
+function tgOsFakeEdit(){
+  const f=document.getElementById('cr-edit-os-fake').checked;
+  document.getElementById('cr-edit-fake-dica').style.display=f?'block':'none';
+  const os=document.getElementById('cr-edit-os');
+  if(f&&(!os.value.trim()||os.value.trim().toUpperCase()==='FAKE'))os.value=numeroProvisorio();
+}
+
 function tgOsFake(){
   const f=document.getElementById('cr-os-fake').checked;
   document.getElementById('cr-fake-dica').style.display=f?'block':'none';
@@ -4644,6 +4661,8 @@ function opEditCr(cid){
   document.getElementById('cr-edit-cpf').value=c.cpf||'';
   document.getElementById('cr-edit-cep').value=c.cep||'';
   document.getElementById('cr-edit-os').value=c.os||'';
+  document.getElementById('cr-edit-os-fake').checked=!!c.os_fake;
+  document.getElementById('cr-edit-fake-dica').style.display=c.os_fake?'block':'none';
   document.getElementById('cr-edit-dtcompra').value=(c.dt_compra||'').split('T')[0];
   document.getElementById('cr-edit-fin').value=c.financeira||'multicredito';
   document.getElementById('cr-edit-vcompra').value=c.valor_compra||'';
@@ -4679,6 +4698,13 @@ async function svEditCr(){
     alert('Preencha o CEP do cliente (obrigatório na ASAAS).');
     document.getElementById('cr-edit-cep').focus();return;
   }
+
+  // a palavra FAKE nunca vai para o contrato impresso
+  const campoOsEd=document.getElementById('cr-edit-os');
+  if(document.getElementById('cr-edit-os-fake').checked
+     &&(!campoOsEd.value.trim()||campoOsEd.value.trim().toUpperCase()==='FAKE')){
+    campoOsEd.value=numeroProvisorio();
+  }
   const c=window._crDetData?.c;
   const hist=(c?.historico||[]);
   hist.push({u:U.n,at:new Date().toISOString(),
@@ -4691,6 +4717,7 @@ async function svEditCr(){
       nome,
       cpf:document.getElementById('cr-edit-cpf').value.trim()||null,
       os:UP(document.getElementById('cr-edit-os').value.trim())||null,
+      os_fake:document.getElementById('cr-edit-os-fake').checked,
       dt_compra:document.getElementById('cr-edit-dtcompra').value||null,
       cep:finEd==='asaas'?cepEd:null,
       financeira:finEd,
