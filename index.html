@@ -5233,9 +5233,9 @@ async function svOS(){
   const colInicial=(tipo==='gar-armacao-sem')?3:0;
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
-    col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
+    col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
   const isVenda=tipo==='venda'||tipo==='hora';
-  c.history.push({u:U.n,r:U.r,from:-1,to:0,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
+  c.history.push({u:U.n,r:U.r,from:-1,to:colInicial,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
   ST.cards.unshift(c);clsOs();rnKan();
   await saveCard(c);
 }
