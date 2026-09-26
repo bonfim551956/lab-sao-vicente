@@ -2890,7 +2890,9 @@ function quandoEntregue(c){
 }
 
 function situacaoSaldo(c){
-  if(c.col<5)return 'aberto';
+  // Só a entrega de verdade (coluna 5) quita o saldo. Não retirado (6) e
+  // cancelada (7) não são entrega: o saldo continua em aberto.
+  if(c.col!==5)return 'aberto';
   const rec=Number(c.entregaValor||0)+Number(c.entregaValor2||0), dev=Number(c.saldoValor||0);
   return rec+0.001>=dev ? 'recebido' : 'parcial';
 }
@@ -4593,24 +4595,47 @@ function rnNaoRet(){
   const b=document.getElementById('nr-body');if(!b)return;
   const busca=(document.getElementById('nr-busca')?.value||'').toLowerCase();
   const lista=ST.cards.filter(c=>c.col===COL_NAO_RET)
-    .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')).toLowerCase().includes(busca))
+    .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')
+      +' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase().includes(busca))
     .sort((a,b2)=>(a.naoRetEm||0)-(b2.naoRetEm||0));
   if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado.</div>';return;}
+
   b.innerHTML=`<table><thead><tr>
-      <th>#</th><th>OS</th><th>Cliente</th><th>Telefone</th><th>Dt. Venda</th>
-      <th>Desde</th><th>Espera</th><th>Por</th><th>Ações</th>
+      <th>#</th><th>OS / Cliente</th><th>Contato</th><th>Tipo</th><th>Óculos</th>
+      <th>Venda</th><th>Valores</th><th>Espera</th><th>Anotações</th><th>Ações</th>
     </tr></thead><tbody>${lista.map((c,i)=>{
       const dias=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
+      const corD=dias>60?'#B91C1C':dias>30?'#B45309':'var(--mu)';
+      const ocs=ocDoCard(c);
+      const rec=Number(c.valorRecebido||0)+Number(c.valorRecebido2||0);
+      const ult=(c.saldoObs&&c.saldoObs.length)?c.saldoObs[c.saldoObs.length-1]:null;
       return `<tr>
       <td style="color:var(--mu);font-size:11px">${i+1}</td>
-      <td style="font-weight:800">${c.os||'—'}</td>
-      <td style="font-weight:600">${c.cliente||'—'}</td>
-      <td style="color:var(--mu)">${c.telefone||'—'}</td>
-      <td style="color:var(--mu)">${c.dtVenda?dtBR(c.dtVenda):'—'}</td>
-      <td style="color:var(--mu);white-space:nowrap">${fmtDtH(c.naoRetEm)}</td>
-      <td style="font-weight:800;color:${dias>60?'#B91C1C':dias>30?'#B45309':'var(--mu)'}">${dias} dias</td>
-      <td style="color:var(--mu);font-size:11px">${c.naoRetPor||'—'}</td>
+      <td><div style="font-weight:800;font-size:13px">${c.os||'—'}</div>
+          <div style="font-weight:600">${c.cliente||'—'}</div></td>
+      <td style="white-space:nowrap">${c.telefone?`<div style="font-weight:600">${c.telefone}</div>`:'<span style="color:var(--mu)">sem telefone</span>'}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(c.tipo)}">${tGL(c.tipo)}</span>
+          ${c.lab?`<div style="font-size:9px;color:var(--mu);margin-top:2px">${c.lab}</div>`:''}</td>
+      <td style="font-size:11px;color:var(--mu)">${ocs.map((o,k)=>
+          `<div>${ocs.length>1?('#'+(k+1)+' '):''}${o.ped||'—'}${(o.esfOD!=null)?` · ${fmtGrau(o.esfOD)}/${fmtGrau(o.cilOD||0)}`:''}</div>`).join('')}</td>
+      <td style="white-space:nowrap;color:var(--mu)">${c.dtVenda?dtBR(c.dtVenda):'—'}
+          ${c.prazo?`<div style="font-size:9px">prazo ${dtBR(c.prazo)}</div>`:''}</td>
+      <td style="white-space:nowrap;font-size:11px">
+          ${c.valorVenda?`<div>Venda <b style="color:#1D4ED8">${rs(c.valorVenda)}</b></div>`:''}
+          ${rec?`<div>Pago <b style="color:#16A34A">${rs(rec)}</b></div>`:''}
+          ${c.saldo?`<div style="font-weight:800;color:#B45309">Saldo ${rs(c.saldoValor)}</div>`:''}
+          ${c.saldoPago?`<div style="font-weight:800;color:#16A34A">quitado ${dtBR(c.saldoPagoData)}</div>`:''}</td>
+      <td style="font-weight:800;color:${corD};white-space:nowrap">${dias} dias
+          <div style="font-size:9px;font-weight:600;color:var(--mu)">desde ${fmtDtH(c.naoRetEm)}</div>
+          <div style="font-size:9px;font-weight:600;color:var(--mu)">por ${c.naoRetPor||'—'}</div></td>
+      <td style="max-width:210px">${ult?`<div style="font-size:11px;font-weight:600">${ult.txt}</div>
+          <div style="font-size:9px;color:var(--mu)">${ult.u} · ${fmtDtH(ult.t)}</div>
+          <div style="font-size:9px;color:var(--mu)">${c.saldoObs.length} anotação(ões)</div>`
+        :'<span style="color:var(--mu);font-size:11px">sem anotações</span>'}</td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="bex" onclick="opSaldoObs('${c.id}')">Anotar</button>
+        ${(c.telefone&&R&&R.wa)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="avisarWhats('${c.id}')">WhatsApp</button>`:''}
+        ${(c.saldo&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}
         <button class="bex" onclick="voltarDoArquivo('${c.id}',4)">Voltar p/ Avisado</button>
         ${R&&R.cd?`<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}
       </div></td></tr>`;}).join('')}</tbody></table>`;
