@@ -1168,7 +1168,18 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="mf"><label>Nome Completo <span style="color:var(--re)">*</span></label><input id="cr-nome" placeholder="Nome completo do cliente"/></div>
       <div class="mf"><label>CPF</label><input id="cr-cpf" placeholder="000.000.000-00" maxlength="14"/></div>
       <div class="mf" id="cr-cep-wrap" style="display:none"><label>CEP do cliente <span style="color:var(--re)">*</span></label><input id="cr-cep" placeholder="00000-000" maxlength="9" oninput="mascCEP(this)"/></div>
-      <div class="mf"><label>Ordem de Serviço</label><input id="cr-os" placeholder="Ex: 4546"/></div>
+      <div class="mf"><label>Ordem de Serviço</label>
+        <input id="cr-os" placeholder="Ex: 4546"/>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#92400E;cursor:pointer;margin-top:7px">
+          <input type="checkbox" id="cr-os-fake" onchange="tgOsFake()" style="width:16px;height:16px;cursor:pointer;accent-color:#D97706"/>
+          OS provisória — o cliente ainda não escolheu o óculos
+        </label>
+        <div id="cr-fake-dica" style="display:none;font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:8px 11px;margin-top:6px;font-weight:500">
+          O sistema gera um número provisório de 8 dígitos, que vai no contrato impresso.
+          Quando o cliente escolher o óculos, use o botão <b>Criar OS</b> no detalhe do
+          contrato: o número provisório é substituído pelo número real da OS.
+        </div>
+      </div>
       <div class="mf"><label>Data da Compra <span style="color:var(--re)">*</span></label><input id="cr-dtcompra" type="date"/></div>
       <div class="mf"><label>Financeira <span style="color:var(--re)">*</span></label>
         <select id="cr-fin-novo" onchange="tgCepNovo()">
@@ -1227,6 +1238,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button id="cr-det-edit-btn" class="bsv" style="background:#1D4ED8;border-color:#1D4ED8;display:none" onclick="opEditCr(window._crDetId)">Editar Contrato</button>
       <button id="cr-det-reneg-btn" class="bsv" style="background:#D97706;border-color:#D97706;display:none" onclick="opReneg(window._crDetId)">Renegociar</button>
       <button id="cr-det-cancel-btn" class="bsv" style="background:#DC2626;border-color:#DC2626;display:none" onclick="opCancelarCr(window._crDetId)">Cancelar Contrato</button>
+      <button id="cr-det-criaros-btn" class="bsv" style="background:#0D7A75;border-color:#0D7A75;display:none" onclick="criarOsDoCrediario()">Criar OS</button>
       <button id="cr-det-contrato-btn" class="bsv" style="background:#0F1923;border-color:#0F1923;display:none" onclick="gerarContratoAsaas()">Gerar Contrato</button>
       <button class="bsv" style="background:#16A34A;border-color:#16A34A" onclick="expCrPDF()">Exportar PDF</button>
     </div>
@@ -1749,7 +1761,7 @@ function mapCard(r){return upCard({
   obsTxt:r.obs_txt,osCompra:r.os_compra,
   esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
-  cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,
+  cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,credId:r.cred_id,
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,saldoObs:r.saldo_obs||[],
@@ -1860,6 +1872,7 @@ async function saveCard(c){
       esf_oe:c.esfOE!=null?c.esfOE:null,cil_oe:c.cilOE!=null?c.cilOE:null,
       refeito:!!c.refeito,motivo_refeito:c.motivoRefeito||null,
       cliente:c.cliente||null,telefone:c.telefone||null,descricao:c.descricao||null,
+      cred_id:c.credId||null,
       entrega_valor:(c.entregaValor===0||c.entregaValor)?c.entregaValor:null,
       entrega_forma:c.entregaForma||null,
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
@@ -2112,6 +2125,99 @@ async function svParcEdit(){
     setSy('ok','Parcela atualizada — '+horaAgora());
   }catch(e){alert('Erro ao salvar: '+e.message);}
   finally{if(btn){btn.textContent='Salvar';btn.disabled=false;}}
+}
+
+
+// ── OS FAKE NO CREDIÁRIO ────────────────────────────────────────────────────
+// O cliente fecha o crediário antes de escolher o óculos, então o contrato
+// nasce com uma OS provisória. Quando ele paga, a OS real é criada aqui.
+//
+// A OS entra com o valor da compra e RECEBIDO ZERO: o dinheiro já entrou no
+// caixa pela baixa da parcela. Sem isso o mesmo valor apareceria duas vezes
+// no fechamento do dia — foi o que aconteceu no contrato do LISANDRO.
+// Número provisório de 8 dígitos. A palavra FAKE aparecia no contrato
+// impresso, e contrato é documento que vai para a mão do cliente.
+function numeroProvisorio(){
+  let n;
+  const usados=new Set(ST.cards.map(c=>String(c.os||'')));
+  do{ n=String(Math.floor(10000000+Math.random()*90000000)); }while(usados.has(n));
+  return n;
+}
+function tgOsFake(){
+  const f=document.getElementById('cr-os-fake').checked;
+  document.getElementById('cr-fake-dica').style.display=f?'block':'none';
+  const os=document.getElementById('cr-os');
+  if(f&&(!os.value||os.value.toUpperCase()==='FAKE'))os.value=numeroProvisorio();
+}
+
+// Data do pagamento mais recente do contrato: é o dia em que a venda conta
+function dataPagamentoCred(c,parcs){
+  const datas=[];
+  if(c.entrada_paga&&c.dt_entrada_paga)datas.push(String(c.dt_entrada_paga).split('T')[0]);
+  (parcs||[]).forEach(p=>{if(p.status==='pago'&&p.dt_pagamento)datas.push(String(p.dt_pagamento).split('T')[0]);});
+  datas.sort();
+  return datas.length?datas[datas.length-1]:hojeBR();
+}
+
+// Só a ENTRADA entra como recebido na venda. As parcelas seguem no
+// crediário e entram no caixa quando forem baixadas, cada uma no seu dia.
+function entradaPagaCred(c){
+  if(!c.entrada_paga)return 0;
+  const v=(c.entrada_paga_valor===0||c.entrada_paga_valor)
+    ? Number(c.entrada_paga_valor)
+    : Number(c.valor_entrada||0);    // contratos antigos: entrada cheia
+  return Math.round(v*100)/100;
+}
+// Quanto ainda falta da entrada — este é o saldo que vai para a OS
+function faltaEntradaCred(c){
+  return Math.round((Number(c.valor_entrada||0)-entradaPagaCred(c))*100)/100;
+}
+
+function mostrarCriarOs(c){
+  const b=document.getElementById('cr-det-criaros-btn');
+  if(b)b.style.display=(c&&c.os_fake&&R&&R.ca)?'inline-block':'none';
+}
+
+function criarOsDoCrediario(){
+  const d=window._crDetData;
+  if(!d||!d.c){alert('Abra o contrato antes.');return;}
+  if(!R||!R.ca){alert('Sem permissão para criar OS.');return;}
+  const c=d.c;
+
+  clsCrDet();
+  opOs();                                   // abre o formulário normal de OS
+  const total=Number(c.valor_compra||c.valor_crediario||0);
+  const pago=entradaPagaCred(c);
+  const falta=faltaEntradaCred(c);
+  window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,
+    parcelado:Number(c.valor_crediario||0)};
+
+  document.getElementById('fcli').value=UP(c.nome||'');
+  if(c.telefone)document.getElementById('ftel').value=c.telefone;
+  document.getElementById('fdt').value=dataPagamentoCred(c,d.parcs);
+  // A venda registra o que passa pelo caixa da loja: a entrada.
+  // O valor parcelado continua no crediário e entra a cada baixa.
+  document.getElementById('fvenda').value=(pago+falta).toFixed(2);
+  document.getElementById('frecebido').value=pago||'';
+  document.getElementById('fforma').value=(c.financeira==='asaas')?'Asaas':'Multicrediário';
+  calcSaldo();
+
+  // um aviso no alto do formulário, para ninguém preencher pagamento de novo
+  const t=document.getElementById('om-title');
+  if(t)t.innerHTML='Nova OS <span style="font-size:12px;font-weight:600;color:#0D7A75">'
+    +'· a partir do crediário de '+UP(c.nome||'')+'</span>';
+  const nw=document.getElementById('nw');
+  if(nw){
+    nw.style.display='block';
+    nw.style.cssText='display:block;background:#F0FDFA;border:1px solid #99DDD8;color:#0D7A75;'
+      +'font-size:11px;font-weight:600;border-radius:9px;padding:9px 12px;margin-bottom:12px';
+    const o=window._credOrigem;
+    nw.textContent='Entrada paga: R$ '+o.pago.toFixed(2)+'. '
+      +(o.falta>0.001?('Faltam R$ '+o.falta.toFixed(2)+' da entrada, que ficam como saldo. '):'')
+      +'As '+(o.parcelado?('parcelas de R$ '+o.parcelado.toFixed(2)+' '):'parcelas ')
+      +'seguem no crediário e entram no caixa a cada baixa.';
+  }
+  setTimeout(()=>document.getElementById('fo')?.focus(),120);
 }
 
 // ── RENEGOCIAÇÃO DE CREDIÁRIO ───────────────────────────────────────────────
@@ -2443,6 +2549,8 @@ async function parcelasAsaasDoDia(dia){
         (cs||[]).forEach(c=>{info[c.id]={nome:c.nome,os:c.os};});
       }catch(e){}
     }
+    // As parcelas entram normalmente: quem não entra aqui é a ENTRADA,
+    // que passa pelo caixa da loja como valor recebido na venda.
     return ps.map(p=>{
       const c=info[p.crediario_id]||{};
       return {cardId:'parc_'+p.id, os:c.os||'', cliente:UP(c.nome||''), dtVenda:'',
@@ -3480,6 +3588,8 @@ function opNovoCr(){
   document.getElementById('cr-cpf').value='';
   document.getElementById('cr-cep').value='';
   document.getElementById('cr-os').value='';
+  document.getElementById('cr-os-fake').checked=false;
+  tgOsFake();
   document.getElementById('cr-dtcompra').value=hojeBR();
   document.getElementById('cr-fin-novo').value='multicredito';
   document.getElementById('cr-vcompra').value='';
@@ -3541,6 +3651,13 @@ async function svNovoCr(){
   if(!dtCompra){alert('Preencha a data da compra.');return;}
   const cep=document.getElementById('cr-cep').value.trim();
   if(fin==='asaas'&&cep.replace(/\D/g,'').length!==8){alert('Preencha o CEP do cliente (obrigatório na ASAAS).');return;}
+
+  // rede de segurança: a palavra FAKE nunca vai para o contrato impresso
+  const campoOs=document.getElementById('cr-os');
+  if(document.getElementById('cr-os-fake').checked
+     &&(!campoOs.value.trim()||campoOs.value.trim().toUpperCase()==='FAKE')){
+    campoOs.value=numeroProvisorio();
+  }
   if(!crParcelas.length){alert('Adicione pelo menos uma parcela.');return;}
   const invalidas=crParcelas.filter(p=>!p.dt_vencimento||!p.valor);
   if(invalidas.length){alert('Preencha valor e data de todas as parcelas.');return;}
@@ -3561,6 +3678,7 @@ async function svNovoCr(){
     valor_compra:vcompra,valor_crediario:vcred,
     valor_entrada:ventrada,
     dt_entrada:document.getElementById('cr-dtentrada').value||null,
+    os_fake:document.getElementById('cr-os-fake').checked,
     entrada_paga:false,dt_entrada_paga:null,entrada_paga_por:null,
     num_parcelas:crParcelas.length,status:'aberto',
     obs:null,criado_por:U.n
@@ -3782,6 +3900,7 @@ async function opCrDet(cid){
     if(btnCt)btnCt.style.display=(c.financeira==='asaas'&&c.status!=='cancelado')?'inline-block':'none';
     window._crDetId=cid;
     window._crDetData={c,parcs};
+    mostrarCriarOs(c);
 
     const hoje=hojeBR();
     parcs.forEach(p=>{if(p.status==='aberto'&&p.dt_vencimento<hoje)p.status='atrasado';});
@@ -3799,8 +3918,13 @@ async function opCrDet(cid){
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Financeira</div><div style="font-weight:600">${finLabel[c.financeira]||c.financeira}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Vl. Compra</div><div>R$ ${(c.valor_compra||0).toFixed(2)}</div></div>
         <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Vl. Crediário</div><div style="font-weight:700;color:var(--v)">R$ ${(c.valor_crediario||0).toFixed(2)}</div></div>
-        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Entrada</div><div>${c.valor_entrada?'R$ '+c.valor_entrada.toFixed(2)+' — '+(c.entrada_paga?'Pago':'Em aberto'):'—'}</div></div>
-        ${c.valor_entrada&&!c.entrada_paga&&R&&R.ed?`<div style="grid-column:1/-1"><button onclick="crBaixaEntrada('${c.id}')" style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--v);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar Entrada</button></div>`:''}
+        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase">Entrada</div><div>${c.valor_entrada?('R$ '+c.valor_entrada.toFixed(2)+' — '+(c.entrada_paga
+          ?(faltaEntradaCred(c)>0.001
+            ?('<span style="color:#B45309;font-weight:700">Parcial: R$ '+entradaPagaCred(c).toFixed(2)
+              +' · faltam R$ '+faltaEntradaCred(c).toFixed(2)+'</span>')
+            :'<span style="color:#16A34A;font-weight:700">Pago</span>')
+          :'Em aberto')):'—'}</div></div>
+        ${c.valor_entrada&&(!c.entrada_paga||faltaEntradaCred(c)>0.001)&&R&&R.ed?`<div style="grid-column:1/-1"><button onclick="crBaixaEntrada('${c.id}')" style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--v);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar Entrada</button></div>`:''}
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:8px">Parcelas (${parcs.filter(p=>p.status==='pago').length}/${parcs.filter(p=>p.status!=='renegociado').length} pagas)${c.renegociado?' <span style="font-size:10px;padding:2px 8px;border-radius:5px;background:#FEF3C7;color:#92400E;font-weight:800">CONTRATO RENEGOCIADO</span>':''}</div>
       <table>
@@ -3856,11 +3980,30 @@ async function svCrBaixa(){
 }
 
 async function crBaixaEntrada(cid){
+  const d=window._crDetData;
+  const c=(d&&d.c&&d.c.id===cid)?d.c:null;
+  const devida=Number(c?c.valor_entrada:0)||0;
+
+  // Acontece de o cliente pagar só parte da entrada. O que falta precisa
+  // ficar registrado, e vira saldo na OS quando ela for criada.
+  const txt=prompt('Quanto o cliente pagou da entrada?\n\n'
+    +'Entrada acordada: R$ '+devida.toFixed(2)+'\n'
+    +'Informe o valor recebido (pode ser parcial).', devida?devida.toFixed(2):'');
+  if(txt===null)return;
+  const pago=parseFloat(String(txt).replace(',','.'));
+  if(isNaN(pago)||pago<=0){alert('Informe um valor válido.');return;}
+  if(devida&&pago>devida+0.001){
+    if(!confirm('O valor informado (R$ '+pago.toFixed(2)+') é maior que a entrada '
+      +'acordada de R$ '+devida.toFixed(2)+'.\n\nConfirma mesmo assim?'))return;
+  }
+
   const dt=hojeBR();
   try{
-    await sbPatch('crediario',{entrada_paga:true,dt_entrada_paga:dt,entrada_paga_por:U.n},{id:cid});
+    await sbPatch('crediario',
+      {entrada_paga:true,entrada_paga_valor:pago,dt_entrada_paga:dt,entrada_paga_por:U.n},{id:cid});
     await opCrDet(cid);
-    setSy('ok','Entrada baixada!');
+    const falta=Math.round((devida-pago)*100)/100;
+    setSy('ok','Entrada baixada'+(falta>0.001?(' — faltam R$ '+falta.toFixed(2)):'')+' — '+horaAgora());
   }catch(err){alert('Erro: '+err.message);}
 }
 
@@ -5399,6 +5542,7 @@ const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;bo
 function clsH(){document.getElementById('hm').style.display='none';}
 
 function opOs(){
+  window._credOrigem=null;
   editId=null;
   document.getElementById('om-title').textContent='Nova ordem de serviço';
   document.getElementById('nw').style.display=R&&R.ca?'none':'block';
@@ -5525,6 +5669,7 @@ async function svOS(){
     document.getElementById('fvenda').focus();return;
   }
   const valorVenda=num(vv);
+  const credOrigem=window._credOrigem||null;
   const valorRecebido=num(document.getElementById('frecebido').value);
   const valorRecebido2=num(document.getElementById('frecebido2').value);
   const formaPag=document.getElementById('fforma').value||null;
@@ -5577,11 +5722,24 @@ async function svOS(){
   const colInicial=(tipo==='gar-armacao-sem')?3:0;
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
-    col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
+    col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
+    credId:credOrigem?credOrigem.id:null};
   const isVenda=tipo==='venda'||tipo==='hora';
   c.history.push({u:U.n,r:U.r,from:-1,to:colInicial,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
   ST.cards.unshift(c);clsOs();rnKan();
   await saveCard(c);
+
+  // veio do crediário: o contrato passa a apontar para a OS real
+  if(credOrigem){
+    try{
+      await sbPatch('crediario',{os,os_fake:false},{id:credOrigem.id});
+      await rnCr();
+      setSy('ok','OS '+os+' criada e vinculada ao crediário — '+horaAgora());
+    }catch(e){
+      alert('A OS foi criada, mas não consegui atualizar o contrato: '+e.message);
+    }
+    window._credOrigem=null;
+  }
 }
 
 // ── RENDER KANBAN ─────────────────────────────────
@@ -5662,7 +5820,7 @@ function rnKan(){
       div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
         ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
-        ${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
+        ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
       frag.appendChild(div);
     });
