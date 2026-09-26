@@ -2941,7 +2941,7 @@ function rnSaldos(){
   body.innerHTML=`<table>
     <thead><tr>
       <th>#</th><th>OS</th><th>Cliente</th><th>Dt. Venda</th><th>Saldo</th>
-      <th>Situação</th><th>Entregue em</th><th>Vl. Recebido</th><th>Forma</th><th>Contato</th>
+      <th>Situação</th><th>Entregue em</th><th>Vl. Recebido</th><th>Forma</th><th>Contato</th><th>Ação</th>
     </tr></thead>
     <tbody>${sdDados.map((c,i)=>`<tr${c._sit==='aberto'?' style="background:#FFFBFB"':''}>
       <td style="color:var(--mu);font-size:11px">${i+1}</td>
@@ -2958,6 +2958,10 @@ function rnSaldos(){
            <div style="font-size:9px;color:var(--mu)">${c.saldoObs.length} anotação(ões)</div>`:''}
         <button class="bex" style="margin-top:3px" onclick="opSaldoObs('${c.id}')">${(c.saldoObs&&c.saldoObs.length)?'Ver / anotar':'+ Anotar'}</button>
       </td>
+      <td style="white-space:nowrap">${(c._sit==='aberto'&&R&&R.ed)?`
+        <button class="bex" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800" onclick="opEntregarAgora('${c.id}')">Receber e entregar</button>
+        <div style="margin-top:3px"><button class="bex" onclick="opSaldoPago('${c.id}')">Só receber saldo</button></div>`
+        :'<span style="color:var(--mu)">—</span>'}</td>
     </tr>`).join('')}</tbody></table>`;
 }
 
@@ -3016,6 +3020,18 @@ function somaEnt(){
     ? 'Total recebido: R$ '+(a+b).toFixed(2) : '';
 }
 
+let _entDireta=false;
+
+// Chamado da aba Saldos e da aba Não retirados: recebe e entrega de uma vez.
+function opEntregarAgora(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  if(!R||!R.ed){alert('Sem permissão para entregar.');return;}
+  if(c.col===5){alert('Esta OS já está entregue.');return;}
+  _entDireta=true;
+  opEntrega(id);
+  document.getElementById('ent-tit').textContent='Receber e entregar — OS '+(c.os||'');
+}
+
 function opEntrega(id){
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   document.getElementById('ent-id').value=id;
@@ -3037,7 +3053,8 @@ function opEntrega(id){
   document.getElementById('entm').style.display='flex';
   setTimeout(()=>document.getElementById('ent-valor').focus(),90);
 }
-function clsEntrega(){document.getElementById('entm').style.display='none';}
+function clsEntrega(){
+  _entDireta=false;document.getElementById('entm').style.display='none';}
 
 async function svEntrega(){
   const id=document.getElementById('ent-id').value;
@@ -3067,6 +3084,26 @@ async function svEntrega(){
   c.entregaValor=valor;c.entregaForma=forma;
   c.entregaValor2=dois?valor2:null;c.entregaForma2=dois?forma2:null;
   clsEntrega();
+
+  if(_entDireta){
+    // veio de Saldos ou de Não retirados: vai direto para Entregue
+    _entDireta=false;
+    const now=Date.now();
+    c.saldo=false;
+    if(!c.history)c.history=[];
+    c.history.push({u:U.n,r:U.r,from:c.col,to:5,at:now,mc:false,entrega:true});
+    c.col=5;c.ts=now;
+    c.naoRetEm=null;c.naoRetPor=null;
+    rnKan();
+    if(document.getElementById('nrs').style.display!=='none')rnNaoRet();
+    if(document.getElementById('sds').style.display!=='none')rnSaldos();
+    try{
+      await saveCard(c);
+      if(document.getElementById('fcs').style.display!=='none')sincEntregasFech();
+      setSy('ok','OS entregue — '+horaAgora());
+    }catch(e){alert('Erro ao salvar: '+e.message);}
+    return;
+  }
   await mvCardExec(id,null,null);
 }
 
@@ -4686,7 +4723,8 @@ function rnNaoRet(){
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="bex" onclick="opSaldoObs('${c.id}')">Anotar</button>
         ${(c.telefone&&R&&R.wa)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="avisarWhats('${c.id}')">WhatsApp</button>`:''}
-        ${(c.saldo&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}
+        ${(R&&R.ed)?`<button class="bex" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800" onclick="opEntregarAgora('${c.id}')">${c.saldo?'Receber e entregar':'Entregar'}</button>`:''}
+        ${(c.saldo&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Só receber saldo</button>`:''}
         <button class="bex" onclick="voltarDoArquivo('${c.id}',4)">Voltar p/ Avisado</button>
         ${R&&R.cd?`<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}
       </div></td></tr>`;}).join('')}</tbody></table>`;
@@ -5944,7 +5982,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'cancm':()=>clsCancOs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>{_entDireta=false;clsEntrega();}, 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'cancm':()=>clsCancOs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
