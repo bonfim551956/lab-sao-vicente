@@ -1781,9 +1781,20 @@ async function loadData(full){
     rnAtiva();
     await carregarEstoque();
     if(abaAtual()==='e')rnEst();
-    // fase 2: entregues carregam em segundo plano (usados nos relatorios)
-    sbGet('os_cards','col=gte.5&order=ts_created.desc'+un)
-      .then(ent=>{if(mesclarCards((ent||[]).map(mapCard)))rnAtiva();varrerNaoRetirados();})
+    // fase 2: não retirados e cancelados — são poucos e têm aba própria
+    sbGet('os_cards','col=gte.6&order=ts.desc'+un)
+      .then(arq=>{
+        if(mesclarCards((arq||[]).map(mapCard)))rnAtiva();
+        varrerNaoRetirados();
+      })
+      .catch(()=>{});
+
+    // fase 3: entregues recentes, em segundo plano. O Histórico busca
+    // direto no banco, então aqui só precisamos do que alimenta o caixa
+    // e os relatórios do período corrente.
+    const corte=Date.now()-DIAS_ENTREGUES*86400000;
+    sbGet('os_cards','col=eq.5&ts=gte.'+corte+'&order=ts.desc'+un)
+      .then(ent=>{if(mesclarCards((ent||[]).map(mapCard)))rnAtiva();})
       .catch(()=>{});
   }catch(e){
     setSy('e','Erro: '+e.message);
@@ -1952,6 +1963,7 @@ function sw(tab){
   if(tab==='pz')rnPrazos();
   if(tab==='fc')rnFech();
   if(tab==='pj')rnProj();
+  if(tab==='k'&&_kanPendente)rnKan();
   if(tab==='us')rnUsuarios();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
@@ -4604,6 +4616,9 @@ function calcSaldo(){
 // vai para a aba Não retirados com todas as informações e uma anotação
 // explicando o motivo. Vale para as que já estavam paradas antes.
 const DIAS_NAO_RET=15;
+// Quantos dias de OS entregues ficam na memória. O Histórico não depende
+// disto: ele consulta o banco direto, por período.
+const DIAS_ENTREGUES=120;
 let _ultimaVarredura=0;
 
 async function varrerNaoRetirados(){
@@ -4618,7 +4633,7 @@ async function varrerNaoRetirados(){
     .slice(0,25);                                // em lotes, para não travar
   if(!alvos.length)return;
 
-  let ok=0;
+  const gravar=[];
   for(const c of alvos){
     const now=Date.now();
     const dias=Math.floor((now-(c.ts||c.tsCreated||now))/86400000);
@@ -4632,8 +4647,11 @@ async function varrerNaoRetirados(){
     c.history.push({u:'Sistema',r:'auto',from:4,to:COL_NAO_RET,at:now,
       mc:false,naoRet:true,auto:true,dias});
     c.col=COL_NAO_RET;c.ts=now;
-    try{await saveCard(c);ok++;}catch(e){}
+    gravar.push(c);
   }
+  // grava em paralelo: 25 requisições em fila davam quase um minuto
+  const res=await Promise.allSettled(gravar.map(c=>saveCard(c)));
+  const ok=res.filter(r=>r.status==='fulfilled').length;
   if(ok){
     atualizarTelas();
     setSy('ok',ok+' OS movida(s) para Não retirados — '+horaAgora());
@@ -4772,7 +4790,6 @@ function rnNaoRet(){
         ${(c.telefone&&R&&R.wa)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="avisarWhats('${c.id}')">WhatsApp</button>`:''}
         ${(R&&R.ed)?`<button class="bex" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800" onclick="opEntregarAgora('${c.id}')">${c.saldo?'Receber e entregar':'Entregar'}</button>`:''}
         ${(c.saldo&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Só receber saldo</button>`:''}
-        <button class="bex" onclick="voltarDoArquivo('${c.id}',4)">Voltar p/ Avisado</button>
         ${R&&R.cd?`<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}
       </div></td></tr>`;}).join('')}</tbody></table>`;
 }
@@ -5423,8 +5440,12 @@ async function svOS(){
 }
 
 // ── RENDER KANBAN ─────────────────────────────────
+let _kanPendente=false;
 function rnKan(){
   if(!U||!R)return;
+  const ks=document.getElementById('ks');
+  if(ks&&ks.style.display==='none'){_kanPendente=true;return;}  // desenha ao voltar
+  _kanPendente=false;
   const board=document.getElementById('bd');board.innerHTML='';
   const btnNova=document.getElementById('btn-nova-os');if(btnNova)btnNova.style.display=R.ca?'block':'none';
   let t=0,al=0,en=0;
@@ -5460,6 +5481,9 @@ function rnKan(){
     if(ci===5)return; // Entregue vai para Histórico
     const cs=R.se.includes(ci);
     const col=document.createElement('div');col.className='co'+(ci===5?' co-en':'')+(!cs?' co-lk':'');
+    // os cards entram num fragmento e vão para a tela de uma vez só;
+    // inserir um a um forçava o navegador a recalcular o layout a cada card
+    const frag=document.createDocumentFragment();
     const cc=ordenarColuna(ST.cards.filter(c=>c.col===ci));t+=cc.length;
     cc.forEach(c=>{const h=el(c.ts);if(h>=48&&ci!==5)al++;if(ci===5)en++;});
     const lk=!cs?'<span style="font-size:12px;opacity:.5">🔒</span>':'';
@@ -5492,8 +5516,9 @@ function rnKan(){
         ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
         ${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(R.cd)?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:var(--bg);color:var(--mu);border:1px solid var(--bo);font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opSaldoObs('${c.id}')">Anotar${(c.saldoObs&&c.saldoObs.length)?(' ('+c.saldoObs.length+')'):''}</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
-      col.appendChild(div);
+      frag.appendChild(div);
     });
+    col.appendChild(frag);
 
     board.appendChild(col);
   });
