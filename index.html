@@ -646,6 +646,27 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     <div class="rh">
       <span class="rt">Pedidos não retirados</span>
       <span id="nr-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+        <select id="nr-saldo" onchange="rnNaoRet()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Com e sem saldo</option>
+          <option value="com">Só com saldo em aberto</option>
+          <option value="sem">Só sem saldo</option>
+        </select>
+        <select id="nr-espera" onchange="rnNaoRet()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="0">Qualquer tempo</option>
+          <option value="15">Mais de 15 dias</option>
+          <option value="30">Mais de 30 dias</option>
+          <option value="60">Mais de 60 dias</option>
+          <option value="90">Mais de 90 dias</option>
+        </select>
+        <select id="nr-contato" onchange="rnNaoRet()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Contato: todos</option>
+          <option value="sem">Sem anotação</option>
+          <option value="com">Já contatado</option>
+          <option value="semtel">Sem telefone</option>
+        </select>
+        <button class="bex" onclick="expNR()">CSV</button>
+      </div>
       <div class="sw" style="position:relative">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="nr-busca" placeholder="Buscar OS ou cliente..." oninput="rnNaoRet()" style="padding:7px 10px 7px 32px;font-size:12px;border:1.5px solid var(--bo);border-radius:10px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:200px"/>
@@ -661,6 +682,25 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   <div id="ccs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">OS canceladas</span>
+      <span id="cc-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+        <select id="cc-motivo" onchange="rnCanc()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todos os motivos</option>
+          <option value="Desistência do cliente">Desistência do cliente</option>
+          <option value="Erro de lançamento">Erro de lançamento</option>
+          <option value="OS duplicada">OS duplicada</option>
+          <option value="Devolução">Devolução</option>
+          <option value="Troca por outra OS">Troca por outra OS</option>
+          <option value="Outro">Outro</option>
+        </select>
+        <select id="cc-per" onchange="rnCanc()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todo o período</option>
+          <option value="h">Hoje</option>
+          <option value="s">Últimos 7 dias</option>
+          <option value="m">Últimos 30 dias</option>
+        </select>
+        <button class="bex" onclick="expCC()">CSV</button>
+      </div>
       <div class="sw" style="position:relative">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="cc-busca" placeholder="Buscar OS, cliente ou motivo..." oninput="rnCanc()" style="padding:7px 10px 7px 32px;font-size:12px;border:1.5px solid var(--bo);border-radius:10px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:230px"/>
@@ -4665,17 +4705,34 @@ function atualizarTelas(){
 function rnNaoRet(){
   const b=document.getElementById('nr-body');if(!b)return;
   const busca=(document.getElementById('nr-busca')?.value||'').toLowerCase();
+  const fSaldo=document.getElementById('nr-saldo')?.value||'todos';
+  const fEspera=parseInt(document.getElementById('nr-espera')?.value||'0')||0;
+  const fContato=document.getElementById('nr-contato')?.value||'todos';
   const lista=ST.cards.filter(c=>c.col===COL_NAO_RET)
     .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')
       +' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase().includes(busca))
+    .filter(c=>{
+      if(fSaldo==='com'&&!c.saldo)return false;
+      if(fSaldo==='sem'&&c.saldo)return false;
+      if(fEspera){
+        const d=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
+        if(d<fEspera)return false;
+      }
+      const temObs=!!(c.saldoObs&&c.saldoObs.filter(o=>o.u!=='Sistema').length);
+      if(fContato==='sem'&&temObs)return false;
+      if(fContato==='com'&&!temObs)return false;
+      if(fContato==='semtel'&&c.telefone)return false;
+      return true;
+    })
     .sort((a,b2)=>(a.naoRetEm||0)-(b2.naoRetEm||0));
+  window._nrLista=lista;
   const cont=document.getElementById('nr-cont');
   if(cont){
     const total=ST.cards.filter(c=>c.col===COL_NAO_RET).length;
     const comSaldo=ST.cards.filter(c=>c.col===COL_NAO_RET&&c.saldo).length;
     cont.textContent=total+' no total'+(comSaldo?(' · '+comSaldo+' com saldo em aberto'):'');
   }
-  if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado.</div>';return;}
+  if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado com estes filtros.</div>';return;}
 
   b.innerHTML=`<table><thead><tr>
       <th>#</th><th>OS / Cliente</th><th>Contato</th><th>Tipo</th><th>Óculos</th>
@@ -4720,13 +4777,58 @@ function rnNaoRet(){
       </div></td></tr>`;}).join('')}</tbody></table>`;
 }
 
+// Baixa um CSV com acentos legíveis no Excel
+function baixarCSV(texto,nome){
+  const b=new Blob(['\uFEFF'+texto],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);
+  const a=document.createElement('a');
+  a.href=u;a.download=nome+'-'+hojeBR()+'.csv';a.click();
+  URL.revokeObjectURL(u);
+}
+
+function expNR(){
+  const l=window._nrLista||[];
+  if(!l.length){alert('Nada para exportar.');return;}
+  const linhas=['OS,Cliente,Telefone,Tipo,Dt.Venda,Desde,Dias,Saldo,Ultimo contato'];
+  l.forEach(c=>{
+    const dias=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
+    const ult=(c.saldoObs&&c.saldoObs.length)?String(c.saldoObs[c.saldoObs.length-1].txt).replace(/,/g,';'):'';
+    linhas.push([c.os||'',(c.cliente||'').replace(/,/g,' '),c.telefone||'',tGL(c.tipo),
+      c.dtVenda?dtBR(c.dtVenda):'',fmtDtH(c.naoRetEm).replace(/,/g,''),dias,
+      c.saldo?Number(c.saldoValor||0).toFixed(2):'',ult].join(','));
+  });
+  baixarCSV(linhas.join('\n'),'nao-retirados');
+}
+
+function expCC(){
+  const l=window._ccLista||[];
+  if(!l.length){alert('Nada para exportar.');return;}
+  const linhas=['OS,Cliente,Tipo,Dt.Venda,Cancelada em,Motivo,Por'];
+  l.forEach(c=>linhas.push([c.os||'',(c.cliente||'').replace(/,/g,' '),tGL(c.tipo),
+    c.dtVenda?dtBR(c.dtVenda):'',fmtDtH(c.canceladoEm).replace(/,/g,''),
+    String(c.canceladoMotivo||'').replace(/,/g,';'),c.canceladoPor||''].join(',')));
+  baixarCSV(linhas.join('\n'),'canceladas');
+}
+
 function rnCanc(){
   const b=document.getElementById('cc-body');if(!b)return;
   const busca=(document.getElementById('cc-busca')?.value||'').toLowerCase();
+  const fMot=document.getElementById('cc-motivo')?.value||'todos';
+  const fPer=document.getElementById('cc-per')?.value||'todos';
+  const dias={h:1,s:7,m:30}[fPer]||0;
+  const desde=dias?Date.now()-dias*86400000:0;
   const lista=ST.cards.filter(c=>c.col===COL_CANC)
     .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.canceladoMotivo||'')).toLowerCase().includes(busca))
+    .filter(c=>{
+      if(fMot!=='todos'&&!String(c.canceladoMotivo||'').startsWith(fMot))return false;
+      if(desde&&(c.canceladoEm||0)<desde)return false;
+      return true;
+    })
     .sort((a,b2)=>(b2.canceladoEm||0)-(a.canceladoEm||0));
-  if(!lista.length){b.innerHTML='<div class="er">Nenhuma OS cancelada.</div>';return;}
+  window._ccLista=lista;
+  const cont=document.getElementById('cc-cont');
+  if(cont)cont.textContent=ST.cards.filter(c=>c.col===COL_CANC).length+' no total';
+  if(!lista.length){b.innerHTML='<div class="er">Nenhuma OS cancelada com estes filtros.</div>';return;}
   b.innerHTML=`<table><thead><tr>
       <th>#</th><th>OS</th><th>Cliente</th><th>Tipo</th><th>Dt. Venda</th>
       <th>Cancelada em</th><th>Motivo</th><th>Por</th><th>Ações</th>
