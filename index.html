@@ -414,6 +414,27 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   nav.nb .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
   nav.nb .tabs::-webkit-scrollbar{display:none}
 }
+
+/* ── BOTÃO DO WHATSAPP NO CARD ──────────────────────────────────────────
+   A classe .bwa era usada no card mas nunca existiu no CSS: o botão saía
+   com a aparência padrão do navegador, fora do padrão do sistema.
+   Segue as mesmas medidas de .bn e .bh para alinhar no rodapé. */
+.bwa{
+  font-size:11px;padding:6px 10px;border-radius:8px;border:none;
+  background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;
+  cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;
+  min-height:32px;transition:all .15s;letter-spacing:.01em;
+}
+.bwa:hover{opacity:.92;transform:translateY(-1px);}
+.bwa:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+/* já avisado: fica discreto, mas continua clicável para reenviar */
+.bwa.avisado{
+  background:#F0FDF4;color:#16A34A;border:1.5px solid #BBF7D0;font-weight:700;
+}
+.bwa.avisado:hover{background:#DCFCE7;transform:none;}
+@media (max-width:640px){
+  .bwa{font-size:10px;padding:6px 8px;}
+}
 </style>
 </head>
 <body>
