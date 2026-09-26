@@ -5244,12 +5244,6 @@ async function dlCard(id){
   await deleteCard(id);
 }
 
-// O botão Observação agora vive dentro do histórico, que já está aberto
-function opObsDoHist(){
-  const a=document.getElementById('obs-add-area');
-  if(a){a.style.display='block';setTimeout(()=>document.getElementById('obs-txt')?.focus(),80);}
-}
-
 function opObs(id){
   window._editHmId=id;
   opH(id);
@@ -5271,15 +5265,23 @@ async function svObs(){
   c.obsAlert=alerta;
   document.getElementById('obs-txt').value='';
   if(document.getElementById('obs-alert-chk'))document.getElementById('obs-alert-chk').checked=false;
-  opH(id);rnKan();
-  await saveCard(c);
+  opH(id);atualizarTelas();
+  try{
+    await saveCard(c);
+    setSy('ok','Observação salva — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
 }
 function opH(id){
   window._editHmId=id;
   const editBtn=document.getElementById('hm-edit-btn');
   if(editBtn)editBtn.style.display=R&&R.ed?'block':'none';
   const obsArea=document.getElementById('obs-add-area');
-  if(obsArea)obsArea.style.display=R&&R.ed&&!document.getElementById('obs-txt')?.value?'block':'none';
+  if(obsArea)obsArea.style.display=(R&&R.ed)?'block':'none';
+  const obsTxt=document.getElementById('obs-txt');
+  if(obsTxt&&!window._mantemObs)obsTxt.value='';
+  window._mantemObs=false;
+  const chk=document.getElementById('obs-alert-chk');
+  if(chk)chk.checked=false;
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   document.getElementById('hmt').textContent='Histórico — '+c.os;
 
@@ -5289,7 +5291,6 @@ function opH(id){
     const bt=(txt,fn,cor)=>'<button onclick="'+fn+'" style="font-size:11px;font-weight:700;font-family:inherit;'
       +'padding:6px 12px;border-radius:8px;cursor:pointer;'+cor+'">'+txt+'</button>';
     const partes=[];
-    if(R&&R.ed)partes.push(bt('Observação',"opObsDoHist()",'border:1.5px solid #FCD34D;background:#FFFBEB;color:#92400E'));
     if(R&&R.rf&&c.col<5)partes.push(bt('Refazer',"clsH();opRf('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
     if(R&&R.ed&&c.saldo)partes.push(bt('Anotar cobrança',"clsH();opSaldoObs('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--bg);color:var(--mu)'));
     if(R&&R.cd&&c.col!==7)partes.push(bt('Cancelar OS',"clsH();opCancOs('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
