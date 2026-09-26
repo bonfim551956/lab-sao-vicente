@@ -1107,6 +1107,15 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     <div class="mf"><label>Motivo do refazer <span style="color:var(--re)">*</span></label>
       <textarea id="frf" placeholder="Descreva o motivo pelo qual o serviço será refeito..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:80px"></textarea>
     </div>
+
+    <!-- Só para serviço de hora: a lente nova sai do estoque -->
+    <div id="rf-baixa-wrap" style="display:none">
+      <div style="font-size:11px;font-weight:800;color:#0D7A75;text-transform:uppercase;letter-spacing:.06em;padding-bottom:5px;margin-bottom:9px;border-bottom:1.5px solid var(--bo)">Baixa de lente</div>
+      <div id="rf-oculos"></div>
+      <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:10px;font-weight:500">
+        Marque o que precisa de lente nova. Às vezes quebra só um olho.
+      </div>
+    </div>
     <div class="mft"><button class="bc" onclick="clsRf()">Cancelar</button><button class="bsv" style="background:#DC2626;border-color:#DC2626" onclick="svRf()">Refazer</button></div>
   </div>
 </div>
@@ -4559,22 +4568,91 @@ async function svEditCr(){
 let rfId=null,mvPendId=null,editId=null;
 function clsLab(){mvPendId=null;document.getElementById('labm').style.display='none';}
 async function svLab(){const lab=document.getElementById('flab').value;if(!lab){alert('Selecione Lab Próprio ou Lab Parceiro.');return;}const pendId=mvPendId;clsLab();await mvCardExec(pendId,lab,null);}
-function opRf(id){if(!R||!R.rf){alert('Sem permissão para refazer serviços.');return;}rfId=id;document.getElementById('frf').value='';document.getElementById('rfm').style.display='flex';}
+function opRf(id){
+  if(!R||!R.rf){alert('Sem permissão para refazer serviços.');return;}
+  rfId=id;
+  document.getElementById('frf').value='';
+  rnRfBaixa();
+  document.getElementById('rfm').style.display='flex';
+}
 function clsRf(){rfId=null;document.getElementById('rfm').style.display='none';}
+// Serviço de hora refeito consome lente nova do estoque. Pode ser só o
+// olho direito, só o esquerdo, o par, ou nenhum — quando a lente é
+// reaproveitada ou o defeito foi na armação.
+function rnRfBaixa(){
+  const c=ST.cards.find(x=>x.id===rfId);
+  const w=document.getElementById('rf-baixa-wrap');
+  if(!c||!w)return;
+  const ocs=ocDoCard(c).map((o,i)=>({o,i})).filter(x=>ocEhHora(c,x.o));
+  if(!ocs.length){w.style.display='none';return;}
+  w.style.display='block';
+  document.getElementById('rf-oculos').innerHTML=ocs.map(({o,i})=>{
+    const g=(e,cl)=>(e==null)?'—':(fmtGrau(e)+' / '+fmtGrau(cl||0));
+    return '<div style="border:1.5px solid var(--bo);border-radius:10px;padding:10px 12px;margin-bottom:9px">'
+      +(ocDoCard(c).length>1?'<div style="font-size:10px;font-weight:800;color:var(--v);margin-bottom:6px">ÓCULOS '+(i+1)+'</div>':'')
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap">'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer">'
+      +'<input type="checkbox" id="rfod_'+i+'" style="width:16px;height:16px;cursor:pointer;accent-color:#0D7A75"/>'
+      +'OD <span style="font-weight:500;color:var(--mu)">'+g(o.esfOD,o.cilOD)+'</span></label>'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer">'
+      +'<input type="checkbox" id="rfoe_'+i+'" style="width:16px;height:16px;cursor:pointer;accent-color:#0D7A75"/>'
+      +'OE <span style="font-weight:500;color:var(--mu)">'+g(o.esfOE,o.cilOE)+'</span></label>'
+      +'<button type="button" onclick="rfPar('+i+')" style="font-size:10px;font-weight:700;font-family:inherit;padding:4px 10px;border-radius:7px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">Par</button>'
+      +'</div></div>';
+  }).join('');
+}
+function rfPar(i){
+  const od=document.getElementById('rfod_'+i), oe=document.getElementById('rfoe_'+i);
+  const marcar=!(od.checked&&oe.checked);
+  od.checked=marcar;oe.checked=marcar;
+}
+
 async function svRf(){
   if(!R||!R.rf){alert('Sem permissão.');return;}
   const motivo=document.getElementById('frf').value.trim();
   if(!motivo){alert('Preencha o motivo do refazer.');return;}
   const c=ST.cards.find(x=>x.id===rfId);
   if(!c)return;
+  // lentes marcadas para baixa
+  const lentes=[];const marcadas=[];
+  ocDoCard(c).forEach((o,i)=>{
+    const od=document.getElementById('rfod_'+i), oe=document.getElementById('rfoe_'+i);
+    if(od&&od.checked&&o.esfOD!=null){lentes.push([o.esfOD,o.cilOD||0]);marcadas.push((i+1)+'-OD');}
+    if(oe&&oe.checked&&o.esfOE!=null){lentes.push([o.esfOE,o.cilOE||0]);marcadas.push((i+1)+'-OE');}
+  });
+
   const prev=c.col;
   c.col=0;
   c.refeito=true;
   c.motivoRefeito=motivo;
   c.history=c.history||[];
-  c.history.push({u:U.n,r:U.r,from:prev,to:0,at:Date.now(),mc:false,refeito:true,motivoRefeito:motivo});
+  c.history.push({u:U.n,r:U.r,from:prev,to:0,at:Date.now(),mc:false,refeito:true,
+    motivoRefeito:motivo,lentesBaixa:marcadas.length?marcadas.join(', '):null});
+
+  // baixa no estoque das lentes marcadas
+  let semEstoque=[];
+  for(const [e,cl] of lentes){
+    const k=eK(e,cl);
+    if(!ST.estoque[k])ST.estoque[k]={esf:e,cil:cl,qty:0};
+    if(ST.estoque[k].qty>0){
+      ST.estoque[k].qty--;
+      try{await sbPatch('estoque',{qty:ST.estoque[k].qty},{id:k});}
+      catch(err){console.error('Erro baixa estoque:',err.message);}
+    }else{
+      semEstoque.push(fmtGrau(e)+' / '+fmtGrau(cl));
+    }
+  }
+  if(document.getElementById('es').style.display!=='none')rnEst();
+
   await saveCard(c);
   clsRf();rnKan();
+  if(marcadas.length){
+    setSy('ok',marcadas.length+' lente(s) baixada(s) do estoque — '+horaAgora());
+  }
+  if(semEstoque.length){
+    alert('Atenção: estes graus estão zerados no estoque e não foram baixados:\n\n'
+      +semEstoque.join('\n')+'\n\nConfira a prateleira.');
+  }
 }
 function onSrch(v){srch=v.trim().toLowerCase();document.getElementById('sc').className='sc'+(srch?' show':'');rnKan();if(srch)window.scrollTo({top:0,behavior:'smooth'});}
 function clrSrch(){srch='';document.getElementById('si').value='';document.getElementById('sc').className='sc';rnKan();}
@@ -5313,7 +5391,8 @@ function opH(id){
   }
   const l=document.getElementById('hl');
   if(!c.history||!c.history.length){l.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Sem movimentações.</div>';}
-  else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`:'';
+  else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`
+  +(h.lentesBaixa?`<div style="color:#0D7A75;font-size:10px;font-weight:700;margin-top:2px">Lente nova: ${h.lentesBaixa}</div>`:''):'';
 const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">'+(h.parcial?'avisou pelo WhatsApp — óculos de hora':'avisou pelo WhatsApp')+'</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
   document.getElementById('hm').style.display='flex';
 }
