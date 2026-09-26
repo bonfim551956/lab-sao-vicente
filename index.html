@@ -740,7 +740,7 @@ textarea {
           <input type="date" id="cr-dt-ini" onchange="rnCr()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none"/>
           <input type="date" id="cr-dt-fim" onchange="rnCr()" style="font-size:11px;padding:5px 8px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none"/>
         </div>
-        <input id="cr-busca" type="text" placeholder="Buscar nome ou OS..." oninput="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:180px"/>
+        <input id="cr-busca" type="text" placeholder="Buscar nome, CPF ou OS..." oninput="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:180px"/>
         <button id="cr-novo-btn" onclick="opNovoCr()" style="font-size:12px;padding:7px 16px;border-radius:9px;border:none;background:var(--v);color:#fff;cursor:pointer;font-weight:700;font-family:inherit;display:none">+ Novo Crediário</button>
       </div>
     </div>
@@ -1110,6 +1110,27 @@ textarea {
 
 
 <!-- Modal Renegociar Crediário -->
+
+<!-- Editar parcela do crediário -->
+<div class="mb" id="pem" style="display:none;z-index:300">
+  <div class="md" style="max-width:400px">
+    <div class="mh"><span id="pe-tit">Editar parcela</span><button class="mx" onclick="clsParcEdit()">&#10005;</button></div>
+    <input type="hidden" id="pe-id"/>
+    <div class="mf"><label>Valor da parcela <span style="color:var(--re)">*</span></label>
+      <input id="pe-valor" type="number" step="0.01" min="0" placeholder="0,00"/></div>
+    <div class="mf"><label>Vencimento <span style="color:var(--re)">*</span></label>
+      <input id="pe-venc" type="date"/></div>
+    <div class="mf"><label>Motivo da alteração <span style="color:var(--re)">*</span></label>
+      <input id="pe-motivo" placeholder="Ex: acerto de valor com o cliente"/></div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:10px;font-weight:500">
+      A alteração fica registrada no histórico do contrato, com o valor anterior.
+    </div>
+    <div class="mft">
+      <button class="bc" onclick="clsParcEdit()">Cancelar</button>
+      <button class="bsv" onclick="svParcEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
 <div class="mb" id="cr-reneg-modal" style="display:none;z-index:300">
   <div class="md" style="max-width:520px;width:95vw;max-height:92vh;overflow-y:auto">
     <div class="mh"><span id="rn-tit">Renegociar contrato</span><button class="mx" onclick="clsReneg()">&#10005;</button></div>
@@ -1800,6 +1821,57 @@ function tgG(v){
 
 
 
+
+
+// ── EDITAR UMA PARCELA ──────────────────────────────────────────────────────
+// Ajuste pontual de valor ou vencimento. Para mudar o contrato inteiro,
+// o caminho é Renegociar.
+function opParcEdit(pid){
+  const d=window._crDetData;
+  if(!d||!d.parcs){alert('Abra o contrato antes.');return;}
+  const p=d.parcs.find(x=>x.id===pid);
+  if(!p)return;
+  if(p.status==='pago'){alert('Esta parcela já foi paga. Para corrigir, fale com o supervisor.');return;}
+  document.getElementById('pe-id').value=pid;
+  document.getElementById('pe-tit').textContent='Editar parcela '+(p.numero||'');
+  document.getElementById('pe-valor').value=Number(p.valor||0);
+  document.getElementById('pe-venc').value=(p.dt_vencimento||'').split('T')[0];
+  document.getElementById('pe-motivo').value='';
+  document.getElementById('pem').style.display='flex';
+  setTimeout(()=>document.getElementById('pe-valor').focus(),90);
+}
+function clsParcEdit(){document.getElementById('pem').style.display='none';}
+
+async function svParcEdit(){
+  const pid=document.getElementById('pe-id').value;
+  const d=window._crDetData;
+  const p=d&&d.parcs?d.parcs.find(x=>x.id===pid):null;
+  if(!p)return;
+  const valor=num(document.getElementById('pe-valor').value);
+  const venc=document.getElementById('pe-venc').value;
+  const motivo=UP(document.getElementById('pe-motivo').value.trim());
+  if(valor<=0){alert('Informe o valor da parcela.');document.getElementById('pe-valor').focus();return;}
+  if(!venc){alert('Informe o vencimento.');return;}
+  if(!motivo){alert('Informe o motivo da alteração.');document.getElementById('pe-motivo').focus();return;}
+
+  const btn=document.querySelector('#pem .bsv');
+  if(btn){btn.textContent='Salvando...';btn.disabled=true;}
+  try{
+    await sbPatch('crediario_parcelas',{valor,dt_vencimento:venc},{id:pid});
+    // registra no histórico do contrato o que mudou
+    const c=d.c;
+    const hist=(c.historico||[]);
+    hist.push({u:U.n,at:new Date().toISOString(),acao:'Editou a parcela '+(p.numero||''),
+      motivo, de:{valor:Number(p.valor||0),vencimento:p.dt_vencimento},
+      para:{valor,vencimento:venc}});
+    await sbPatch('crediario',{historico:hist},{id:c.id});
+    clsParcEdit();
+    await opCrDet(c.id);
+    await rnCr();
+    setSy('ok','Parcela atualizada — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+  finally{if(btn){btn.textContent='Salvar';btn.disabled=false;}}
+}
 
 // ── RENEGOCIAÇÃO DE CREDIÁRIO ───────────────────────────────────────────────
 // Em vez de cancelar e refazer, o contrato continua o mesmo: as parcelas em
@@ -2843,11 +2915,12 @@ async function svEntrega(){
 // -- AVISO DE "OCULOS PRONTO" PELO WHATSAPP ---------------------------------
 // Abre o WhatsApp com a mensagem pronta. Nada e enviado sozinho: quem
 // confirma o envio e o atendente. Para editar o texto, mexa aqui embaixo.
+// No WhatsApp: *negrito*, _itálico_. Juntos ficam *_assim_*
 const MSG_PRONTO='Olá, tudo bem?\n'
   +'Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, '
-  +'seu óculos da Ordem de Serviço nº {os}{nome} já está pronto! 😉\n'
-  +'Estamos abertos de segunda a sexta das 9h às 19h, '
-  +'e aos sábados e feriados das 9h às 15h.';
+  +'seu óculos da Ordem de Serviço nº {os}{nome} já está pronto! 😉\n\n'
+  +'*_Estamos abertos de segunda a sexta das 9h às 19h, '
+  +'e aos sábados e feriados das 9h às 15h._*';
 
 function mascTel(el){
   let v=el.value.replace(/\D/g,'').slice(0,11);
@@ -2861,7 +2934,8 @@ function waLink(c){
   const tel=String(c.telefone||'').replace(/\D/g,'');
   if(tel.length<10)return '';
   const num=tel.length<=11?'55'+tel:tel;          // DDI do Brasil
-  const nome=(c.cliente||'').trim();
+  // só o primeiro nome, igual ao envio automático
+  const nome=(c.cliente||'').trim().split(/\s+/)[0]||'';
   const msg=MSG_PRONTO.replace('{nome}',nome?' em nome de: '+nome:'').replace('{os}',c.os||'');
   return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
 }
@@ -3301,7 +3375,15 @@ async function rnCr(){
 
     // Filtra contratos
     let filtrados=contratos.filter(c=>{
-      if(busca&&!c.nome.toLowerCase().includes(busca)&&!(c.os||'').toLowerCase().includes(busca))return false;
+      if(busca){
+        // CPF compara só os números: encontra digitando com ou sem pontuação
+        const soNum=busca.replace(/\D/g,'');
+        const cpfNum=String(c.cpf||'').replace(/\D/g,'');
+        const achou=c.nome.toLowerCase().includes(busca)
+          ||(c.os||'').toLowerCase().includes(busca)
+          ||(soNum.length>=3&&cpfNum.includes(soNum));
+        if(!achou)return false;
+      }
       if(dtIni&&(c.created_at||'').split('T')[0]<dtIni)return false;
       if(dtFim&&(c.created_at||'').split('T')[0]>dtFim)return false;
       const cParcs=parcMap[c.id]||[];
@@ -3445,7 +3527,7 @@ async function opCrDet(cid){
             <td><span style="font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700;${stStyle[st]}">${stLabel[st]}</span></td>
             <td style="color:var(--mu)">${pago}</td>
             <td style="color:var(--mu);font-size:11px">${p.baixado_por||'—'}</td>
-            ${R&&R.ed?`<td>${(st!=='pago'&&st!=='renegociado')?`<button onclick="opCrBaixa('${p.id}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid rgba(27,168,160,.3);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar</button>`:'—'}</td>`:''}
+            ${R&&R.ed?`<td>${(st!=='pago'&&st!=='renegociado')?`<button onclick="opCrBaixa('${p.id}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid rgba(27,168,160,.3);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar</button>`:''}${(st!=='pago'&&st!=='renegociado')?`<button onclick="opParcEdit('${p.id}')" title="Editar valor ou vencimento" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--mu);cursor:pointer;font-weight:700;margin-left:4px">Editar</button>`:''}${(st==='pago'||st==='renegociado')?'—':''}</td>`:''}
           </tr>`;
         }).join('')}</tbody>
       </table>`;
@@ -5429,7 +5511,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
