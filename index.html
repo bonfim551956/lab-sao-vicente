@@ -444,6 +444,28 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 #hm{z-index:250;}                       /* o histórico, acima dos comuns */
 #rfm,#cancm,#sobm,#sqm,#entm,#mtm{z-index:320;}   /* abertos de dentro dele */
 #cr-baixa-modal,#cr-edit-modal,#cr-reneg-modal,#pem{z-index:320;}
+
+/* ── TAMANHO DOS MODAIS ─────────────────────────────────────────────────
+   Regra geral: podem ser largos, mas nunca ultrapassam a janela. Vários
+   modais não tinham limite de altura e saíam da tela em monitor menor —
+   o Editar Contrato era um deles, e os botões ficavam inalcançáveis. */
+.mb{padding:14px;}
+.mo,.md{
+  max-height:92vh;          /* nunca passa da altura da janela */
+  overflow-y:auto;          /* o conteúdo rola dentro do modal */
+  box-sizing:border-box;
+}
+/* modais de formulário ganham mais largura: cabe mais campo por linha */
+#cr-edit-modal .md{max-width:640px;}
+#cr-modal .md{max-width:640px;}
+#usm .md{max-width:520px;}
+#sobm .md{max-width:520px;}
+#hm .mo{max-width:520px;}
+
+@media (max-width:640px){
+  .mb{padding:8px;}
+  .mo,.md{max-height:94vh;}
+}
 </style>
 </head>
 <body>
@@ -3863,7 +3885,7 @@ async function rnCr(){
           <td style="color:var(--mu);font-size:11px;${txt}">${i+1}</td>
           <td style="font-weight:600;white-space:nowrap;${txt||'color:var(--tx);'}">${dtBR(c.dt_compra||c.created_at)}</td>
           <td style="font-weight:700;${txt}">${c.nome}${canc?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#DC2626;color:#fff;font-weight:800;letter-spacing:.04em">CANCELADO</span>':''}<br><span style="font-size:10px;color:${canc?'#B91C1C':'var(--mu)'};font-weight:400">${c.cpf||''}</span></td>
-          <td style="color:${canc?'#B91C1C':'var(--mu)'}">${c.os||'—'}</td>
+          <td style="color:${canc?'#B91C1C':'var(--mu)'}">${c.os||'—'}${c.os_fake?`<div style="font-size:9px;font-weight:800;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:4px;padding:1px 5px;display:inline-block;margin-left:5px">PROVISÓRIA</div>`:''}</td>
           <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;${canc?'background:#FEE2E2;color:#B91C1C':(finColor[c.financeira]||'')}">${finLabel[c.financeira]||c.financeira}</span></td>
           <td style="font-weight:700;${canc?'color:#B91C1C;text-decoration:line-through':''}">R$ ${(c.valor_crediario||0).toFixed(2)}</td>
           <td>${entrada}</td>
@@ -3906,7 +3928,9 @@ async function opCrDet(cid){
     ]);
     const c=upCampos(contratos[0],['nome','os','obs','criado_por','entrada_paga_por']);if(!c)return;
     (parcs||[]).forEach(p=>upCampos(p,['baixado_por','obs']));
-    document.getElementById('cr-det-title').textContent=c.nome+(c.os?' — '+c.os:'')+(c.status==='cancelado'?' [CANCELADO]':'');
+    document.getElementById('cr-det-title').innerHTML=c.nome+(c.os?' — '+c.os:'')
+      +(c.os_fake?' <span style="font-size:10px;font-weight:800;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:5px;padding:2px 7px;vertical-align:middle">OS PROVISÓRIA</span>':'')
+      +(c.status==='cancelado'?' [CANCELADO]':'');
     const crEditBtn=document.getElementById('cr-det-edit-btn');
     if(crEditBtn)crEditBtn.style.display=R&&R.ed?'inline-block':'none';
     const crRenegBtn=document.getElementById('cr-det-reneg-btn');
