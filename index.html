@@ -4881,7 +4881,9 @@ function osMista(c){
   return ocs.some(o=>ocEhHora(c,o))&&ocs.some(o=>ocPrecisaPedido(c,o));
 }
 function ocPrecisaPedido(c,o){
-  const temLente=!['passagem','gar-armacao'].includes(c.tipo);
+  // Só troca de armação, com ou sem lapidação, usa a lente que o cliente já
+  // tem: não há pedido ao fornecedor. Passagem também não.
+  const temLente=!['passagem','gar-armacao','gar-armacao-sem'].includes(c.tipo);
   return temLente&&!ocEhHora(c,o);
 }
 
