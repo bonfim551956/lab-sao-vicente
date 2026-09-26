@@ -645,6 +645,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   <div id="nrs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">Pedidos não retirados</span>
+      <span id="nr-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
       <div class="sw" style="position:relative">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="nr-busca" placeholder="Buscar OS ou cliente..." oninput="rnNaoRet()" style="padding:7px 10px 7px 32px;font-size:12px;border:1.5px solid var(--bo);border-radius:10px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:200px"/>
@@ -1741,8 +1742,8 @@ async function loadData(full){
     await carregarEstoque();
     if(abaAtual()==='e')rnEst();
     // fase 2: entregues carregam em segundo plano (usados nos relatorios)
-    sbGet('os_cards','col=eq.5&order=ts_created.desc'+un)
-      .then(ent=>{if(mesclarCards((ent||[]).map(mapCard)))rnAtiva();})
+    sbGet('os_cards','col=gte.5&order=ts_created.desc'+un)
+      .then(ent=>{if(mesclarCards((ent||[]).map(mapCard)))rnAtiva();varrerNaoRetirados();})
       .catch(()=>{});
   }catch(e){
     setSy('e','Erro: '+e.message);
@@ -4522,6 +4523,49 @@ function calcSaldo(){
 
 
 
+
+// ── VARREDURA DOS NÃO RETIRADOS ─────────────────────────────────────────────
+// OS parada mais de 15 dias em Avisado sai do quadro sozinha. Ela não some:
+// vai para a aba Não retirados com todas as informações e uma anotação
+// explicando o motivo. Vale para as que já estavam paradas antes.
+const DIAS_NAO_RET=15;
+let _ultimaVarredura=0;
+
+async function varrerNaoRetirados(){
+  if(!U||!R||!R.ed)return;                       // quem não movimenta não dispara
+  if(Date.now()-_ultimaVarredura<300000)return;  // no máximo a cada 5 minutos
+  _ultimaVarredura=Date.now();
+
+  const limite=Date.now()-DIAS_NAO_RET*86400000;
+  const alvos=ST.cards
+    .filter(c=>c.col===4&&(c.ts||c.tsCreated||0)<limite)
+    .sort((a,b)=>(a.ts||0)-(b.ts||0))
+    .slice(0,25);                                // em lotes, para não travar
+  if(!alvos.length)return;
+
+  let ok=0;
+  for(const c of alvos){
+    const now=Date.now();
+    const dias=Math.floor((now-(c.ts||c.tsCreated||now))/86400000);
+    c.naoRetEm=now;
+    c.naoRetPor='Sistema — '+DIAS_NAO_RET+' dias em Avisado';
+    if(!Array.isArray(c.saldoObs))c.saldoObs=[];
+    c.saldoObs.push({t:now,u:'Sistema',
+      txt:'MOVIDO AUTOMATICAMENTE — '+dias+' DIAS EM AVISADO SEM RETIRADA'
+        +(c.saldo?(' · SALDO DE R$ '+Number(c.saldoValor||0).toFixed(2)+' EM ABERTO'):'')});
+    if(!c.history)c.history=[];
+    c.history.push({u:'Sistema',r:'auto',from:4,to:COL_NAO_RET,at:now,
+      mc:false,naoRet:true,auto:true,dias});
+    c.col=COL_NAO_RET;c.ts=now;
+    try{await saveCard(c);ok++;}catch(e){}
+  }
+  if(ok){
+    rnKan();
+    if(document.getElementById('nrs').style.display!=='none')rnNaoRet();
+    setSy('ok',ok+' OS movida(s) para Não retirados — '+horaAgora());
+  }
+}
+
 // ── CANCELAMENTO E PEDIDOS NÃO RETIRADOS ────────────────────────────────────
 // Colunas 6 e 7 ficam fora do quadro: cada uma tem a sua aba.
 const COL_NAO_RET=6, COL_CANC=7;
@@ -4598,6 +4642,12 @@ function rnNaoRet(){
     .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')
       +' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase().includes(busca))
     .sort((a,b2)=>(a.naoRetEm||0)-(b2.naoRetEm||0));
+  const cont=document.getElementById('nr-cont');
+  if(cont){
+    const total=ST.cards.filter(c=>c.col===COL_NAO_RET).length;
+    const comSaldo=ST.cards.filter(c=>c.col===COL_NAO_RET&&c.saldo).length;
+    cont.textContent=total+' no total'+(comSaldo?(' · '+comSaldo+' com saldo em aberto'):'');
+  }
   if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado.</div>';return;}
 
   b.innerHTML=`<table><thead><tr>
@@ -4626,6 +4676,7 @@ function rnNaoRet(){
           ${c.saldo?`<div style="font-weight:800;color:#B45309">Saldo ${rs(c.saldoValor)}</div>`:''}
           ${c.saldoPago?`<div style="font-weight:800;color:#16A34A">quitado ${dtBR(c.saldoPagoData)}</div>`:''}</td>
       <td style="font-weight:800;color:${corD};white-space:nowrap">${dias} dias
+          ${c.naoRetPor&&c.naoRetPor.indexOf('Sistema')===0?'<div style="font-size:9px;font-weight:800;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:4px;padding:1px 5px;display:inline-block;margin-top:2px">AUTOMÁTICO</div>':''}
           <div style="font-size:9px;font-weight:600;color:var(--mu)">desde ${fmtDtH(c.naoRetEm)}</div>
           <div style="font-size:9px;font-weight:600;color:var(--mu)">por ${c.naoRetPor||'—'}</div></td>
       <td style="max-width:210px">${ult?`<div style="font-size:11px;font-weight:600">${ult.txt}</div>
