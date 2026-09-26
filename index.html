@@ -77,11 +77,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 }
 .nb-logo{height:34px;width:auto;display:block;opacity:.97;}
 @media (max-width:1024px){.nb-logo{height:30px}}
-.nb{background:var(--v);padding:0 1.5rem;height:var(--nb-h);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;
-  box-shadow:0 2px 12px rgba(27,168,160,.3);}
+.nb{background:var(--v);padding:6px 1.5rem;min-height:var(--nb-h);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 12px rgba(27,168,160,.3);gap:10px;}
 .nb-l{display:flex;align-items:center;gap:12px;}
 .nt{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.4px;}
-.nb-r{display:flex;align-items:center;gap:8px;}
+.nb-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:0;}
 .av{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--v),var(--vc));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;}
 .nn{font-size:12px;color:rgba(255,255,255,.75);font-weight:600;}
 .rb{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:700;letter-spacing:.04em;}
@@ -90,8 +90,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .rb-m{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.2);}
 .rb-g{background:rgba(139,92,246,.3);color:#DDD6FE;border:1px solid rgba(139,92,246,.4);}
 .rb-p{background:rgba(236,72,153,.25);color:#FBCFE8;border:1px solid rgba(236,72,153,.35);}
-.tabs{display:flex;gap:2px;background:rgba(0,0,0,.12);border-radius:10px;padding:3px;}
-.tab{font-size:12px;font-weight:600;color:rgba(255,255,255,.65);background:none;border:none;padding:5px 14px;border-radius:8px;cursor:pointer;font-family:inherit;transition:all .2s;white-space:nowrap;letter-spacing:.01em;}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,.12);border-radius:10px;padding:3px;flex-wrap:wrap;justify-content:flex-end;}
+.tab{font-size:12px;font-weight:600;color:rgba(255,255,255,.65);background:none;border:none;padding:5px 11px;border-radius:8px;cursor:pointer;font-family:inherit;transition:all .2s;white-space:nowrap;letter-spacing:.01em;}
 .tab:hover{color:#fff;background:rgba(255,255,255,.12);}
 .tab.active{background:#fff;color:var(--v);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.12);}
 .blo{background:rgba(0,0,0,.15);border:1px solid rgba(0,0,0,.1);color:rgba(255,255,255,.85);font-size:11px;font-family:inherit;padding:5px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:all .2s;}
@@ -416,7 +416,9 @@ textarea {
         <button class="tab" id="t-sd" onclick="sw('sd')" style="display:none">Saldos</button>
         <button class="tab" id="t-cr" onclick="sw('cr')" style="display:none">Crediário</button>
         <button class="tab" id="t-ig" onclick="sw('ig')" style="display:none">Indique e Ganhe</button>
-        <button class="tab" id="t-hs" onclick="sw('hs')">Histórico</button>
+                <button class="tab" id="t-nr" onclick="sw('nr')" style="display:none">Não retirados</button>
+        <button class="tab" id="t-cc" onclick="sw('cc')" style="display:none">Cancelados</button>
+<button class="tab" id="t-hs" onclick="sw('hs')">Histórico</button>
         <button class="tab" id="t-e" onclick="sw('e')" style="display:none">Estoque</button>
         <button class="tab" id="t-fc" onclick="sw('fc')" style="display:none">Fechamento</button>
         <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
@@ -606,6 +608,33 @@ textarea {
 
 
 
+
+
+  <div id="nrs" class="rm" style="display:none">
+    <div class="rh">
+      <span class="rt">Pedidos não retirados</span>
+      <div class="sw" style="position:relative">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="nr-busca" placeholder="Buscar OS ou cliente..." oninput="rnNaoRet()" style="padding:7px 10px 7px 32px;font-size:12px;border:1.5px solid var(--bo);border-radius:10px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:200px"/>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border:1px solid var(--bo);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:500">
+      OS prontas que o cliente foi avisado e não veio buscar. Elas saem do quadro para não
+      poluir o dia a dia, mas continuam aqui — com o tempo de espera e o histórico de contatos.
+    </div>
+    <div class="tw"><div id="nr-body"><div class="er">Carregando...</div></div></div>
+  </div>
+
+  <div id="ccs" class="rm" style="display:none">
+    <div class="rh">
+      <span class="rt">OS canceladas</span>
+      <div class="sw" style="position:relative">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="cc-busca" placeholder="Buscar OS, cliente ou motivo..." oninput="rnCanc()" style="padding:7px 10px 7px 32px;font-size:12px;border:1.5px solid var(--bo);border-radius:10px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;width:230px"/>
+      </div>
+    </div>
+    <div class="tw"><div id="cc-body"><div class="er">Carregando...</div></div></div>
+  </div>
 
   <div id="uss" class="rm" style="display:none">
     <div class="rh">
@@ -868,7 +897,8 @@ textarea {
             <option value="venda">Venda — Pedido</option>
             <option value="hora" selected>Venda — Hora</option>
             <option value="gar-hora">Garantia — Hora</option>
-            <option value="gar-armacao">Garantia — Armação</option>
+            <option value="gar-armacao">Garantia — Armação c/ lapidação</option>
+            <option value="gar-armacao-sem">Garantia — Armação s/ lapidação</option>
             <option value="gar-pedido">Garantia — Pedido</option>
             <option value="passagem">Passagem — com lapidação</option>
           </select>
@@ -1245,6 +1275,34 @@ textarea {
 <!-- Receber o saldo antes da retirada -->
 
 <!-- Anotações de cobrança do saldo -->
+
+<!-- Cancelar OS -->
+<div class="mb" id="cancm" style="display:none">
+  <div class="md" style="max-width:420px">
+    <div class="mh"><span id="canc-tit">Cancelar OS</span><button class="mx" onclick="clsCancOs()">&#10005;</button></div>
+    <input type="hidden" id="canc-id"/>
+    <div class="perigo" style="font-size:11px;background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:600">
+      A OS sai do quadro e vai para a aba Cancelados. Ela não é apagada:
+      continua pesquisável, com o motivo e quem cancelou.
+    </div>
+    <div class="mf"><label>Motivo do cancelamento <span style="color:var(--re)">*</span></label>
+      <select id="canc-motivo">
+        <option value="">Selecione...</option>
+        <option value="Desistência do cliente">Desistência do cliente</option>
+        <option value="Erro de lançamento">Erro de lançamento</option>
+        <option value="OS duplicada">OS duplicada</option>
+        <option value="Devolução">Devolução</option>
+        <option value="Troca por outra OS">Troca por outra OS</option>
+        <option value="Outro">Outro</option>
+      </select></div>
+    <div class="mf"><label>Detalhe <span style="color:var(--mu);font-weight:400">(opcional)</span></label>
+      <input id="canc-obs" placeholder="Ex: cliente desistiu por causa do prazo"/></div>
+    <div class="mft">
+      <button class="bc" onclick="clsCancOs()">Voltar</button>
+      <button class="bsv" style="background:#B91C1C;border-color:#B91C1C" onclick="svCancOs()">Cancelar a OS</button>
+    </div>
+  </div>
+</div>
 <div class="mb" id="sobm" style="display:none">
   <div class="md" style="max-width:460px">
     <div class="mh"><span id="sob-tit">Anotações</span><button class="mx" onclick="clsSaldoObs()">&#10005;</button></div>
@@ -1582,6 +1640,8 @@ function mapCard(r){return upCard({
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,saldoObs:r.saldo_obs||[],
+  canceladoEm:r.cancelado_em,canceladoPor:r.cancelado_por,canceladoMotivo:r.cancelado_motivo,
+  naoRetEm:r.nao_ret_em,naoRetPor:r.nao_ret_por,
   saldoPago:r.saldo_pago,saldoPagoEm:r.saldo_pago_em,saldoPagoPor:r.saldo_pago_por,
   saldoPagoValor:r.saldo_pago_valor,saldoPagoForma:r.saldo_pago_forma,saldoPagoData:r.saldo_pago_data,
   horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
@@ -1678,6 +1738,9 @@ async function saveCard(c){
       entrega_forma2:c.entregaForma2||null,
       saldo:!!c.saldo,saldo_valor:(c.saldoValor===0||c.saldoValor)?c.saldoValor:null,
       saldo_obs:Array.isArray(c.saldoObs)?c.saldoObs:[],
+      cancelado_em:c.canceladoEm||null,cancelado_por:c.canceladoPor||null,
+      cancelado_motivo:c.canceladoMotivo||null,
+      nao_ret_em:c.naoRetEm||null,nao_ret_por:c.naoRetPor||null,
       saldo_pago:!!c.saldoPago,saldo_pago_em:c.saldoPagoEm||null,saldo_pago_por:c.saldoPagoPor||null,
       saldo_pago_valor:(c.saldoPagoValor===0||c.saldoPagoValor)?c.saldoPagoValor:null,
       saldo_pago_forma:c.saldoPagoForma||null,saldo_pago_data:c.saldoPagoData||null,
@@ -1775,6 +1838,8 @@ function aplicarAbas(){
   mostra('t-cr', fin);
   mostra('t-ig', fin);
   mostra('t-us', U.r==='supervisor');
+  mostra('t-nr', true);
+  mostra('t-cc', true);
 }
 
 function doLogout(){
@@ -1790,14 +1855,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',pj:'pjs',us:'uss',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','pj','us'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','pj','us','nr','cc'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -1815,6 +1880,8 @@ function sw(tab){
   if(tab==='fc')rnFech();
   if(tab==='pj')rnProj();
   if(tab==='us')rnUsuarios();
+  if(tab==='nr')rnNaoRet();
+  if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
   if(tab==='cr')rnCr();
   if(tab==='ig')rnIG();
@@ -1844,8 +1911,8 @@ function travarCil(el){
 }
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
-function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação'};return m[t]||t;}
-function tGC(t){if(t==='avulsa')return'bvd';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
+function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação'};return m[t]||t;}
+function tGC(t){if(t==='avulsa')return'bvd';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -2208,7 +2275,8 @@ function idFech(d){return 'fc_'+(U.un)+'_'+d;}
 
 // ── o que o sistema traz sozinho ───────────────────────────────────────────
 function vendasDoDia(dia){
-  return ST.cards.filter(c=>c.dtVenda===dia).map(c=>({
+  // cancelada não entra no faturamento do dia
+  return ST.cards.filter(c=>c.dtVenda===dia&&c.col!==COL_CANC).map(c=>({
     cardId:c.id, os:c.descricao||c.os||'', cliente:c.cliente||'',
     tipo:c.tipo, valorTotal:num(c.valorVenda),
     forma1:c.formaPag||(num(c.valorVenda)?'':'Garantia'), pago1:num(c.valorRecebido),
@@ -2222,6 +2290,7 @@ function entregasDoDia(dia){
   ST.cards.forEach(c=>{
     // registradas pela venda avulsa já entram como venda do dia
     if(c.tipo==='avulsa'||c.tipo==='passagem-sem')return;
+    if(c.col===COL_CANC)return;            // cancelada não entra no caixa
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
     out.push({cardId:c.id, os:c.os||'', cliente:c.cliente||'', dtVenda:c.dtVenda||'',
@@ -2803,6 +2872,7 @@ function rnSaldos(){
 
   sdDados=ST.cards.filter(c=>{
     if(!c.saldo)return false;
+    if(c.col===COL_CANC)return false;      // cancelada não se cobra
     if(ini&&(!c.dtVenda||c.dtVenda<ini||c.dtVenda>fim))return false;
     const s=situacaoSaldo(c);
     if(sit!=='todos'&&s!==sit)return false;
@@ -3054,7 +3124,7 @@ async function avisarWhats(id){
 
 // -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
 let ocQtd=1;
-const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','hora'];
+const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','gar-armacao-sem','hora'];
 
 // Lista de oculos de um card (cards antigos, sem "pedidos", viram 1 oculos)
 function ocDoCard(c){
@@ -4417,6 +4487,126 @@ function calcSaldo(){
 
 
 
+
+// ── CANCELAMENTO E PEDIDOS NÃO RETIRADOS ────────────────────────────────────
+// Colunas 6 e 7 ficam fora do quadro: cada uma tem a sua aba.
+const COL_NAO_RET=6, COL_CANC=7;
+
+function opCancOs(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  if(!R||!R.cd){alert('Só o supervisor pode cancelar uma OS.');return;}
+  document.getElementById('canc-id').value=id;
+  document.getElementById('canc-tit').textContent='Cancelar OS '+(c.os||'');
+  document.getElementById('canc-motivo').value='';
+  document.getElementById('canc-obs').value='';
+  document.getElementById('cancm').style.display='flex';
+}
+function clsCancOs(){document.getElementById('cancm').style.display='none';}
+
+async function svCancOs(){
+  const id=document.getElementById('canc-id').value;
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  const motivo=document.getElementById('canc-motivo').value;
+  const obs=UP(document.getElementById('canc-obs').value.trim());
+  if(!motivo){alert('Selecione o motivo do cancelamento.');return;}
+  const texto=motivo+(obs?(' — '+obs):'');
+  if(!confirm('Cancelar a OS '+(c.os||'')+'?\n\nMotivo: '+texto))return;
+  const now=Date.now();
+  c.canceladoEm=now;c.canceladoPor=U.n;c.canceladoMotivo=texto;
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:COL_CANC,at:now,mc:false,cancelado:true,motivo:texto});
+  c.col=COL_CANC;c.ts=now;
+  clsCancOs();rnKan();
+  try{await saveCard(c);setSy('ok','OS cancelada — '+horaAgora());}
+  catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+// Avisado e o cliente não veio buscar
+async function marcarNaoRet(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  if(!R||!R.ed){alert('Sem permissão.');return;}
+  if(!confirm('Mover a OS '+(c.os||'')+' para Não retirados?\n\n'
+    +'Ela sai do quadro mas continua na aba própria, com o tempo de espera.\n'
+    +'Dá para trazer de volta quando o cliente aparecer.'))return;
+  const now=Date.now();
+  c.naoRetEm=now;c.naoRetPor=U.n;
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:COL_NAO_RET,at:now,mc:false,naoRet:true});
+  c.col=COL_NAO_RET;c.ts=now;
+  rnKan();
+  try{await saveCard(c);setSy('ok','Movida para Não retirados — '+horaAgora());}
+  catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+// Volta para o quadro, na coluna Avisado
+async function voltarDoArquivo(id,destino){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  if(!R||!R.ed){alert('Sem permissão.');return;}
+  const nomes={4:'Avisado',3:'Pronto'};
+  if(!confirm('Trazer a OS '+(c.os||'')+' de volta para '+(nomes[destino]||destino)+'?'))return;
+  const now=Date.now();
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:destino,at:now,mc:false,retomada:true});
+  c.col=destino;c.ts=now;
+  c.canceladoEm=null;c.canceladoPor=null;c.canceladoMotivo=null;
+  c.naoRetEm=null;c.naoRetPor=null;
+  rnKan();rnNaoRet();rnCanc();
+  try{await saveCard(c);setSy('ok','OS reaberta — '+horaAgora());}
+  catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+const fmtDtH=ts=>ts?new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+
+function rnNaoRet(){
+  const b=document.getElementById('nr-body');if(!b)return;
+  const busca=(document.getElementById('nr-busca')?.value||'').toLowerCase();
+  const lista=ST.cards.filter(c=>c.col===COL_NAO_RET)
+    .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')).toLowerCase().includes(busca))
+    .sort((a,b2)=>(a.naoRetEm||0)-(b2.naoRetEm||0));
+  if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado.</div>';return;}
+  b.innerHTML=`<table><thead><tr>
+      <th>#</th><th>OS</th><th>Cliente</th><th>Telefone</th><th>Dt. Venda</th>
+      <th>Desde</th><th>Espera</th><th>Por</th><th>Ações</th>
+    </tr></thead><tbody>${lista.map((c,i)=>{
+      const dias=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
+      return `<tr>
+      <td style="color:var(--mu);font-size:11px">${i+1}</td>
+      <td style="font-weight:800">${c.os||'—'}</td>
+      <td style="font-weight:600">${c.cliente||'—'}</td>
+      <td style="color:var(--mu)">${c.telefone||'—'}</td>
+      <td style="color:var(--mu)">${c.dtVenda?dtBR(c.dtVenda):'—'}</td>
+      <td style="color:var(--mu);white-space:nowrap">${fmtDtH(c.naoRetEm)}</td>
+      <td style="font-weight:800;color:${dias>60?'#B91C1C':dias>30?'#B45309':'var(--mu)'}">${dias} dias</td>
+      <td style="color:var(--mu);font-size:11px">${c.naoRetPor||'—'}</td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="bex" onclick="voltarDoArquivo('${c.id}',4)">Voltar p/ Avisado</button>
+        ${R&&R.cd?`<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}
+      </div></td></tr>`;}).join('')}</tbody></table>`;
+}
+
+function rnCanc(){
+  const b=document.getElementById('cc-body');if(!b)return;
+  const busca=(document.getElementById('cc-busca')?.value||'').toLowerCase();
+  const lista=ST.cards.filter(c=>c.col===COL_CANC)
+    .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.canceladoMotivo||'')).toLowerCase().includes(busca))
+    .sort((a,b2)=>(b2.canceladoEm||0)-(a.canceladoEm||0));
+  if(!lista.length){b.innerHTML='<div class="er">Nenhuma OS cancelada.</div>';return;}
+  b.innerHTML=`<table><thead><tr>
+      <th>#</th><th>OS</th><th>Cliente</th><th>Tipo</th><th>Dt. Venda</th>
+      <th>Cancelada em</th><th>Motivo</th><th>Por</th><th>Ações</th>
+    </tr></thead><tbody>${lista.map((c,i)=>`<tr>
+      <td style="color:var(--mu);font-size:11px">${i+1}</td>
+      <td style="font-weight:800">${c.os||'—'}</td>
+      <td style="font-weight:600">${c.cliente||'—'}</td>
+      <td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(c.tipo)}">${tGL(c.tipo)}</span></td>
+      <td style="color:var(--mu)">${c.dtVenda?dtBR(c.dtVenda):'—'}</td>
+      <td style="color:var(--mu);white-space:nowrap">${fmtDtH(c.canceladoEm)}</td>
+      <td style="font-weight:600;color:#B91C1C">${c.canceladoMotivo||'—'}</td>
+      <td style="color:var(--mu);font-size:11px">${c.canceladoPor||'—'}</td>
+      <td>${R&&R.cd?`<button class="bex" onclick="voltarDoArquivo('${c.id}',4)">Reabrir</button>`:'—'}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
 // ── ANOTAÇÕES DE COBRANÇA ───────────────────────────────────────────────────
 // Registro das tentativas de contato com o cliente que tem saldo em aberto.
 // Cada anotação guarda quem escreveu e quando.
@@ -4979,8 +5169,9 @@ async function svOS(){
     }
     return;
   }
-  // Garantia de armação não passa pelo laboratório: nasce já em Pronto
-  const colInicial=(tipo==='gar-armacao')?3:0;
+  // Sem lapidação não passa pelo laboratório: nasce já em Pronto.
+  // Com lapidação segue o fluxo normal, começando em Venda.
+  const colInicial=(tipo==='gar-armacao-sem')?3:0;
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
@@ -5059,7 +5250,7 @@ function rnKan(){
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
         ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
         ${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
-      </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:var(--bg);color:var(--mu);border:1px solid var(--bo);font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opSaldoObs('${c.id}')">Anotar${(c.saldoObs&&c.saldoObs.length)?(' ('+c.saldoObs.length+')'):''}</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(ci===4&&R.ed)?`<button class="bde" style="background:#FFFBEB;color:#92400E;border:1px solid #FCD34D;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="marcarNaoRet('${c.id}')">Não retirado</button>`:''}${(R.cd)?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:var(--bg);color:var(--mu);border:1px solid var(--bo);font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opSaldoObs('${c.id}')">Anotar${(c.saldoObs&&c.saldoObs.length)?(' ('+c.saldoObs.length+')'):''}</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
@@ -5105,7 +5296,7 @@ function rnGar(){
   garR.sort((a,b)=>b.at-a.at);
   document.getElementById('g0').textContent=garR.length;
   document.getElementById('g1').textContent=garR.filter(r=>r.tipo==='gar-hora').length;
-  document.getElementById('g2').textContent=garR.filter(r=>r.tipo==='gar-armacao').length;
+  document.getElementById('g2').textContent=garR.filter(r=>r.tipo==='gar-armacao'||r.tipo==='gar-armacao-sem').length;
   document.getElementById('g3').textContent=garR.filter(r=>r.tipo==='gar-pedido').length;
   // Cards por motivo
   const motivos={};
@@ -5643,7 +5834,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'cancm':()=>clsCancOs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
