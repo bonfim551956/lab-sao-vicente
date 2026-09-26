@@ -562,6 +562,13 @@ textarea {
       <span class="rt">Prazos de Entrega</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--mu);font-weight:500">Mostrando OS com prazo nos próximos</span>
+        <select id="pz-col" onchange="rnPrazos()" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todas">Todas as etapas</option>
+          <option value="0">Venda</option>
+          <option value="1">Pedido</option>
+          <option value="2">Montagem</option>
+          <option value="3">Pronto</option>
+        </select>
         <select id="pz-dias" onchange="rnPrazos()" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer">
           <option value="4" selected>4 dias</option>
           <option value="7">7 dias</option>
@@ -849,7 +856,7 @@ textarea {
             <option value="gar-hora">Garantia — Hora</option>
             <option value="gar-armacao">Garantia — Armação</option>
             <option value="gar-pedido">Garantia — Pedido</option>
-            <option value="passagem">Passagem</option>
+            <option value="passagem">Passagem — com lapidação</option>
           </select>
         </div>
         <label class="os-chk">
@@ -1253,8 +1260,18 @@ textarea {
     <div class="os-grid">
       <div class="os-col">
         <div class="os-sec">Produto</div>
-        <div class="mf"><label>Produto <span style="color:var(--re)">*</span></label>
+        <div class="mf"><label>Tipo</label>
+          <select id="av-tipo" onchange="tgAvulsaTipo()">
+            <option value="avulsa">Venda avulsa — óculos de sol, armação</option>
+            <option value="passagem-sem">Passagem sem lapidação</option>
+          </select></div>
+        <div class="mf"><label id="av-desc-lb">Produto <span style="color:var(--re)">*</span></label>
           <input id="av-desc" placeholder="Ex: Óculos de sol Ray-Ban"/></div>
+        <div class="mf"><label>Encaminhar para</label>
+          <select id="av-destino">
+            <option value="5">Entregue — o cliente já levou</option>
+            <option value="3">Pronto — o cliente ainda vai buscar</option>
+          </select></div>
         <div class="mf"><label>Cliente <span style="color:var(--re)">*</span></label>
           <input id="av-cli" placeholder="Nome do cliente"/></div>
         <div class="mf"><label>Nº da OS <span style="color:var(--re)">*</span></label>
@@ -1799,7 +1816,7 @@ function travarCil(el){
 }
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
-function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem'};return m[t]||t;}
+function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação'};return m[t]||t;}
 function tGC(t){if(t==='avulsa')return'bvd';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
@@ -2175,7 +2192,8 @@ function entregasDoDia(dia){
   const ini=new Date(dia+'T00:00:00').getTime(), fim=new Date(dia+'T23:59:59').getTime();
   const out=[];
   ST.cards.forEach(c=>{
-    if(c.tipo==='avulsa')return;          // já entra como venda do dia
+    // registradas pela venda avulsa já entram como venda do dia
+    if(c.tipo==='avulsa'||c.tipo==='passagem-sem')return;
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
     out.push({cardId:c.id, os:c.os||'', cliente:c.cliente||'', dtVenda:c.dtVenda||'',
@@ -4417,6 +4435,9 @@ async function svSaldoPago(){
 function opAvulsa(){
   if(!R||!R.ca){alert('Sem permissão para registrar vendas.');return;}
   ['av-desc','av-cli','av-os','av-valor','av-rec','av-rec2'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('av-tipo').value='avulsa';
+  document.getElementById('av-destino').value='5';
+  tgAvulsaTipo();
   opcoesFormas(document.getElementById('av-forma'));
   opcoesFormas(document.getElementById('av-forma2'));
   document.getElementById('av-wrap2').style.display='block';tgAvulsa2();
@@ -4425,6 +4446,21 @@ function opAvulsa(){
   setTimeout(()=>document.getElementById('av-desc').focus(),90);
 }
 function clsAvulsa(){document.getElementById('avm').style.display='none';}
+
+// Passagem sem lapidação: o serviço não passa pelo laboratório, então segue
+// direto para Pronto ou Entregue, conforme o cliente já tenha levado ou não.
+function tgAvulsaTipo(){
+  const t=document.getElementById('av-tipo').value;
+  const lb=document.getElementById('av-desc-lb');
+  const inp=document.getElementById('av-desc');
+  if(t==='passagem-sem'){
+    lb.innerHTML='Descrição do serviço <span style="color:var(--re)">*</span>';
+    inp.placeholder='Ex: passagem em armação do cliente';
+  }else{
+    lb.innerHTML='Produto <span style="color:var(--re)">*</span>';
+    inp.placeholder='Ex: Óculos de sol Ray-Ban';
+  }
+}
 function tgAvulsa2(){
   const w=document.getElementById('av-wrap2');
   const abrir=w.style.display==='none';
@@ -4479,13 +4515,15 @@ async function svAvulsa(){
 
   const now=Date.now();
   const saldoV=Math.round((valor-rec-rec2)*100)/100;
-  const c={id:'os_'+now, os, cliente, descricao:desc, tipo:'avulsa',
+  const tipo=document.getElementById('av-tipo').value;
+  const destino=parseInt(document.getElementById('av-destino').value)||5;
+  const c={id:'os_'+now, os, cliente, descricao:desc, tipo,
     ped:'', pedidos:[], dtVenda:hojeBR(), prazo:hojeBR(), urgente:false,
     valorVenda:valor, valorRecebido:rec, valorRecebido2:rec2||null,
     formaPag:forma, formaPag2:forma2||null,
     saldo:saldoV>0.001, saldoValor:saldoV>0.001?saldoV:null,
-    col:5, ts:now, tsCreated:now, unidade:U.un||UNIDADE,
-    history:[{u:U.n,r:U.r,from:-1,to:5,at:now,mc:false,venda:true,avulsa:true}]};
+    col:destino, ts:now, tsCreated:now, unidade:U.un||UNIDADE,
+    history:[{u:U.n,r:U.r,from:-1,to:destino,at:now,mc:false,venda:true,avulsa:true}]};
   ST.cards.unshift(c);
   clsAvulsa();rnKan();
   try{
@@ -5075,6 +5113,9 @@ function rnPrazos(){
   prazosData=[];
   ST.cards.forEach(c=>{
     if(!c.prazo||c.col>=4)return;
+    // filtro por etapa: Venda, Pedido, Montagem ou Pronto
+    const filtroCol=document.getElementById('pz-col')?.value||'todas';
+    if(filtroCol!=='todas'&&String(c.col)!==filtroCol)return;
     const dp=new Date(c.prazo+'T00:00:00');
     // Inclui atrasadas + dentro do limite
     if(dp<=limite){
@@ -5095,7 +5136,11 @@ function rnPrazos(){
   document.getElementById('pz4').textContent=prazosData.filter(c=>c._diff<0).length;
 
   const b=document.getElementById('pzb');
-  if(!prazosData.length){b.innerHTML='<div class="er">Nenhuma OS com prazo nos próximos '+dias+' dias.</div>';return;}
+  if(!prazosData.length){
+    const fc=document.getElementById('pz-col')?.value||'todas';
+    const etapa=fc==='todas'?'':(' na etapa '+cols[Number(fc)]);
+    b.innerHTML='<div class="er">Nenhuma OS'+etapa+' com prazo nos próximos '+dias+' dias.</div>';return;
+  }
 
   b.innerHTML=`<table><thead><tr>
     <th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Data Venda</th>
@@ -5186,7 +5231,7 @@ function rnRel(){
   document.getElementById('r4').textContent=passagemCount;
   const b=document.getElementById('rb2');
   if(!relR.length){b.innerHTML='<div class="er">Nenhuma montagem neste período.</div>';return;}
-  const evLabel={montagem:'Montagem',venda:'Venda',garantia:'Garantia',passagem:'Passagem'};
+  const evLabel={montagem:'Montagem',venda:'Venda',garantia:'Garantia',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação'};
   const evColor={montagem:'background:#E0F7F6;color:#0D7A75',venda:'background:#D1FAE5;color:#065F46',garantia:'background:#FEF0E6;color:#C05E0A',passagem:'background:#EDE9FE;color:#5B21B6'};
   b.innerHTML=`<table><thead><tr><th>#</th><th>Evento</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Responsável</th><th>Data</th></tr></thead><tbody>${relR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;${evColor[r.ev]||''}">${evLabel[r.ev]||r.ev}</span></td><td style="font-weight:600">${r.os}${r.oc?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800">ÓCULOS ${r.oc}/${r.totOc}</span>`:''}</td><td>${r.ped||'—'}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="${tGC(r.tipo)}">${tGL(r.tipo)}</span></td><td style="color:var(--mu)">${r.u}</td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
 }
