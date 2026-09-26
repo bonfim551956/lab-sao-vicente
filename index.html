@@ -500,6 +500,20 @@ textarea {
   <div id="gs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">Relatório de Garantias</span>
+      <select id="gar-motivo" onchange="rnGar()" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600;margin-left:10px">
+        <option value="todos">Todos os motivos</option>
+        <option value="Montagem">Montagem</option>
+        <option value="Erro Oftalmologista">Erro Oftalmologista</option>
+        <option value="Erro Optometrista">Erro Optometrista</option>
+        <option value="Erro Medida">Erro Medida</option>
+        <option value="Laboratório">Laboratório</option>
+        <option value="Preenchimento OS">Preenchimento OS</option>
+        <option value="Armação">Armação</option>
+        <option value="Adaptação">Adaptação</option>
+        <option value="Armação + Lentes">Armação + Lentes</option>
+        <option value="Com Valor">Com Valor</option>
+        <option value="Outros">Outros</option>
+      </select>
       <div>
         <div class="pb-w">
           <button class="pb active" id="gph" onclick="setPerG('h')">Hoje</button>
@@ -1229,6 +1243,19 @@ textarea {
 <!-- Venda avulsa: produto que não passa pelo laboratório -->
 
 <!-- Receber o saldo antes da retirada -->
+
+<!-- Anotações de cobrança do saldo -->
+<div class="mb" id="sobm" style="display:none">
+  <div class="md" style="max-width:460px">
+    <div class="mh"><span id="sob-tit">Anotações</span><button class="mx" onclick="clsSaldoObs()">&#10005;</button></div>
+    <input type="hidden" id="sob-id"/>
+    <div class="mf"><label>Nova anotação</label>
+      <input id="sob-txt" placeholder="Ex: liguei, não atendeu" onkeydown="if(event.key==='Enter')addSaldoObs()"/></div>
+    <button onclick="addSaldoObs()" class="os-add" style="width:100%;text-align:center">+ Registrar anotação</button>
+    <div id="sob-lista" style="max-height:260px;overflow-y:auto;margin-top:6px"></div>
+    <div class="mft"><button class="bc" onclick="clsSaldoObs()">Fechar</button></div>
+  </div>
+</div>
 <div class="mb" id="sqm" style="display:none">
   <div class="md" style="max-width:430px">
     <div class="mh"><span id="sq-tit">Receber saldo</span><button class="mx" onclick="clsSaldoPago()">&#10005;</button></div>
@@ -1554,7 +1581,7 @@ function mapCard(r){return upCard({
   cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
-  saldo:r.saldo,saldoValor:r.saldo_valor,
+  saldo:r.saldo,saldoValor:r.saldo_valor,saldoObs:r.saldo_obs||[],
   saldoPago:r.saldo_pago,saldoPagoEm:r.saldo_pago_em,saldoPagoPor:r.saldo_pago_por,
   saldoPagoValor:r.saldo_pago_valor,saldoPagoForma:r.saldo_pago_forma,saldoPagoData:r.saldo_pago_data,
   horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
@@ -1650,6 +1677,7 @@ async function saveCard(c){
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
       entrega_forma2:c.entregaForma2||null,
       saldo:!!c.saldo,saldo_valor:(c.saldoValor===0||c.saldoValor)?c.saldoValor:null,
+      saldo_obs:Array.isArray(c.saldoObs)?c.saldoObs:[],
       saldo_pago:!!c.saldoPago,saldo_pago_em:c.saldoPagoEm||null,saldo_pago_por:c.saldoPagoPor||null,
       saldo_pago_valor:(c.saldoPagoValor===0||c.saldoPagoValor)?c.saldoPagoValor:null,
       saldo_pago_forma:c.saldoPagoForma||null,saldo_pago_data:c.saldoPagoData||null,
@@ -2808,7 +2836,7 @@ function rnSaldos(){
   body.innerHTML=`<table>
     <thead><tr>
       <th>#</th><th>OS</th><th>Cliente</th><th>Dt. Venda</th><th>Saldo</th>
-      <th>Situação</th><th>Entregue em</th><th>Vl. Recebido</th><th>Forma</th>
+      <th>Situação</th><th>Entregue em</th><th>Vl. Recebido</th><th>Forma</th><th>Contato</th>
     </tr></thead>
     <tbody>${sdDados.map((c,i)=>`<tr${c._sit==='aberto'?' style="background:#FFFBFB"':''}>
       <td style="color:var(--mu);font-size:11px">${i+1}</td>
@@ -2820,6 +2848,11 @@ function rnSaldos(){
       <td style="color:var(--mu);white-space:nowrap">${fmtDt(c._ent)}</td>
       <td style="font-weight:700;color:${c._sit==='aberto'?'var(--mu)':'#16A34A'}">${(c.entregaValor===0||c.entregaValor)?'R$ '+Number(c.entregaValor).toFixed(2):'—'}</td>
       <td style="color:var(--mu)">${c.entregaForma||'—'}</td>
+      <td style="white-space:nowrap">
+        ${(c.saldoObs&&c.saldoObs.length)?`<div style="font-size:10px;color:var(--tx);font-weight:600;max-width:190px;overflow:hidden;text-overflow:ellipsis">${c.saldoObs[c.saldoObs.length-1].txt}</div>
+           <div style="font-size:9px;color:var(--mu)">${c.saldoObs.length} anotação(ões)</div>`:''}
+        <button class="bex" style="margin-top:3px" onclick="opSaldoObs('${c.id}')">${(c.saldoObs&&c.saldoObs.length)?'Ver / anotar':'+ Anotar'}</button>
+      </td>
     </tr>`).join('')}</tbody></table>`;
 }
 
@@ -2827,10 +2860,12 @@ function expSdCSV(){
   if(!sdDados.length){alert('Nenhum dado.');return;}
   const fmtDt=ts=>ts?new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';
   const rot={aberto:'EM ABERTO',recebido:'RECEBIDO',parcial:'A MENOR'};
-  const csv=['OS,Cliente,Dt.Venda,Saldo,Situacao,Entregue em,Vl.Recebido,Forma',
+  const csv=['OS,Cliente,Dt.Venda,Saldo,Situacao,Entregue em,Vl.Recebido,Forma,Ultimo contato',
     ...sdDados.map(c=>[c.os||'',c.cliente||'',c.dtVenda||'',Number(c.saldoValor||0).toFixed(2),
       rot[c._sit],fmtDt(c._ent),(c.entregaValor===0||c.entregaValor)?Number(c.entregaValor).toFixed(2):'',
-      c.entregaForma||''].join(','))].join('\n');
+      c.entregaForma||'',
+      (c.saldoObs&&c.saldoObs.length)?String(c.saldoObs[c.saldoObs.length-1].txt).replace(/,/g,';'):''
+    ].join(','))].join('\n');
   const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const u=URL.createObjectURL(b);const a=document.createElement('a');
   a.href=u;a.download='saldos_'+hojeBR()+'.csv';a.click();URL.revokeObjectURL(u);
@@ -4381,6 +4416,50 @@ function calcSaldo(){
 
 
 
+
+// ── ANOTAÇÕES DE COBRANÇA ───────────────────────────────────────────────────
+// Registro das tentativas de contato com o cliente que tem saldo em aberto.
+// Cada anotação guarda quem escreveu e quando.
+function opSaldoObs(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  document.getElementById('sob-id').value=id;
+  document.getElementById('sob-tit').textContent='Anotações — OS '+(c.os||'')+(c.cliente?(' · '+c.cliente):'');
+  document.getElementById('sob-txt').value='';
+  rnSaldoObs();
+  document.getElementById('sobm').style.display='flex';
+  setTimeout(()=>document.getElementById('sob-txt').focus(),90);
+}
+function clsSaldoObs(){document.getElementById('sobm').style.display='none';}
+
+function rnSaldoObs(){
+  const c=ST.cards.find(x=>x.id===document.getElementById('sob-id').value);
+  const el=document.getElementById('sob-lista');
+  const lista=(c&&Array.isArray(c.saldoObs))?c.saldoObs.slice().sort((a,b)=>b.t-a.t):[];
+  if(!lista.length){el.innerHTML='<div class="er" style="padding:1rem">Nenhuma anotação ainda.</div>';return;}
+  el.innerHTML=lista.map(o=>
+    '<div style="border-left:3px solid var(--v);background:var(--bg);border-radius:0 9px 9px 0;padding:8px 11px;margin-bottom:6px">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--tx)">'+o.txt+'</div>'
+    +'<div style="font-size:10px;color:var(--mu);margin-top:3px">'+o.u+' · '
+    +new Date(o.t).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    +'</div></div>').join('');
+}
+
+async function addSaldoObs(){
+  const id=document.getElementById('sob-id').value;
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  const txt=UP(document.getElementById('sob-txt').value.trim());
+  if(!txt){document.getElementById('sob-txt').focus();return;}
+  if(!Array.isArray(c.saldoObs))c.saldoObs=[];
+  c.saldoObs.push({t:Date.now(),u:U.n,txt});
+  document.getElementById('sob-txt').value='';
+  rnSaldoObs();rnKan();
+  try{
+    await saveCard(c);
+    if(document.getElementById('sds').style.display!=='none')rnSaldos();
+    setSy('ok','Anotação registrada — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
 // ── RECEBER O SALDO ANTES DA RETIRADA ───────────────────────────────────────
 // O cliente quita o saldo dias antes de buscar o óculos. O valor entra no
 // caixa do dia em que foi pago, e a retirada deixa de pedir pagamento.
@@ -4900,6 +4979,8 @@ async function svOS(){
     }
     return;
   }
+  // Garantia de armação não passa pelo laboratório: nasce já em Pronto
+  const colInicial=(tipo==='gar-armacao')?3:0;
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:0,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente'};
@@ -4978,7 +5059,7 @@ function rnKan(){
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
         ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
         ${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
-      </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
+      </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:var(--bg);color:var(--mu);border:1px solid var(--bo);font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opSaldoObs('${c.id}')">Anotar${(c.saldoObs&&c.saldoObs.length)?(' ('+c.saldoObs.length+')'):''}</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bde" style="background:${jaAvisado(c)?'#F0FDF4':'#25D366'};color:${jaAvisado(c)?'#16A34A':'#fff'};border:1px solid ${jaAvisado(c)?'#BBF7D0':'#25D366'};font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}<button class="bh" onclick="opH('${c.id}')">&#9776;</button>${R.ed?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="opObs('${c.id}')">Obs</button>`:''}${R.rf?`<button class="bde" style="background:#FEF2F2;color:#B91C1C;border:1px solid #DC2626;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer" onclick="opRf('${c.id}')">Refazer</button>`:''}${R.cd?`<button class="bde" onclick="dlCard('${c.id}')">&#10005;</button>`:''}</div>`;
       col.appendChild(div);
     });
 
@@ -5011,9 +5092,12 @@ function rnGar(){
   const{ini,fim}=getRangeG();
   const lbs={h:'Garantias de hoje',s:'Garantias desta semana',m:'Garantias deste mês',c:'Período personalizado'};
   document.getElementById('gtt').textContent=lbs[perG];
+  // filtro por motivo: montagem, erro médico, armação e os demais
+  const motivo=document.getElementById('gar-motivo')?.value||'todos';
   garR=[];
   ST.cards.forEach(c=>{
     if(c.tipo&&c.tipo.startsWith('gar')){
+      if(motivo!=='todos'&&UP(c.obs||'')!==UP(motivo))return;
       const h0=c.history&&c.history[0];
       if(h0){const d=new Date(h0.at);if(d>=ini&&d<=fim)garR.push({os:c.os,ped:c.ped||'—',tipo:c.tipo,obs:c.obs||'—',respGar:c.respGar||'—',receita:c.receita||'—',obsTxt:c.obsTxt||'—',osCompra:c.osCompra||'—',u:h0.u,at:h0.at,col:c.col});}
     }
@@ -5032,7 +5116,10 @@ function rnGar(){
     mDiv.innerHTML=sorted.length?sorted.map(([m,n])=>`<div class="rs2"><div class="rl">${m}</div><div class="rv" style="color:#374151">${n}</div></div>`).join(''):'';
   }
   const b=document.getElementById('gb2');
-  if(!garR.length){b.innerHTML='<div class="er">Nenhuma garantia neste período.</div>';return;}
+  if(!garR.length){
+    const m=document.getElementById('gar-motivo')?.value||'todos';
+    b.innerHTML='<div class="er">Nenhuma garantia'+(m!=='todos'?(' por '+m):'')+' neste período.</div>';return;
+  }
   const status=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
   b.innerHTML=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp. Garantia</th><th>Receita</th><th>Observação</th><th>Lançado por</th><th>Status</th><th>Data</th></tr></thead><tbody>${garR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td style="font-weight:600">${r.os}</td><td>${r.ped}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="bgr">${tGL(r.tipo)}</span></td><td style="color:var(--mu);font-size:12px">${r.obs}</td><td style="color:var(--mu)">${r.respGar}</td><td style="color:var(--mu)">${r.receita}</td><td style="color:var(--mu);font-size:12px">${r.obsTxt}</td><td style="color:var(--mu)">${r.u}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg);border:1px solid var(--bo)">${status[r.col]||'—'}</span></td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
 }
@@ -5556,7 +5643,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>clsEntrega(), 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
