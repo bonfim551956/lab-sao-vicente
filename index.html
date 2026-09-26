@@ -975,6 +975,41 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     <div class="tw">
       <div class="th2">
         <span class="tt" id="hs-tt">Entregas de hoje</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <select id="hs-tipo" onchange="rnHist()" style="font-size:11px;padding:5px 9px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todos os tipos</option>
+          <option value="venda">Venda — Pedido</option>
+          <option value="hora">Venda — Hora</option>
+          <option value="avulsa">Venda avulsa</option>
+          <option value="passagem">Passagem</option>
+          <option value="passagem-sem">Passagem s/ lapidação</option>
+          <option value="gar">Todas as garantias</option>
+          <option value="gar-hora">Gar. Hora</option>
+          <option value="gar-pedido">Gar. Pedido</option>
+          <option value="gar-armacao">Gar. Armação c/ lap.</option>
+          <option value="gar-armacao-sem">Gar. Armação s/ lap.</option>
+        </select>
+        <select id="hs-lab" onchange="rnHist()" style="font-size:11px;padding:5px 9px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todos os laboratórios</option>
+          <option value="Lab Próprio">Lab Próprio</option>
+          <option value="Lab Parceiro">Lab Parceiro</option>
+        </select>
+        <select id="hs-forma" onchange="rnHist()" style="font-size:11px;padding:5px 9px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todas as formas</option>
+        </select>
+        <select id="hs-saldo" onchange="rnHist()" style="font-size:11px;padding:5px 9px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Com e sem saldo</option>
+          <option value="com">Teve saldo</option>
+          <option value="sem">Sem saldo</option>
+          <option value="menor">Recebido a menor</option>
+        </select>
+        <select id="hs-extra" onchange="rnHist()" style="font-size:11px;padding:5px 9px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Tudo</option>
+          <option value="refeito">Só refeitos</option>
+          <option value="cred">Só do crediário</option>
+          <option value="multi">Mais de um óculos</option>
+        </select>
+      </div>
         <div style="display:flex;gap:6px">
           <button class="bex" onclick="expHsCSV()">CSV</button>
           <button class="bex" style="background:#FEF3E2;color:#C05E0A;border-color:rgba(245,154,42,.3)" onclick="expHsPDF()">PDF</button>
@@ -1793,7 +1828,7 @@ function mapCard(r){return upCard({
   obsTxt:r.obs_txt,osCompra:r.os_compra,
   esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
-  cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,credId:r.cred_id,
+  cliente:r.cliente,telefone:r.telefone,descricao:r.descricao,credId:r.cred_id,credParcelado:r.cred_parcelado,
   entregaValor:r.entrega_valor,entregaForma:r.entrega_forma,
   entregaValor2:r.entrega_valor2,entregaForma2:r.entrega_forma2,
   saldo:r.saldo,saldoValor:r.saldo_valor,saldoObs:r.saldo_obs||[],
@@ -1904,7 +1939,7 @@ async function saveCard(c){
       esf_oe:c.esfOE!=null?c.esfOE:null,cil_oe:c.cilOE!=null?c.cilOE:null,
       refeito:!!c.refeito,motivo_refeito:c.motivoRefeito||null,
       cliente:c.cliente||null,telefone:c.telefone||null,descricao:c.descricao||null,
-      cred_id:c.credId||null,
+      cred_id:c.credId||null,cred_parcelado:c.credParcelado||null,
       entrega_valor:(c.entregaValor===0||c.entregaValor)?c.entregaValor:null,
       entrega_forma:c.entregaForma||null,
       entrega_valor2:(c.entregaValor2===0||c.entregaValor2)?c.entregaValor2:null,
@@ -2225,18 +2260,18 @@ function criarOsDoCrediario(){
 
   clsCrDet();
   opOs();                                   // abre o formulário normal de OS
-  const total=Number(c.valor_compra||c.valor_crediario||0);
+  // O ranking precisa do valor cheio da compra, então a OS registra o total.
+  // O parcelado não vira saldo: ele entra no caixa a cada parcela baixada.
+  const parcelado=Number(c.valor_crediario||0);
   const pago=entradaPagaCred(c);
   const falta=faltaEntradaCred(c);
-  window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,
-    parcelado:Number(c.valor_crediario||0)};
+  const total=Number(c.valor_compra||0)||(parcelado+pago+falta);
+  window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,parcelado};
 
   document.getElementById('fcli').value=UP(c.nome||'');
   if(c.telefone)document.getElementById('ftel').value=c.telefone;
   document.getElementById('fdt').value=dataPagamentoCred(c,d.parcs);
-  // A venda registra o que passa pelo caixa da loja: a entrada.
-  // O valor parcelado continua no crediário e entra a cada baixa.
-  document.getElementById('fvenda').value=(pago+falta).toFixed(2);
+  document.getElementById('fvenda').value=total.toFixed(2);
   document.getElementById('frecebido').value=pago||'';
   document.getElementById('fforma').value=(c.financeira==='asaas')?'Asaas':'Multicrediário';
   calcSaldo();
@@ -2251,10 +2286,10 @@ function criarOsDoCrediario(){
     nw.style.cssText='display:block;background:#F0FDFA;border:1px solid #99DDD8;color:#0D7A75;'
       +'font-size:11px;font-weight:600;border-radius:9px;padding:9px 12px;margin-bottom:12px';
     const o=window._credOrigem;
-    nw.textContent='Entrada paga: R$ '+o.pago.toFixed(2)+'. '
-      +(o.falta>0.001?('Faltam R$ '+o.falta.toFixed(2)+' da entrada, que ficam como saldo. '):'')
-      +'As '+(o.parcelado?('parcelas de R$ '+o.parcelado.toFixed(2)+' '):'parcelas ')
-      +'seguem no crediário e entram no caixa a cada baixa.';
+    nw.textContent='Venda de R$ '+o.valor.toFixed(2)+' — entrada paga R$ '+o.pago.toFixed(2)
+      +(o.parcelado?(', parcelado no crediário R$ '+o.parcelado.toFixed(2)):'')
+      +(o.falta>0.001?(', faltam R$ '+o.falta.toFixed(2)+' da entrada (vira saldo)'):'')
+      +'. O parcelado não é saldo: entra no caixa a cada parcela baixada.';
   }
   setTimeout(()=>document.getElementById('fo')?.focus(),120);
 }
@@ -4561,13 +4596,55 @@ async function rnHist(){
       const entrega=hist.filter(h=>h.to===5).pop();
       const at=entrega?entrega.at:c.ts;
       if(at<ini||at>fim)return false;
-      if(busca&&!(c.os||'').toLowerCase().includes(busca))return false;
+      if(busca&&!((c.os||'')+' '+(c.cliente||'')+' '+(c.descricao||'')
+        +' '+(c.pedidos||[]).map(o=>o.ped||'').join(' ')).toLowerCase().includes(busca))return false;
+
+      const fTipo=document.getElementById('hs-tipo')?.value||'todos';
+      if(fTipo!=='todos'){
+        if(fTipo==='gar'){ if(!(c.tipo||'').startsWith('gar'))return false; }
+        else if(c.tipo!==fTipo)return false;
+      }
+      const fLab=document.getElementById('hs-lab')?.value||'todos';
+      if(fLab!=='todos'&&UP(c.lab||'')!==UP(fLab))return false;
+
+      const fForma=document.getElementById('hs-forma')?.value||'todos';
+      if(fForma!=='todos'){
+        const formas=[c.entrega_forma||c.entregaForma,c.entrega_forma2||c.entregaForma2,
+                      c.forma_pag||c.formaPag,c.forma_pag2||c.formaPag2].filter(Boolean).map(x=>UP(x));
+        if(!formas.includes(UP(fForma)))return false;
+      }
+      const fSaldo=document.getElementById('hs-saldo')?.value||'todos';
+      if(fSaldo!=='todos'){
+        const teve=!!(c.saldo_valor||c.saldoValor);
+        const rec=Number(c.entrega_valor||c.entregaValor||0)+Number(c.entrega_valor2||c.entregaValor2||0);
+        const dev=Number(c.saldo_valor||c.saldoValor||0);
+        if(fSaldo==='com'&&!teve)return false;
+        if(fSaldo==='sem'&&teve)return false;
+        if(fSaldo==='menor'&&!(teve&&rec+0.001<dev))return false;
+      }
+      const fEx=document.getElementById('hs-extra')?.value||'todos';
+      if(fEx==='refeito'&&!c.refeito)return false;
+      if(fEx==='cred'&&!(c.cred_id||c.credId))return false;
+      if(fEx==='multi'&&!((c.pedidos||[]).length>1))return false;
+
       return true;
     }).map(c=>{
       const hist=c.history||[];
       const entrega=hist.filter(h=>h.to===5).pop();
       return{...c,_entregaAt:entrega?entrega.at:c.ts,_entregaPor:entrega?entrega.u:'—'};
     }).sort((a,b)=>b._entregaAt-a._entregaAt);
+
+    // o seletor de formas mostra só o que apareceu no período
+    const selF=document.getElementById('hs-forma');
+    if(selF){
+      const atual=selF.value;
+      const usadas=new Set();
+      (cards||[]).forEach(c=>[c.entrega_forma,c.entrega_forma2,c.forma_pag,c.forma_pag2]
+        .filter(Boolean).forEach(f=>usadas.add(formaCanon(f))));
+      selF.innerHTML='<option value="todos">Todas as formas</option>'
+        +FORMAS.filter(f=>usadas.has(f)).map(f=>'<option value="'+f+'">'+f+'</option>').join('');
+      if([...selF.options].some(o=>o.value===atual))selF.value=atual;
+    }
 
     // KPIs
     const total=hsData.length;
@@ -4886,9 +4963,18 @@ function calcSaldo(){
   pintarValorVenda();
   const venda=num(document.getElementById('fvenda').value);
   const rec=num(document.getElementById('frecebido').value)+num(document.getElementById('frecebido2').value);
-  const saldo=Math.round((venda-rec)*100)/100;
+  // vindo do crediário, a parte parcelada sai da conta do saldo
+  const parc=(window._credOrigem&&window._credOrigem.parcelado)||0;
+  const saldo=Math.round((venda-rec-parc)*100)/100;
   const box=document.getElementById('fsaldo-box');
 
+  if(parc){
+    box.style.display='block';
+    box.style.cssText+=';background:#F5F3FF;border:1px solid #DDD6FE;color:#5B21B6';
+    box.innerHTML='Parcelado no crediário: <b>R$ '+parc.toFixed(2)+'</b>'
+      +(saldo>0.001?(' · saldo da entrada a receber: <b>R$ '+saldo.toFixed(2)+'</b>'):' · entrada quitada');
+    return;
+  }
   if(!venda&&!rec){box.style.display='none';}
   else if(saldo>0.001){
     box.style.display='block';
@@ -5731,8 +5817,10 @@ async function svOS(){
   if(valorRecebido2&&!formaPag2){
     alert('Selecione a 2ª forma de pagamento.');document.getElementById('fforma2').focus();return;
   }
-  // saldo deixa de ser marcado na mão: é o que falta receber
-  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2)*100)/100;
+  // saldo deixa de ser marcado na mão: é o que falta receber.
+  // Vindo do crediário, o valor parcelado não entra nessa conta.
+  const credParcelado=credOrigem?Number(credOrigem.parcelado||0):0;
+  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2-credParcelado)*100)/100;
   const saldo=saldoValor>0.001;
 
   const precisaRet=FIN_RETIRADA.includes(formaPag)||FIN_RETIRADA.includes(formaPag2);
@@ -5774,7 +5862,8 @@ async function svOS(){
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
-    credId:credOrigem?credOrigem.id:null};
+    credId:credOrigem?credOrigem.id:null,
+    credParcelado:credParcelado||null};
   const isVenda=tipo==='venda'||tipo==='hora';
   c.history.push({u:U.n,r:U.r,from:-1,to:colInicial,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
   ST.cards.unshift(c);clsOs();rnKan();
@@ -5871,7 +5960,7 @@ function rnKan(){
       div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
         ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
-        ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
+        ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?`<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`:''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">SALDO${c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):''}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
       frag.appendChild(div);
     });
