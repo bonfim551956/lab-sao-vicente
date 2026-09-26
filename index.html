@@ -435,6 +435,15 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 @media (max-width:640px){
   .bwa{font-size:10px;padding:6px 8px;}
 }
+
+/* ── EMPILHAMENTO DOS MODAIS ────────────────────────────────────────────
+   O histórico virou um ponto de partida para outras ações (Refazer,
+   Cancelar, Anotar). Como todos os modais nasciam no mesmo nível, o que
+   era aberto DEPOIS ficava atrás. Quem é aberto a partir de outro modal
+   precisa ficar por cima. */
+#hm{z-index:250;}                       /* o histórico, acima dos comuns */
+#rfm,#cancm,#sobm,#sqm,#entm,#mtm{z-index:320;}   /* abertos de dentro dele */
+#cr-baixa-modal,#cr-edit-modal,#cr-reneg-modal,#pem{z-index:320;}
 </style>
 </head>
 <body>
@@ -5281,10 +5290,10 @@ function opH(id){
       +'padding:6px 12px;border-radius:8px;cursor:pointer;'+cor+'">'+txt+'</button>';
     const partes=[];
     if(R&&R.ed)partes.push(bt('Observação',"opObsDoHist()",'border:1.5px solid #FCD34D;background:#FFFBEB;color:#92400E'));
-    if(R&&R.rf&&c.col<5)partes.push(bt('Refazer',"opRf('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
+    if(R&&R.rf&&c.col<5)partes.push(bt('Refazer',"clsH();opRf('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
     if(R&&R.ed&&c.saldo)partes.push(bt('Anotar cobrança',"clsH();opSaldoObs('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--bg);color:var(--mu)'));
     if(R&&R.cd&&c.col!==7)partes.push(bt('Cancelar OS',"clsH();opCancOs('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
-    if(R&&R.cd)partes.push(bt('Excluir',"dlCard('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--w);color:var(--mu)'));
+    if(R&&R.cd)partes.push(bt('Excluir',"clsH();dlCard('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--w);color:var(--mu)'));
     ac.innerHTML=partes.join('');
   }
   const l=document.getElementById('hl');
