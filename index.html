@@ -1779,6 +1779,8 @@ function rnAtiva(){
   if(t==='fc')return sincEntregasFech();
   if(t==='sd')return rnSaldos();
   if(t==='e')return rnEst();
+  if(t==='nr')return rnNaoRet();
+  if(t==='cc')return rnCanc();
   if(t==='k')return rnKan();
 }
 
@@ -1815,10 +1817,12 @@ async function loadData(full){
     // fase 2: não retirados e cancelados — são poucos e têm aba própria
     sbGet('os_cards','col=gte.6&order=ts.desc'+un)
       .then(arq=>{
-        if(mesclarCards((arq||[]).map(mapCard)))rnAtiva();
+        _arquivoCarregado=true;
+        mesclarCards((arq||[]).map(mapCard));
+        rnAtiva();
         varrerNaoRetirados();
       })
-      .catch(()=>{});
+      .catch(()=>{_arquivoCarregado=true;});
 
     // fase 3: entregues recentes, em segundo plano. O Histórico busca
     // direto no banco, então aqui só precisamos do que alimenta o caixa
@@ -4781,7 +4785,12 @@ function rnNaoRet(){
     const comSaldo=ST.cards.filter(c=>c.col===COL_NAO_RET&&c.saldo).length;
     cont.textContent=total+' no total'+(comSaldo?(' · '+comSaldo+' com saldo em aberto'):'');
   }
-  if(!lista.length){b.innerHTML='<div class="er">Nenhum pedido não retirado com estes filtros.</div>';return;}
+  if(!lista.length){
+    b.innerHTML=_arquivoCarregado
+      ? '<div class="er">Nenhum pedido não retirado com estes filtros.</div>'
+      : '<div class="er">Carregando...</div>';
+    return;
+  }
 
   b.innerHTML=`<table><thead><tr>
       <th>#</th><th>OS / Cliente</th><th>Contato</th><th>Tipo</th><th>Óculos</th>
@@ -4876,7 +4885,12 @@ function rnCanc(){
   window._ccLista=lista;
   const cont=document.getElementById('cc-cont');
   if(cont)cont.textContent=ST.cards.filter(c=>c.col===COL_CANC).length+' no total';
-  if(!lista.length){b.innerHTML='<div class="er">Nenhuma OS cancelada com estes filtros.</div>';return;}
+  if(!lista.length){
+    b.innerHTML=_arquivoCarregado
+      ? '<div class="er">Nenhuma OS cancelada com estes filtros.</div>'
+      : '<div class="er">Carregando...</div>';
+    return;
+  }
   b.innerHTML=`<table><thead><tr>
       <th>#</th><th>OS</th><th>Cliente</th><th>Tipo</th><th>Dt. Venda</th>
       <th>Cancelada em</th><th>Motivo</th><th>Por</th><th>Ações</th>
@@ -5493,6 +5507,9 @@ async function svOS(){
 
 // ── RENDER KANBAN ─────────────────────────────────
 let _kanPendente=false;
+// Não retirados e Cancelados chegam na fase 2, depois do quadro.
+// Sem esta marca, a aba dizia "nenhum" antes de os dados existirem.
+let _arquivoCarregado=false;
 function rnKan(){
   if(!U||!R)return;
   const ks=document.getElementById('ks');
