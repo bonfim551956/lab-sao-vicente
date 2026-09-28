@@ -2969,22 +2969,96 @@ async function excluirFech(){
   }catch(e){alert('Erro ao excluir: '+e.message);}
 }
 
+// O fechamento em PDF segue o desenho da planilha antiga: colunas lado a
+// lado, para caber tudo numa tela só. Sai em paisagem.
 function expFcPDF(){
   const t=totaisFech();
   const dia=document.getElementById('fc-data').value;
-  const kpis=`<div class="kpis">
-    <div class="kpi"><div class="kpi-label">Ranking</div><div class="kpi-val">${rs(t.ranking)}</div></div>
-    <div class="kpi"><div class="kpi-label">Caixa</div><div class="kpi-val">${rs(t.caixa)}</div></div>
-    <div class="kpi"><div class="kpi-label">Vendas</div><div class="kpi-val">${t.qtd}</div></div>
-    <div class="kpi"><div class="kpi-label">Ticket médio</div><div class="kpi-val">${rs(t.ticket)}</div></div></div>`;
-  const tv=`<h3 style="font-size:12px;margin:10px 0 4px">Vendas do dia</h3><table><thead><tr><th>OS / Item</th><th>Vl. Venda</th><th>Forma</th><th>Pago</th></tr></thead><tbody>
-    ${fcVendas.map(v=>`<tr><td>${v.os||v.descricao||'—'}</td><td>${rs(v.valorTotal)}</td><td>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}</td><td>${rs(num(v.pago1)+num(v.pago2))}</td></tr>`).join('')||'<tr><td colspan="4">Nenhuma</td></tr>'}</tbody></table>`;
-  const te=`<h3 style="font-size:12px;margin:12px 0 4px">Recebimentos</h3><table><thead><tr><th>OS</th><th>Cliente</th><th>Venda de</th><th>Forma</th><th>Valor</th></tr></thead><tbody>
-    ${fcEntregas.map(e=>`<tr><td>${e.os||'—'}</td><td>${e.cliente||'—'}</td><td>${e.dtVenda?dtBR(e.dtVenda):'—'}</td><td>${e.forma||'—'}</td><td>${rs(num(e.valor)+num(e.valor2))}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum</td></tr>'}</tbody></table>`;
-  const tc=`<h3 style="font-size:12px;margin:12px 0 4px">Receita por forma</h3><table><tbody>
-    ${Object.entries(t.porForma).map(([f,v])=>`<tr><td>${f}</td><td><b>${rs(v)}</b></td></tr>`).join('')}
-    <tr style="background:#E8F7F6"><td><b>TOTAL</b></td><td><b>${rs(t.caixa)}</b></td></tr></tbody></table>`;
-  abrirPDF('Fechamento de Caixa — '+dtBR(dia), kpis+tv+te+tc);
+  const google=document.getElementById('fc-google').value||'—';
+  const obs=document.getElementById('fc-obs').value||'';
+
+  const cab='style="font-size:9px;font-weight:800;color:#fff;background:#0F1923;'
+    +'text-align:left;padding:4px 6px;text-transform:uppercase;letter-spacing:.03em"';
+  const td='style="padding:3px 6px;border-bottom:1px solid #E2E8F0;font-size:10px"';
+  const tdN='style="padding:3px 6px;border-bottom:1px solid #E2E8F0;font-size:10px;text-align:right;white-space:nowrap"';
+
+  // ── coluna 1: vendas do dia ──
+  const vendas=`<table style="width:100%;border-collapse:collapse">
+    <thead><tr><th ${cab}>Nº OS / Item</th><th ${cab}>Forma</th>
+      <th ${cab} style="text-align:right">Total</th><th ${cab} style="text-align:right">Pago</th></tr></thead>
+    <tbody>${fcVendas.map(v=>{
+      const pago=num(v.pago1)+num(v.pago2);
+      const saldo=num(v.valorTotal)-pago;
+      return `<tr>
+        <td ${td}><b>${v.os||v.descricao||'—'}</b>${saldo>0.001?`<div style="font-size:8px;color:#B45309;font-weight:700">saldo ${rs(saldo)}</div>`:''}</td>
+        <td ${td}>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}</td>
+        <td ${tdN}>${num(v.valorTotal)?rs(v.valorTotal):'—'}</td>
+        <td ${tdN}>${pago?rs(pago):'—'}</td></tr>`;}).join('')
+      ||`<tr><td ${td} colspan="4">Nenhuma venda</td></tr>`}</tbody></table>`;
+
+  // ── coluna 2: recebimentos ──
+  const receb=`<table style="width:100%;border-collapse:collapse">
+    <thead><tr><th ${cab}>Nº OS</th><th ${cab}>Forma</th>
+      <th ${cab} style="text-align:right">Valor</th></tr></thead>
+    <tbody>${fcEntregas.map(e=>{
+      const val=num(e.valor)+num(e.valor2);
+      const orig=e._parcela?'parcela crediário':e._saldoAntes?'saldo antecipado'
+        :(e.dtVenda&&e.dtVenda!==dia)?('venda '+dtBR(e.dtVenda)):'';
+      return `<tr>
+        <td ${td}><b>${e.os||'—'}</b>${e.cliente?`<div style="font-size:8px;color:#64748B">${e.cliente}</div>`:''}
+          ${orig?`<div style="font-size:8px;color:#5B21B6">${orig}</div>`:''}</td>
+        <td ${td}>${val?(e.forma||'—'):'Sem saldo'}</td>
+        <td ${tdN}>${val?rs(val):'—'}</td></tr>`;}).join('')
+      ||`<tr><td ${td} colspan="3">Nenhum recebimento</td></tr>`}</tbody></table>`;
+
+  // ── coluna 3: receita por forma, separada por origem ──
+  const porOrigem=(itens,campos)=>{
+    const m={};
+    itens.forEach(x=>campos.forEach(([f,v])=>{
+      const forma=x[f], val=num(x[v]);
+      if(!forma||!val||forma==='Sem saldo'||forma==='Garantia')return;
+      m[forma]=(m[forma]||0)+val;
+    }));
+    return m;
+  };
+  const mVendas=porOrigem(fcVendas,[['forma1','pago1'],['forma2','pago2']]);
+  const mReceb =porOrigem(fcEntregas,[['forma','valor'],['forma2','valor2']]);
+
+  const tabelaFormas=(titulo,mapa,cor)=>{
+    const total=Object.values(mapa).reduce((s,v)=>s+v,0);
+    return `<div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:800;color:#fff;background:${cor};padding:4px 6px;text-transform:uppercase">${titulo}</div>
+      <table style="width:100%;border-collapse:collapse">${FORMAS.filter(f=>f!=='Sem saldo'&&f!=='Garantia').map(f=>
+        `<tr><td ${td}>${f}</td><td ${tdN}${mapa[f]?' ':''}>${mapa[f]?'<b>'+rs(mapa[f])+'</b>':'—'}</td></tr>`).join('')}
+        <tr style="background:#F0F4F8"><td ${td}><b>Total</b></td><td ${tdN}><b>${rs(total)}</b></td></tr>
+      </table></div>`;
+  };
+
+  const kpis=`<div style="display:flex;gap:8px;margin-bottom:12px">
+    ${[['Ranking (vendido)',rs(t.ranking),'#1D4ED8'],['Caixa (entrou)',rs(t.caixa),'#16A34A'],
+       ['Vendas',String(t.qtd),'#0F1923'],['Ticket médio',rs(t.ticket),'#0D7A75'],
+       ['Avaliações Google',String(google),'#92400E']]
+      .map(([l,v,c])=>`<div style="flex:1;background:#F0F4F8;border-radius:7px;padding:7px 10px">
+        <div style="font-size:8px;font-weight:800;color:#64748B;text-transform:uppercase">${l}</div>
+        <div style="font-size:15px;font-weight:800;color:${c}">${v}</div></div>`).join('')}
+  </div>`;
+
+  const secao=(t2,conteudo)=>`<div>
+    <div style="font-size:11px;font-weight:800;color:#0F1923;margin-bottom:4px">${t2}</div>${conteudo}</div>`;
+
+  const corpo=kpis
+    +`<div style="display:grid;grid-template-columns:1.25fr 1fr 0.85fr;gap:14px;align-items:start">
+      ${secao('Vendas do dia',vendas)}
+      ${secao('Recebimentos do dia',receb)}
+      <div>
+        ${tabelaFormas('Receita das vendas',mVendas,'#1D4ED8')}
+        ${tabelaFormas('Receita dos recebimentos',mReceb,'#5B21B6')}
+        ${tabelaFormas('Receita total do dia',t.porForma,'#0D7A75')}
+      </div>
+    </div>`
+    +(obs?`<div style="margin-top:10px;font-size:10px;color:#64748B"><b>Observações:</b> ${obs}</div>`:'');
+
+  abrirPDF('Fechamento de Caixa — '+dtBR(dia), corpo, true, true);
 }
 
 // ── PROJEÇÃO DO CICLO ───────────────────────────────────────────────────────
@@ -4165,7 +4239,7 @@ function expCrPDF(){
 
 
 // ── EXPORTAR PDF GENÉRICO ────────────────────────────────────────────────────
-function abrirPDF(titulo, conteudoHTML, imprimir){
+function abrirPDF(titulo, conteudoHTML, imprimir, paisagem){
   const auto = imprimir===false ? '' : '<script>window.onload=()=>window.print();<\/script>';
   const barra = imprimir===false
     ? '<div class="no-print" style="display:flex;gap:10px;align-items:center;margin-bottom:14px">'
@@ -4194,6 +4268,7 @@ function abrirPDF(titulo, conteudoHTML, imprimir){
     .kpi-val{font-size:20px;font-weight:800;color:#1BA8A0;margin-top:2px}
     .badge{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:700}
     .footer{margin-top:16px;border-top:1px solid #E2E8F0;padding-top:8px;font-size:10px;color:#64748B;display:flex;justify-content:space-between}
+    ${paisagem?'@page{size:A4 landscape;margin:8mm}':''}
     @media print{body{padding:12px}.no-print{display:none}}
   </style></head><body>
   <div class="header">
