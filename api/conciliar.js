@@ -62,7 +62,9 @@ ${linhas.map(l => `- OS ${l.os || '-'} | ${l.cliente || '-'} | R$ ${Number(l.val
 EXTRATO COLADO PELO OPERADOR:
 ${texto}
 
-Responda SOMENTE com um objeto JSON, sem markdown e sem texto fora dele:
+IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
+com }. Nada antes, nada depois, sem crases, sem markdown, sem explicação.
+Formato:
 {
   "totalExtrato": number,
   "totalSistema": number,
@@ -139,7 +141,9 @@ ${blocos}
 EXTRATOS COLADOS PELO OPERADOR:
 ${texto}
 
-Responda SOMENTE com um objeto JSON, sem markdown e sem texto fora dele:
+IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
+com }. Nada antes, nada depois, sem crases, sem markdown, sem explicação.
+Formato:
 {
   "formas": [
     {
@@ -232,7 +236,9 @@ ${Object.entries(porForma).map(([f, v]) => `  ${f}: R$ ${v.toFixed(2)}`).join('\
 EXTRATOS COLADOS PELO OPERADOR:
 ${texto}
 
-Responda SOMENTE com um objeto JSON, sem markdown e sem texto fora dele:
+IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
+com }. Nada antes, nada depois, sem crases, sem markdown, sem explicação.
+Formato:
 {
   "formas": [{"forma":"","totalExtrato":0,"encontrado":true,"resumo":"","provavelMotivo":""}],
   "porDia": [{"data":"AAAA-MM-DD","sistema":0,"extrato":0,"resumo":""}],
@@ -286,10 +292,9 @@ async function pedirJSON(chave, prompt, maxTokens) {
     body: JSON.stringify({
       model: MODELO,
       max_tokens: maxTokens || 2000,
-      messages: [
-        { role: 'user', content: prompt },
-        { role: 'assistant', content: '{' },   // obriga a resposta a ser JSON
-      ],
+      // Este modelo não aceita prefill no turno do assistente, então o JSON
+      // é garantido pela instrução no prompt e pelas tentativas de leitura.
+      messages: [{ role: 'user', content: prompt }],
     }),
   });
 
@@ -308,12 +313,13 @@ async function pedirJSON(chave, prompt, maxTokens) {
     .replace(/```json|```/g, '')
     .trim();
 
-  // 2. tenta como veio; depois com a chave do prefill na frente;
-  //    por fim, recortando do primeiro { ao último }
-  const tentativas = [txt, '{' + txt];
+  // 2. tenta como veio; depois recortando do primeiro { ao último };
+  //    por fim, com a chave na frente, caso a resposta comece pelo conteúdo
+  const tentativas = [txt];
   const ini = txt.indexOf('{');
   const fim = txt.lastIndexOf('}');
   if (ini >= 0 && fim > ini) tentativas.push(txt.slice(ini, fim + 1));
+  tentativas.push('{' + txt);
 
   for (const t of tentativas) {
     try { return JSON.parse(t); } catch (e) {}
