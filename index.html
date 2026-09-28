@@ -3266,7 +3266,21 @@ function rnConferencia(){
 
   if(!formas.length){el.innerHTML='<div class="er">Nada a conferir neste dia.</div>';return;}
 
-  el.innerHTML=formas.map(f=>{
+  // explica por que o caixa ainda não está conferido
+  const pend=formas.filter(f=>!fcConferencia[f]);
+  const comDif=formas.filter(f=>fcConferencia[f]&&Math.abs(fcConferencia[f].dif)>=0.01);
+  let aviso='';
+  if(fcStatus==='aberto'){
+    if(pend.length)aviso='<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;'
+      +'border:1px solid #FCD34D;border-radius:9px;padding:8px 11px;margin-bottom:9px">'
+      +'Falta conferir: '+pend.join(', ')+'. O caixa fica conferido sozinho quando todas baterem.</div>';
+    else if(comDif.length)aviso='<div style="font-size:11px;font-weight:700;color:#B91C1C;background:#FEF2F2;'
+      +'border:1px solid #FCA5A5;border-radius:9px;padding:8px 11px;margin-bottom:9px">'
+      +'Todas conferidas, mas há diferença em: '+comDif.join(', ')+'. '
+      +'Use <b>Marcar como conferido</b> se quiser aceitar assim.</div>';
+  }
+
+  el.innerHTML=aviso+formas.map(f=>{
     const sistema=t.porForma[f];
     const c=fcConferencia[f];
     const ehDinheiro=(f==='Dinheiro');
