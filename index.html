@@ -3320,6 +3320,7 @@ function opConf(forma){
         :(dif>0?'Sobrou R$ '+dif.toFixed(2)+' na gaveta.':'Faltam R$ '+Math.abs(dif).toFixed(2)+' na gaveta.')};
     fcDinheiroGaveta=v;
     talvezConferirSozinho();salvarRascunho();rnConferencia();
+    gravarConferencia();
     return;
   }
 
@@ -3397,35 +3398,50 @@ async function conferirForma(){
       +(d.provavelMotivo&&!ok?'<div style="font-size:11px;color:#B45309;margin-top:4px"><b>Provável motivo:</b> '+d.provavelMotivo+'</div>':'')
       +lista(d.soNoExtrato,'só no extrato','#B45309')
       +lista(d.soNoSistema,'só no sistema','#1D4ED8')
-      +(ok?'<div style="margin-top:8px;font-size:11px;font-weight:700;color:#16A34A">Registrado. Pode fechar esta janela.</div>'
-          :'<button class="bsv" style="margin-top:10px;width:100%;background:#B45309;border-color:#B45309" onclick="aceitarConf()">Aceitar a diferença mesmo assim</button>')
+      +'<div style="margin-top:8px;font-size:11px;font-weight:700;color:'+(ok?'#16A34A':'#B45309')+'">'
+      +(ok?'Conferido e registrado.':'Registrado com a diferença. Pode fechar esta janela.')+'</div>'
       +'</div>';
-    window._confResultado={forma,sistema:d.totalSistema,extrato:d.totalExtrato,dif,
-      obs:d.resumo||''};
-    // bateu: registra na hora
-    if(ok){
-      fcConferencia[forma]={sistema:d.totalSistema,extrato:d.totalExtrato,dif:0,
-        por:U.n,em:Date.now(),obs:d.resumo||'Bateu com o extrato.'};
-      window._confResultado=null;
-      talvezConferirSozinho();salvarRascunho();rnConferencia();
-    }
+
+    // A conferência aconteceu: o resultado fica registrado, tenha batido ou
+    // não — igual à contagem da gaveta. A diferença aparece em âmbar na lista.
+    fcConferencia[forma]={sistema:d.totalSistema,extrato:d.totalExtrato,dif,
+      por:U.n,em:Date.now(),obs:d.resumo||(ok?'Bateu com o extrato.':'')};
+    window._confResultado=null;
+    talvezConferirSozinho();salvarRascunho();rnConferencia();
+    await gravarConferencia();
   }catch(e){
     res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
-function aceitarConf(){
-  const r=window._confResultado; if(!r)return;
-  fcConferencia[r.forma]={sistema:r.sistema,extrato:r.extrato,dif:r.dif,
-    por:U.n,em:Date.now(),obs:r.obs};
-  window._confResultado=null;
-  clsConf();talvezConferirSozinho();salvarRascunho();rnConferencia();
-  setSy('ok','Conferência de '+r.forma+' registrada — '+horaAgora());
-}
 
 // Quando todas as formas foram conferidas e todas bateram, não há o que
 // perguntar: o caixa passa a conferido sozinho. Havendo diferença, o
 // supervisor decide se aceita.
+async function gravarConferencia(){
+  if(!fcDiaCarregado)return;
+  const dia=fcDiaCarregado;
+  const campos={conferencia:fcConferencia,status:fcStatus,
+    dinheiro_gaveta:(fcDinheiroGaveta===0||fcDinheiroGaveta)?fcDinheiroGaveta:null,
+    conferido_por:(fcStatus!=='aberto')?U.n:null,
+    conferido_em:(fcStatus!=='aberto')?Date.now():null};
+  try{
+    if(fcSalvo){
+      await sbPatch('fechamento_caixa',campos,{id:idFech(dia)});
+      fcSalvo={...fcSalvo,...campos};
+    }else{
+      // o dia ainda não tinha sido salvo: grava o fechamento inteiro
+      await svFech();
+      return;
+    }
+    if(document.getElementById('cfs').style.display!=='none')rnConfLista();
+    setSy('ok','Conferência gravada — '+horaAgora());
+  }catch(e){
+    alert('A conferência não foi gravada: '+e.message
+      +'\n\nEla continua no rascunho deste computador. Salve o fechamento para guardar.');
+  }
+}
+
 function talvezConferirSozinho(){
   const t=totaisFech();
   const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
@@ -3469,6 +3485,7 @@ async function marcarConferido(){
   if(dif>0.01&&!confirm('Há diferenças somando '+rs(dif)+'.\n\nConfirma a conferência assim mesmo?'))return;
   fcStatus='conferido';
   salvarRascunho();rnConferencia();
+  await gravarConferencia();
   setSy('ok','Caixa conferido — '+horaAgora());
 }
 
@@ -3607,45 +3624,36 @@ async function conferirTudo(){
         +d.naoIdentificado.map(x=>'<div style="font-size:11px;padding:2px 0">'+(x.descricao||'—')+' · <b>'+rs(x.valor)+'</b></div>').join('')
         +'</div>' : '';
 
-    // O que bateu é registrado na hora: não há o que decidir. As divergências
-    // ficam esperando o supervisor confirmar, porque aí há uma decisão.
-    const bateram=(d.formas||[]).filter(f=>f.encontrado!==false&&f.bateu);
-    bateram.forEach(f=>{
-      fcConferencia[f.forma]={sistema:f.totalSistema,extrato:f.totalExtrato,dif:0,
-        por:U.n,em:Date.now(),obs:f.resumo||'Bateu com o extrato.'};
+    // Tudo que a IA encontrou fica registrado na hora, tenha batido ou não.
+    // O que não apareceu em extrato nenhum continua pendente.
+    const achadas=(d.formas||[]).filter(f=>f.encontrado!==false);
+    achadas.forEach(f=>{
+      fcConferencia[f.forma]={sistema:f.totalSistema,extrato:f.totalExtrato,dif:f.diferenca,
+        por:U.n,em:Date.now(),obs:f.resumo||(f.bateu?'Bateu com o extrato.':'')};
     });
-    const divergentes=(d.formas||[]).filter(f=>f.encontrado!==false&&!f.bateu);
-    window._confTudo=divergentes;
-    if(bateram.length){talvezConferirSozinho();salvarRascunho();rnConferencia();}
+    const bateram=achadas.filter(f=>f.bateu);
+    const divergentes=achadas.filter(f=>!f.bateu);
+    window._confTudo=null;
+    talvezConferirSozinho();salvarRascunho();rnConferencia();
+    await gravarConferencia();
 
     res.innerHTML='<div style="margin-top:4px">'
-      +(bateram.length?'<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:9px 11px;margin-bottom:8px;font-size:12px;font-weight:700;color:#16A34A">'
-        +bateram.length+' forma(s) bateram e já foram marcadas: '+bateram.map(f=>f.forma).join(', ')+'</div>':'')
+      +'<div style="background:'+(divergentes.length?'#FFFBEB':'#F0FDF4')
+      +';border:1px solid '+(divergentes.length?'#FCD34D':'#BBF7D0')
+      +';border-radius:9px;padding:9px 11px;margin-bottom:8px;font-size:12px;font-weight:700;color:'
+      +(divergentes.length?'#B45309':'#16A34A')+'">'
+      +achadas.length+' forma(s) conferida(s) e registrada(s)'
+      +(bateram.length?(' · '+bateram.length+' bateram'):'')
+      +(divergentes.length?(' · '+divergentes.length+' com diferença'):'')
+      +'</div>'
       +linhas+naoId
       +(d.resumoGeral?'<div style="font-size:11px;color:var(--mu);margin-top:8px">'+d.resumoGeral+'</div>':'')
-      +(divergentes.length
-        ? '<button class="bsv" style="margin-top:10px;width:100%;background:#B45309;border-color:#B45309" onclick="aceitarConfTudo()">Aceitar as '+divergentes.length+' divergência(s) mesmo assim</button>'
-        : '<div style="margin-top:10px;font-size:11px;color:#16A34A;font-weight:700;text-align:center">Nada mais a confirmar. Pode fechar esta janela.</div>');
+      +'<div style="margin-top:10px;font-size:11px;font-weight:700;text-align:center;color:var(--mu)">Pode fechar esta janela.</div>';
   }catch(e){
     res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
-function aceitarConfTudo(){
-  const lista=window._confTudo||[];
-  if(!lista.length){clsConfTudo();return;}
-  if(!confirm('Registrar '+lista.length+' forma(s) com diferença?\n\n'
-    +lista.map(f=>f.forma+': '+(f.diferenca>0?'sobra ':'falta ')+rs(Math.abs(f.diferenca))).join('\n')))return;
-  let n=0;
-  lista.forEach(f=>{
-    fcConferencia[f.forma]={sistema:f.totalSistema,extrato:f.totalExtrato,dif:f.diferenca,
-      por:U.n,em:Date.now(),obs:f.resumo||''};
-    n++;
-  });
-  window._confTudo=null;
-  clsConfTudo();talvezConferirSozinho();salvarRascunho();rnConferencia();
-  setSy('ok',n+' forma(s) conferida(s) — '+horaAgora());
-}
 
 
 // ── CONFERÊNCIA POR PERÍODO ─────────────────────────────────────────────────
