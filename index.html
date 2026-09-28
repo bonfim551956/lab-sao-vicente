@@ -511,9 +511,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-hs" onclick="sw('hs')">Histórico</button>
       <button class="tab" id="t-e" onclick="sw('e')" style="display:none">Estoque</button>
       <button class="tab" id="t-fc" onclick="sw('fc')" style="display:none">Fechamento</button>
+      <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
       <button class="tab" id="t-cf" onclick="sw('cf')" style="display:none">Conferência</button>
-        <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
-      <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
+        <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
     </div>
   </nav>
 
@@ -740,6 +740,12 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     </div>
 
     <div class="tw"><div id="cl-body"><div class="er">Carregando...</div></div></div>
+
+    <div class="tw" style="margin-top:12px">
+      <div class="th2"><span class="tt">Entrou no período, por forma de pagamento</span>
+        <span id="cl-per-rot" style="font-size:11px;color:var(--mu);font-weight:600"></span></div>
+      <div id="cl-formas" style="padding:10px"></div>
+    </div>
   </div>
 
   <div id="nrs" class="rm" style="display:none">
@@ -3925,6 +3931,7 @@ async function rnConfLista(){
         +(comDif?(' · '+comDif+' com diferença'):'');
     }
 
+    rnConfTotais();
     if(!clDados.length){b.innerHTML='<div class="er">Nenhum fechamento neste período.</div>';return;}
 
     const est={aberto:['Aberto','background:#FEF3C7;color:#92400E'],
@@ -3975,6 +3982,55 @@ async function conferirDia(data){
   rnConferencia();
   const p=document.getElementById('fc-conf');
   if(p)p.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+// Soma de tudo que entrou no período, por forma de pagamento, com o quanto
+// já foi conferido em cada uma. É o número que se leva para a contabilidade.
+function rnConfTotais(){
+  const el=document.getElementById('cl-formas'); if(!el)return;
+  const rot=document.getElementById('cl-per-rot');
+  const ini=document.getElementById('cl-ini')?.value, fim=document.getElementById('cl-fim')?.value;
+  if(rot)rot.textContent=(ini&&fim)?(dtBR(ini)+' a '+dtBR(fim)):'';
+
+  if(!clDados.length){el.innerHTML='<div class="er">Sem dados no período.</div>';return;}
+
+  const tot={}, conf={}, dif={};
+  clDados.forEach(d=>{
+    Object.entries(d.formas).forEach(([f,v])=>{
+      tot[f]=(tot[f]||0)+v;
+      const c=d.conf[f];
+      if(c){conf[f]=(conf[f]||0)+v; dif[f]=(dif[f]||0)+Math.abs(num(c.dif));}
+    });
+  });
+  const ordem=Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);
+  const geral=Object.values(tot).reduce((s,v)=>s+v,0);
+
+  el.innerHTML=`<table><thead><tr>
+      <th>Forma de pagamento</th><th>Entrou</th><th>% do total</th>
+      <th>Conferido</th><th>Diferença</th>
+    </tr></thead><tbody>${ordem.map(f=>{
+      const pc=geral?(tot[f]/geral*100):0;
+      const cf=conf[f]||0;
+      const pend=tot[f]-cf;
+      return `<tr>
+        <td style="font-weight:700">${f}</td>
+        <td style="font-weight:800;color:#16A34A;white-space:nowrap">${rs(tot[f])}</td>
+        <td style="color:var(--mu);white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;min-width:46px;height:5px;background:var(--bo);border-radius:3px;overflow:hidden">
+              <div style="width:${pc.toFixed(1)}%;height:100%;background:var(--v)"></div></div>
+            <span style="font-size:10px;font-weight:700">${pc.toFixed(1)}%</span></div></td>
+        <td style="white-space:nowrap">${cf?rs(cf):'—'}
+          ${pend>0.01?`<div style="font-size:9px;color:#B45309;font-weight:700">${rs(pend)} por conferir</div>`:''}</td>
+        <td style="font-weight:800;white-space:nowrap;color:${(dif[f]||0)>0.01?'#B91C1C':'var(--mu)'}">${(dif[f]||0)>0.01?rs(dif[f]):'—'}</td>
+      </tr>`;}).join('')}
+      <tr style="background:var(--vl)">
+        <td style="font-weight:800">TOTAL</td>
+        <td style="font-weight:800;color:#16A34A">${rs(geral)}</td>
+        <td></td>
+        <td style="font-weight:800">${rs(Object.values(conf).reduce((s,v)=>s+v,0))}</td>
+        <td style="font-weight:800;color:#B91C1C">${rs(Object.values(dif).reduce((s,v)=>s+v,0))}</td>
+      </tr></tbody></table>`;
 }
 
 function abrirNoFechamento(data){
