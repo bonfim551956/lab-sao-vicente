@@ -1717,7 +1717,10 @@ const US=[
 const RS={
   supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,cn:true,ce:true,es:true,ed:true,rf:true,aj:true,wa:true},
   adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4],ca:true,cd:false,cn:true,ce:true,es:true,ed:true,rf:true,aj:false,wa:true},
-  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[],ca:false,cd:false,cn:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
+  // 'tp' limita os tipos de OS que o perfil pode criar e movimentar.
+  // Sem 'tp', o perfil trabalha com todos os tipos.
+  posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[4],ca:true,cd:false,cn:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false,
+    tp:['gar-hora','gar-armacao','gar-armacao-sem','gar-pedido','passagem','passagem-sem']},
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[2],ca:false,cd:false,cn:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
@@ -2021,7 +2024,7 @@ async function doLogin(){
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
   document.getElementById('nn').textContent=UP(U.n);
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
   aplicarAbas();
   // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
@@ -2429,7 +2432,7 @@ const PERFIS_DESC={
   gerente:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
   adm:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
   montagem:'Move apenas de Montagem para Pronto. Não vê financeiro.',
-  posvendas:'Só visualização dos serviços, do crediário e dos saldos.'
+  posvendas:'Cria e entrega garantias e passagens. Vê crediário e saldos.'
 };
 
 async function rnUsuarios(){
@@ -5454,7 +5457,13 @@ async function svSaldoPago(){
 function opAvulsa(){
   if(!R||!R.ca){alert('Sem permissão para registrar vendas.');return;}
   ['av-desc','av-cli','av-os','av-valor','av-rec','av-rec2'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('av-tipo').value='avulsa';
+  const st=document.getElementById('av-tipo');
+  [...st.options].forEach(o=>{
+    const pode=!R.tp||R.tp.includes(o.value);
+    o.hidden=!pode; o.disabled=!pode;
+  });
+  const livre=[...st.options].find(o=>!o.disabled);
+  st.value=(R.tp&&!R.tp.includes('avulsa'))?(livre?livre.value:'passagem-sem'):'avulsa';
   document.getElementById('av-destino').value='5';
   tgAvulsaTipo();
   opcoesFormas(document.getElementById('av-forma'));
@@ -5505,6 +5514,9 @@ function calcAvulsa(){
 
 async function svAvulsa(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
+  if(R.tp&&!R.tp.includes(document.getElementById('av-tipo').value)){
+    alert('Seu perfil só pode registrar passagem sem lapidação.');return;
+  }
   const desc=UP(document.getElementById('av-desc').value.trim());
   const cliente=UP(document.getElementById('av-cli').value.trim());
   let os=UP(document.getElementById('av-os').value.trim());
@@ -5618,6 +5630,9 @@ function mvCard(id){
   const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
   if(c.col>=5)return;
   if(!R.mv.includes(c.col)){alert('Sem permissão para mover desta coluna.');return;}
+  if(R.tp&&!R.tp.includes(c.tipo)){
+    alert('Seu perfil só movimenta garantias e passagens.');return;
+  }
 
   // Venda -> Pedido: pede o número só dos óculos que vão ao fornecedor.
   // Se todos saem do estoque, passa direto.
@@ -5769,6 +5784,22 @@ const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;bo
 }
 function clsH(){document.getElementById('hm').style.display='none';}
 
+// Perfis com lista de tipos veem só o que podem criar
+function aplicarTiposPermitidos(){
+  const sel=document.getElementById('ft');
+  if(!sel||!R)return;
+  [...sel.options].forEach(o=>{
+    const pode=!R.tp||R.tp.includes(o.value);
+    o.hidden=!pode; o.disabled=!pode;
+  });
+  const atual=sel.selectedOptions[0];
+  if(!atual||atual.disabled){
+    const livre=[...sel.options].find(o=>!o.disabled);
+    if(livre)sel.value=livre.value;
+  }
+  tgG(sel.value);
+}
+
 function opOs(){
   window._credOrigem=null;
   editId=null;
@@ -5793,6 +5824,7 @@ function opOs(){
   document.getElementById('fforma2-wrap').style.display='block';tgForma2();
   document.getElementById('fsaldo-box').style.display='none';
   document.getElementById('fretirada-wrap').style.display='none';
+  aplicarTiposPermitidos();
   rnOculos(1,[{}]);
   tgG('venda');
   document.getElementById('om').style.display='flex';
@@ -5891,6 +5923,9 @@ async function svOS(){
   const now=Date.now();
   const prazo=document.getElementById('fprazo').value;
   const urgente=document.getElementById('furgente').checked;
+  if(R&&R.tp&&!R.tp.includes(document.getElementById('ft').value)){
+    alert('Seu perfil só pode registrar garantias e passagens.');return;
+  }
   const vv=document.getElementById('fvenda').value;
   if(!vendaOpcional()&&(vv===''||num(vv)<=0)){
     alert('Informe o valor da venda.');
@@ -6034,7 +6069,7 @@ function rnKan(){
       // mv é a lista de colunas DE ONDE a pessoa pode mover.
       // Antes exigia permissão também na coluna de destino, o que escondia
       // o botão Pedido -> Montagem do administrativo, já que Montagem é da montagem.
-      const cm=R.mv.includes(ci)&&ci<5;
+      const cm=R.mv.includes(ci)&&ci<5&&(!R.tp||R.tp.includes(c.tipo));
       const nl=ci===4?'✓ Entregar':ci<4?'→ '+CS[ci+1]:'';
       if(filtroAtivo==='urg'&&!c.urgente)return;
       if(filtroAtivo==='gar'&&!(c.tipo&&c.tipo.startsWith('gar')))return;
@@ -6679,7 +6714,7 @@ document.addEventListener('keydown',e=>{
     document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
     document.getElementById('nn').textContent=UP(U.n);
     const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — visualização de todos os serviços.'};
+    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
     const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
     aplicarAbas();
     let aba=localStorage.getItem('idealize_tab')||'k';
