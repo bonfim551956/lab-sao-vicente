@@ -1544,8 +1544,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <textarea id="cp-extrato" placeholder="Relatório da maquininha, do Asaas, extrato do banco... pode ser tudo junto."
         style="width:100%;font-size:12px;padding:9px 11px;border-radius:9px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:150px"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
-        <input type="file" id="cp-arq" accept=".csv,.txt,.xlsx,.xls" multiple onchange="lerArquivosConf(this,'cp-extrato','cp-arqs')" style="font-size:11px"/>
-        <span style="font-size:10px;color:var(--mu)">vários arquivos de uma vez</span>
+        <input type="file" id="cp-arq" accept=".pdf,.csv,.txt,.xlsx,.xls" multiple onchange="lerArquivosConf(this,'cp-extrato','cp-arqs')" style="font-size:11px"/>
+        <span style="font-size:10px;color:var(--mu)">PDF, CSV e XLSX — vários de uma vez</span>
       </div>
       <div id="cp-arqs" style="font-size:10px;color:var(--v);font-weight:700;margin-top:5px"></div>
     </div>
@@ -1564,7 +1564,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <textarea id="cft-extrato" placeholder="Cole o relatório da maquininha, o do Asaas, o extrato do banco... pode ser tudo junto."
         style="width:100%;font-size:12px;padding:9px 11px;border-radius:9px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:170px"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
-        <input type="file" id="cft-arq" accept=".csv,.txt,.xlsx,.xls" multiple onchange="lerArquivosConf(this)" style="font-size:11px"/>
+        <input type="file" id="cft-arq" accept=".pdf,.csv,.txt,.xlsx,.xls" multiple onchange="lerArquivosConf(this)" style="font-size:11px"/>
         <span style="font-size:10px;color:var(--mu)">pode escolher vários arquivos ao mesmo tempo</span>
       </div>
       <div id="cft-arqs" style="font-size:10px;color:var(--v);font-weight:700;margin-top:5px"></div>
@@ -1585,8 +1585,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <textarea id="cf-extrato" placeholder="Cole o relatório da maquininha, do Asaas ou do banco..."
         style="width:100%;font-size:12px;padding:9px 11px;border-radius:9px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:130px"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
-        <input type="file" id="cf-arq" accept=".csv,.txt,.xlsx,.xls" onchange="lerArquivoConf(this)" style="font-size:11px"/>
-        <span style="font-size:10px;color:var(--mu)">aceita texto colado, CSV e XLSX</span>
+        <input type="file" id="cf-arq" accept=".pdf,.csv,.txt,.xlsx,.xls" onchange="lerArquivoConf(this)" style="font-size:11px"/>
+        <span style="font-size:10px;color:var(--mu)">aceita texto colado, PDF, CSV e XLSX</span>
       </div>
     </div>
     <div id="cf-result"></div>
@@ -3327,7 +3327,9 @@ async function lerArquivoConf(input){
   const nome=f.name.toLowerCase();
   const campo=document.getElementById('cf-extrato');
   try{
-    if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){
+    if(nome.endsWith('.pdf')){
+      campo.value=await textoDoPDF(f);
+    }else if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){
       if(!window.XLSX){
         await new Promise((ok,err)=>{
           const s=document.createElement('script');
@@ -3342,6 +3344,7 @@ async function lerArquivoConf(input){
     }else{
       campo.value=await f.text();
     }
+    if(!campo.value.trim())throw new Error('o arquivo veio vazio');
     setSy('ok','Arquivo lido — '+horaAgora());
   }catch(e){alert('Não consegui ler o arquivo: '+e.message+'\n\nCole o conteúdo no campo acima.');}
 }
@@ -3380,10 +3383,18 @@ async function conferirForma(){
       +(d.provavelMotivo&&!ok?'<div style="font-size:11px;color:#B45309;margin-top:4px"><b>Provável motivo:</b> '+d.provavelMotivo+'</div>':'')
       +lista(d.soNoExtrato,'só no extrato','#B45309')
       +lista(d.soNoSistema,'só no sistema','#1D4ED8')
-      +'<button class="bsv" style="margin-top:10px;width:100%" onclick="aceitarConf()">Confirmar esta conferência</button>'
+      +(ok?'<div style="margin-top:8px;font-size:11px;font-weight:700;color:#16A34A">Registrado. Pode fechar esta janela.</div>'
+          :'<button class="bsv" style="margin-top:10px;width:100%;background:#B45309;border-color:#B45309" onclick="aceitarConf()">Aceitar a diferença mesmo assim</button>')
       +'</div>';
     window._confResultado={forma,sistema:d.totalSistema,extrato:d.totalExtrato,dif,
       obs:d.resumo||''};
+    // bateu: registra na hora
+    if(ok){
+      fcConferencia[forma]={sistema:d.totalSistema,extrato:d.totalExtrato,dif:0,
+        por:U.n,em:Date.now(),obs:d.resumo||'Bateu com o extrato.'};
+      window._confResultado=null;
+      talvezConferirSozinho();salvarRascunho();rnConferencia();
+    }
   }catch(e){
     res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
@@ -3475,6 +3486,40 @@ function clsConfTudo(){document.getElementById('cftm').style.display='none';}
 
 // Vários arquivos de uma vez. Cada um entra marcado com o nome, para a IA
 // saber de onde veio cada bloco.
+// Extrai o texto de um PDF. A biblioteca é carregada só quando aparece um,
+// para não pesar o carregamento do sistema.
+async function textoDoPDF(arquivo){
+  if(!window.pdfjsLib){
+    await new Promise((ok,err)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload=ok;s.onerror=()=>err(new Error('não consegui carregar o leitor de PDF'));
+      document.head.appendChild(s);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc=
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const buf=await arquivo.arrayBuffer();
+  const doc=await pdfjsLib.getDocument({data:buf}).promise;
+  const partes=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p);
+    const tc=await pg.getTextContent();
+    // reconstrói as linhas pela posição vertical, senão vira uma sopa de palavras
+    const linhas={};
+    tc.items.forEach(it=>{
+      const y=Math.round(it.transform[5]);
+      (linhas[y]=linhas[y]||[]).push(it.str);
+    });
+    partes.push(Object.keys(linhas).sort((a,b)=>b-a)
+      .map(y=>linhas[y].join(' ').replace(/\s+/g,' ').trim())
+      .filter(Boolean).join('\n'));
+  }
+  const txt=partes.join('\n').trim();
+  if(!txt)throw new Error('este PDF não tem texto — parece ser digitalizado (foto de papel)');
+  return txt;
+}
+
 async function lerArquivosConf(input,idCampo,idLista){
   const arqs=[...(input.files||[])]; if(!arqs.length)return;
   const campo=document.getElementById(idCampo||'cft-extrato');
@@ -3483,7 +3528,9 @@ async function lerArquivosConf(input,idCampo,idLista){
     try{
       const n=f.name.toLowerCase();
       let txt;
-      if(n.endsWith('.xlsx')||n.endsWith('.xls')){
+      if(n.endsWith('.pdf')){
+        txt=await textoDoPDF(f);
+      }else if(n.endsWith('.xlsx')||n.endsWith('.xls')){
         if(!window.XLSX){
           await new Promise((ok,err)=>{
             const s=document.createElement('script');
@@ -3546,10 +3593,25 @@ async function conferirTudo(){
         +d.naoIdentificado.map(x=>'<div style="font-size:11px;padding:2px 0">'+(x.descricao||'—')+' · <b>'+rs(x.valor)+'</b></div>').join('')
         +'</div>' : '';
 
-    res.innerHTML='<div style="margin-top:4px">'+linhas+naoId
+    // O que bateu é registrado na hora: não há o que decidir. As divergências
+    // ficam esperando o supervisor confirmar, porque aí há uma decisão.
+    const bateram=(d.formas||[]).filter(f=>f.encontrado!==false&&f.bateu);
+    bateram.forEach(f=>{
+      fcConferencia[f.forma]={sistema:f.totalSistema,extrato:f.totalExtrato,dif:0,
+        por:U.n,em:Date.now(),obs:f.resumo||'Bateu com o extrato.'};
+    });
+    const divergentes=(d.formas||[]).filter(f=>f.encontrado!==false&&!f.bateu);
+    window._confTudo=divergentes;
+    if(bateram.length){talvezConferirSozinho();salvarRascunho();rnConferencia();}
+
+    res.innerHTML='<div style="margin-top:4px">'
+      +(bateram.length?'<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:9px 11px;margin-bottom:8px;font-size:12px;font-weight:700;color:#16A34A">'
+        +bateram.length+' forma(s) bateram e já foram marcadas: '+bateram.map(f=>f.forma).join(', ')+'</div>':'')
+      +linhas+naoId
       +(d.resumoGeral?'<div style="font-size:11px;color:var(--mu);margin-top:8px">'+d.resumoGeral+'</div>':'')
-      +'<button class="bsv" style="margin-top:10px;width:100%" onclick="aceitarConfTudo()">Confirmar todas as conferências</button></div>';
-    window._confTudo=d.formas||[];
+      +(divergentes.length
+        ? '<button class="bsv" style="margin-top:10px;width:100%;background:#B45309;border-color:#B45309" onclick="aceitarConfTudo()">Aceitar as '+divergentes.length+' divergência(s) mesmo assim</button>'
+        : '<div style="margin-top:10px;font-size:11px;color:#16A34A;font-weight:700;text-align:center">Nada mais a confirmar. Pode fechar esta janela.</div>');
   }catch(e){
     res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
@@ -3557,9 +3619,11 @@ async function conferirTudo(){
 
 function aceitarConfTudo(){
   const lista=window._confTudo||[];
+  if(!lista.length){clsConfTudo();return;}
+  if(!confirm('Registrar '+lista.length+' forma(s) com diferença?\n\n'
+    +lista.map(f=>f.forma+': '+(f.diferenca>0?'sobra ':'falta ')+rs(Math.abs(f.diferenca))).join('\n')))return;
   let n=0;
   lista.forEach(f=>{
-    if(f.encontrado===false)return;          // sem dado no extrato, não registra
     fcConferencia[f.forma]={sistema:f.totalSistema,extrato:f.totalExtrato,dif:f.diferenca,
       por:U.n,em:Date.now(),obs:f.resumo||''};
     n++;
