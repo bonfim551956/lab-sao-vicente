@@ -511,7 +511,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-hs" onclick="sw('hs')">Histórico</button>
       <button class="tab" id="t-e" onclick="sw('e')" style="display:none">Estoque</button>
       <button class="tab" id="t-fc" onclick="sw('fc')" style="display:none">Fechamento</button>
-      <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
+      <button class="tab" id="t-cf" onclick="sw('cf')" style="display:none">Conferência</button>
+        <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
       <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
     </div>
   </nav>
@@ -694,6 +695,33 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 
 
 
+
+  <div id="cfs" class="rm" style="display:none">
+    <div class="rh">
+      <span class="rt">Conferência do caixa</span>
+      <span id="cl-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <input type="date" id="cl-ini" onchange="rnConfLista()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600"/>
+        <span style="font-size:11px;color:var(--mu)">até</span>
+        <input type="date" id="cl-fim" onchange="rnConfLista()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600"/>
+        <select id="cl-estado" onchange="rnConfLista()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;cursor:pointer;font-weight:600">
+          <option value="todos">Todos os estados</option>
+          <option value="aberto">Só abertos</option>
+          <option value="conferido">Só conferidos</option>
+          <option value="fechado">Só fechados</option>
+          <option value="dif">Com diferença</option>
+        </select>
+        <button class="bex" onclick="expConfLista()">CSV</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--mu);background:var(--bg);border:1px solid var(--bo);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:500">
+      Um dia por linha, com o valor de cada forma de pagamento e se ela já foi conferida.
+      Verde bateu, âmbar tem diferença, cinza ainda não foi conferida.
+      Clique no dia para abri-lo no Fechamento.
+    </div>
+    <div class="tw"><div id="cl-body"><div class="er">Carregando...</div></div></div>
+  </div>
+
   <div id="nrs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">Pedidos não retirados</span>
@@ -832,6 +860,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           <button class="bex" onclick="opConfTudo()" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800">Conferir o dia</button>
           <button class="bex" onclick="opConfPer()" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8;font-weight:800">Conferir período</button>
           <button class="bex" id="fc-btn-conferido" onclick="marcarConferido()">Marcar como conferido</button>
+          <button class="bex" id="fc-btn-fechar" onclick="fecharCaixa()" style="background:#16A34A;color:#fff;border-color:#16A34A;font-weight:800">Fechar o caixa</button>
+          <button class="bex" id="fc-btn-reabrir" onclick="reabrirCaixa()">Reabrir</button>
         </div>
       </div>
       <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px;font-weight:500">
@@ -1966,6 +1996,7 @@ function rnAtiva(){
   if(t==='fc')return sincEntregasFech();
   if(t==='sd')return rnSaldos();
   if(t==='e')return rnEst();
+  if(t==='cf')return rnConfLista();
   if(t==='nr')return rnNaoRet();
   if(t==='cc')return rnCanc();
   if(t==='k')return rnKan();
@@ -2145,6 +2176,7 @@ function aplicarAbas(){
   mostra('t-cr', fin);
   mostra('t-ig', fin);
   mostra('t-us', U.r==='supervisor');
+  mostra('t-cf', !!R.cf);
   mostra('t-nr', true);
   mostra('t-cc', true);
 }
@@ -2162,14 +2194,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','pj','us','nr','cc'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -2188,6 +2220,7 @@ function sw(tab){
   if(tab==='pj')rnProj();
   if(tab==='k'&&_kanPendente)rnKan();
   if(tab==='us')rnUsuarios();
+  if(tab==='cf')rnConfLista();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
@@ -3039,7 +3072,7 @@ async function svFech(){
     entregas:fcEntregas.map(limpa),
     removidos:fcRemovidos,
     conferencia:fcConferencia,
-    status:(fcStatus==='aberto')?'fechado':fcStatus,
+    status:fcStatus,
     dinheiro_gaveta:(fcDinheiroGaveta===0||fcDinheiroGaveta)?fcDinheiroGaveta:null,
     conferido_por:(fcStatus!=='aberto')?U.n:null,
     conferido_em:(fcStatus!=='aberto')?Date.now():null,
@@ -3218,6 +3251,10 @@ function rnConferencia(){
     btn.textContent=faltam?('Marcar como conferido ('+faltam+' pendente'+(faltam>1?'s':'')+')')
                           :'Marcar como conferido';
   }
+  const bf=document.getElementById('fc-btn-fechar');
+  if(bf)bf.style.display=(fcStatus==='conferido')?'inline-block':'none';
+  const br=document.getElementById('fc-btn-reabrir');
+  if(br)br.style.display=(fcStatus==='fechado')?'inline-block':'none';
 
   if(!formas.length){el.innerHTML='<div class="er">Nada a conferir neste dia.</div>';return;}
 
@@ -3260,7 +3297,7 @@ function opConf(forma){
       obs:Math.abs(dif)<0.01?'Gaveta bateu com o sistema.'
         :(dif>0?'Sobrou R$ '+dif.toFixed(2)+' na gaveta.':'Faltam R$ '+Math.abs(dif).toFixed(2)+' na gaveta.')};
     fcDinheiroGaveta=v;
-    salvarRascunho();rnConferencia();
+    talvezConferirSozinho();salvarRascunho();rnConferencia();
     return;
   }
 
@@ -3349,8 +3386,42 @@ function aceitarConf(){
   fcConferencia[r.forma]={sistema:r.sistema,extrato:r.extrato,dif:r.dif,
     por:U.n,em:Date.now(),obs:r.obs};
   window._confResultado=null;
-  clsConf();salvarRascunho();rnConferencia();
+  clsConf();talvezConferirSozinho();salvarRascunho();rnConferencia();
   setSy('ok','Conferência de '+r.forma+' registrada — '+horaAgora());
+}
+
+// Quando todas as formas foram conferidas e todas bateram, não há o que
+// perguntar: o caixa passa a conferido sozinho. Havendo diferença, o
+// supervisor decide se aceita.
+function talvezConferirSozinho(){
+  const t=totaisFech();
+  const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
+  if(!formas.length||fcStatus!=='aberto')return false;
+  const todas=formas.every(f=>fcConferencia[f]);
+  const bateu=formas.every(f=>Math.abs((fcConferencia[f]||{}).dif||0)<0.01);
+  if(todas&&bateu){
+    fcStatus='conferido';
+    setSy('ok','Tudo bateu — caixa marcado como conferido');
+    return true;
+  }
+  return false;
+}
+
+async function fecharCaixa(){
+  if(!R||!R.cf){alert('Só o supervisor pode fechar o caixa.');return;}
+  if(fcStatus!=='conferido'){alert('Confira o caixa antes de fechar.');return;}
+  const dia=document.getElementById('fc-data').value;
+  if(!confirm('Fechar o caixa de '+dtBR(dia)+'?\n\n'
+    +'Ele continua podendo ser reaberto pelo supervisor, mas fica marcado como encerrado.'))return;
+  fcStatus='fechado';
+  await svFech();
+}
+
+async function reabrirCaixa(){
+  if(!R||!R.cf){alert('Só o supervisor pode reabrir o caixa.');return;}
+  if(!confirm('Reabrir o caixa deste dia?'))return;
+  fcStatus='conferido';
+  await svFech();
 }
 
 async function marcarConferido(){
@@ -3486,7 +3557,7 @@ function aceitarConfTudo(){
     n++;
   });
   window._confTudo=null;
-  clsConfTudo();salvarRascunho();rnConferencia();
+  clsConfTudo();talvezConferirSozinho();salvarRascunho();rnConferencia();
   setSy('ok',n+' forma(s) conferida(s) — '+horaAgora());
 }
 
@@ -3652,6 +3723,121 @@ async function salvarConfPer(){
     clsConfPer();
     setSy('ok','Conferência do período guardada — '+horaAgora());
   }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+
+// ── LISTA DE CONFERÊNCIA ────────────────────────────────────────────────────
+// Um dia por linha: o valor de cada forma de pagamento e se já foi conferida.
+// Responde de bate-pronto "o que ainda falta conferir neste mês?".
+let clDados=[];
+
+function formasDoFechamento(f){
+  const m={};
+  const soma=(fo,va)=>{
+    const F=formaCanon(fo), V=num(va);
+    if(!F||!V||F==='Sem saldo'||F==='Garantia')return;
+    m[F]=(m[F]||0)+V;
+  };
+  (f.vendas||[]).forEach(v=>{soma(v.forma1,v.pago1);soma(v.forma2,v.pago2);});
+  (f.entregas||[]).forEach(e=>{soma(e.forma,e.valor);soma(e.forma2,e.valor2);});
+  return m;
+}
+
+async function rnConfLista(){
+  const b=document.getElementById('cl-body'); if(!b)return;
+  if(!R||!R.cf){b.innerHTML='<div class="er">Sem permissão.</div>';return;}
+
+  const ini=document.getElementById('cl-ini'), fim=document.getElementById('cl-fim');
+  if(!ini.value||!fim.value){
+    const h=new Date(hojeBR()+'T12:00:00');
+    fim.value=hojeBR();
+    ini.value=new Date(h.getFullYear(),h.getMonth(),1).toISOString().slice(0,10);
+  }
+  const fEstado=document.getElementById('cl-estado')?.value||'todos';
+  b.innerHTML='<div class="er">Carregando...</div>';
+
+  try{
+    const r=await sbGet('fechamento_caixa',
+      'unidade=eq.'+U.un+'&data=gte.'+ini.value+'&data=lte.'+fim.value+'&order=data.desc');
+    clDados=(r||[]).map(f=>{
+      const formas=formasDoFechamento(f);
+      const conf=(f.conferencia&&typeof f.conferencia==='object')?f.conferencia:{};
+      const dif=Object.values(conf).reduce((s,c)=>s+Math.abs(num(c.dif)),0);
+      const pend=Object.keys(formas).filter(x=>!conf[x]).length;
+      return {data:f.data, caixa:num(f.caixa), ranking:num(f.ranking),
+              status:f.status||'aberto', formas, conf, dif, pend,
+              por:f.conferido_por||f.fechado_por||''};
+    }).filter(d=>{
+      if(fEstado==='dif')return d.dif>0.01;
+      return fEstado==='todos'||d.status===fEstado;
+    });
+
+    const cont=document.getElementById('cl-cont');
+    if(cont){
+      const abertos=clDados.filter(d=>d.status==='aberto').length;
+      const comDif=clDados.filter(d=>d.dif>0.01).length;
+      cont.textContent=clDados.length+' dia(s)'
+        +(abertos?(' · '+abertos+' por conferir'):'')
+        +(comDif?(' · '+comDif+' com diferença'):'');
+    }
+
+    if(!clDados.length){b.innerHTML='<div class="er">Nenhum fechamento neste período.</div>';return;}
+
+    const est={aberto:['Aberto','background:#FEF3C7;color:#92400E'],
+               conferido:['Conferido','background:#EFF6FF;color:#1D4ED8'],
+               fechado:['Fechado','background:#F0FDF4;color:#16A34A']};
+
+    b.innerHTML=`<table><thead><tr>
+        <th>Data</th><th>Caixa</th><th>Formas de pagamento</th>
+        <th>Diferença</th><th>Estado</th><th>Por</th><th></th>
+      </tr></thead><tbody>${clDados.map(d=>{
+        const chips=Object.entries(d.formas).sort((a,b2)=>b2[1]-a[1]).map(([f,v])=>{
+          const c=d.conf[f];
+          const cor=!c?'background:var(--bg);color:var(--mu);border:1px solid var(--bo)'
+            :(Math.abs(num(c.dif))<0.01?'background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0'
+                                       :'background:#FFFBEB;color:#B45309;border:1px solid #FCD34D');
+          const marca=!c?'':(Math.abs(num(c.dif))<0.01?' ✓':(' '+(num(c.dif)>0?'+':'')+num(c.dif).toFixed(2)));
+          return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;'
+            +'border-radius:6px;margin:1px 3px 1px 0;'+cor+'">'+f+' '+rs(v)+marca+'</span>';
+        }).join('');
+        const [rot,cor]=est[d.status]||est.aberto;
+        return `<tr>
+          <td style="font-weight:800;white-space:nowrap">${dtBR(d.data)}</td>
+          <td style="font-weight:700;color:#16A34A;white-space:nowrap">${rs(d.caixa)}</td>
+          <td style="max-width:420px">${chips||'<span style="color:var(--mu)">—</span>'}
+            ${d.pend?`<div style="font-size:9px;color:#B45309;font-weight:700;margin-top:2px">${d.pend} forma(s) por conferir</div>`:''}</td>
+          <td style="font-weight:800;white-space:nowrap;color:${d.dif>0.01?'#B91C1C':'var(--mu)'}">${d.dif>0.01?rs(d.dif):'—'}</td>
+          <td><span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;${cor}">${rot}</span></td>
+          <td style="color:var(--mu);font-size:11px">${d.por||'—'}</td>
+          <td><button class="bex" onclick="abrirNoFechamento('${d.data}')">Abrir</button></td>
+        </tr>`;}).join('')}
+        <tr style="background:var(--vl)">
+          <td style="font-weight:800">TOTAL</td>
+          <td style="font-weight:800;color:#16A34A">${rs(clDados.reduce((s,d)=>s+d.caixa,0))}</td>
+          <td></td>
+          <td style="font-weight:800;color:#B91C1C">${rs(clDados.reduce((s,d)=>s+d.dif,0))}</td>
+          <td colspan="3"></td>
+        </tr></tbody></table>`;
+  }catch(e){b.innerHTML='<div class="er">Erro: '+e.message+'</div>';}
+}
+
+function abrirNoFechamento(data){
+  sw('fc');
+  const c=document.getElementById('fc-data');
+  if(c){c.value=data;fcDiaCarregado=null;rnFech();}
+}
+
+function expConfLista(){
+  if(!clDados.length){alert('Nada para exportar.');return;}
+  const formas=[...new Set(clDados.flatMap(d=>Object.keys(d.formas)))];
+  const linhas=[['Data','Caixa','Estado','Diferenca','Por',...formas,...formas.map(f=>f+' conferido')].join(',')];
+  clDados.forEach(d=>{
+    linhas.push([dtBR(d.data),d.caixa.toFixed(2),d.status,d.dif.toFixed(2),d.por||'',
+      ...formas.map(f=>(d.formas[f]||0).toFixed(2)),
+      ...formas.map(f=>{const c=d.conf[f];return !c?'nao':(Math.abs(num(c.dif))<0.01?'sim':'dif '+num(c.dif).toFixed(2));})
+    ].join(','));
+  });
+  baixarCSV(linhas.join('\n'),'conferencia');
 }
 
 // ── PROJEÇÃO DO CICLO ───────────────────────────────────────────────────────
