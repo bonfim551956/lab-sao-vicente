@@ -822,6 +822,23 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="th2"><span class="tt">Receita do dia por forma de pagamento</span></div>
       <div id="fc-consol"></div>
     </div>
+
+    <!-- Conferência: bater cada forma com o extrato -->
+    <div class="tw" style="margin-top:12px">
+      <div class="th2">
+        <span class="tt">Conferência do caixa</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span id="fc-estado" style="font-size:11px;font-weight:700;padding:5px 11px;border-radius:9px"></span>
+          <button class="bex" id="fc-btn-conferido" onclick="marcarConferido()">Marcar como conferido</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px;font-weight:500">
+        Confira uma forma de pagamento por vez. Cole o relatório da maquininha ou do Asaas e
+        clique em Conferir — a inteligência artificial aponta o que bateu e o que sobrou.
+        No dinheiro, informe o valor contado na gaveta.
+      </div>
+      <div id="fc-conf" style="padding:0 10px 10px"></div>
+    </div>
     <div class="tw" style="margin-top:12px">
       <div class="th2"><span class="tt">Avaliações Google e observação</span></div>
       <div style="padding:12px;display:grid;grid-template-columns:150px 1fr;gap:12px">
@@ -1471,6 +1488,28 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 <!-- Anotações de cobrança do saldo -->
 
 <!-- Cancelar OS -->
+
+<!-- Conferir uma forma de pagamento com o extrato -->
+<div class="mb" id="cfm" style="display:none">
+  <div class="md" style="max-width:700px">
+    <div class="mh"><span id="cf-tit">Conferir</span><button class="mx" onclick="clsConf()">&#10005;</button></div>
+    <input type="hidden" id="cf-forma"/>
+    <div id="cf-resumo" style="font-size:12px;font-weight:700;background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
+    <div class="mf"><label>Extrato — cole aqui, ou escolha o arquivo</label>
+      <textarea id="cf-extrato" placeholder="Cole o relatório da maquininha, do Asaas ou do banco..."
+        style="width:100%;font-size:12px;padding:9px 11px;border-radius:9px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:130px"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
+        <input type="file" id="cf-arq" accept=".csv,.txt,.xlsx,.xls" onchange="lerArquivoConf(this)" style="font-size:11px"/>
+        <span style="font-size:10px;color:var(--mu)">aceita texto colado, CSV e XLSX</span>
+      </div>
+    </div>
+    <div id="cf-result"></div>
+    <div class="mft">
+      <button class="bc" onclick="clsConf()">Fechar</button>
+      <button class="bsv" id="cf-btn" onclick="conferirForma()">Conferir com a IA</button>
+    </div>
+  </div>
+</div>
 <div class="mb" id="cancm" style="display:none">
   <div class="md" style="max-width:420px">
     <div class="mh"><span id="canc-tit">Cancelar OS</span><button class="mx" onclick="clsCancOs()">&#10005;</button></div>
@@ -2661,6 +2700,9 @@ async function rnFech(){
   // duplicaria a cada abertura. Quem quiser atualizar usa o botão.
   fcTravado=!!salvo;
   fcRemovidos=(salvo&&Array.isArray(salvo.removidos))?salvo.removidos:[];
+  fcConferencia=(salvo&&salvo.conferencia&&typeof salvo.conferencia==='object')?salvo.conferencia:{};
+  fcStatus=(salvo&&salvo.status)?salvo.status:'aberto';
+  fcDinheiroGaveta=(salvo&&(salvo.dinheiro_gaveta===0||salvo.dinheiro_gaveta))?salvo.dinheiro_gaveta:null;
   fcVendas=(salvo&&Array.isArray(salvo.vendas))?salvo.vendas:vendasDoDia(dia).filter(v=>!fcRemovidos.includes(v.cardId));
   const parcAsaas=await parcelasAsaasDoDia(dia);
   fcEntregas=(salvo&&Array.isArray(salvo.entregas))
@@ -2682,6 +2724,9 @@ async function rnFech(){
     if(Array.isArray(rasc.vendas))fcVendas=rasc.vendas;
     if(Array.isArray(rasc.entregas))fcEntregas=rasc.entregas;
     if(Array.isArray(rasc.removidos))fcRemovidos=rasc.removidos;
+    if(rasc.conferencia)fcConferencia=rasc.conferencia;
+    if(rasc.status)fcStatus=rasc.status;
+    if(rasc.dinheiroGaveta!==undefined)fcDinheiroGaveta=rasc.dinheiroGaveta;
     if(rasc.google)document.getElementById('fc-google').value=rasc.google;
     if(rasc.obs)document.getElementById('fc-obs').value=rasc.obs;
     marcarRascunho(true);
@@ -2735,6 +2780,7 @@ function salvarRascunho(){
     try{
       localStorage.setItem(chaveRascunho(fcDiaCarregado),JSON.stringify({
         em:Date.now(), por:U?U.n:'', vendas:fcVendas, entregas:fcEntregas, removidos:fcRemovidos,
+        conferencia:fcConferencia, status:fcStatus, dinheiroGaveta:fcDinheiroGaveta,
         google:document.getElementById('fc-google').value,
         obs:document.getElementById('fc-obs').value}));
       marcarRascunho(true);
@@ -2896,6 +2942,7 @@ function rnFechLinhas(){
           : '<button onclick="tgEnt2('+i+')" style="margin-top:5px;font-size:10px;font-weight:700;font-family:inherit;padding:3px 10px;border-radius:6px;border:1.5px dashed var(--v);background:var(--vl);color:var(--v);cursor:pointer">+ 2ª forma</button>'))
       +'</div>';}).join('');
   totFech();
+  rnConferencia();
 }
 
 function totaisFech(){
@@ -2936,6 +2983,11 @@ async function svFech(){
     vendas:fcVendas.filter(v=>v.os||v.descricao||num(v.valorTotal)||num(v.pago1)).map(limpa),
     entregas:fcEntregas.map(limpa),
     removidos:fcRemovidos,
+    conferencia:fcConferencia,
+    status:(fcStatus==='aberto')?'fechado':fcStatus,
+    dinheiro_gaveta:(fcDinheiroGaveta===0||fcDinheiroGaveta)?fcDinheiroGaveta:null,
+    conferido_por:(fcStatus!=='aberto')?U.n:null,
+    conferido_em:(fcStatus!=='aberto')?Date.now():null,
     ranking:t.ranking,caixa:t.caixa,qtd_vendas:t.qtd,
     google_avaliacoes:parseInt(document.getElementById('fc-google').value)||0,
     obs:UP(document.getElementById('fc-obs').value.trim())||null,
@@ -3064,6 +3116,197 @@ function expFcPDF(){
     +(obs?`<div style="margin-top:10px;font-size:10px;color:#64748B"><b>Observações:</b> ${obs}</div>`:'');
 
   abrirPDF('Fechamento de Caixa — '+dtBR(dia), corpo, true, true);
+}
+
+
+// ── CONFERÊNCIA DO CAIXA ────────────────────────────────────────────────────
+// Cada forma de pagamento é batida com o extrato, uma por vez. A IA compara e
+// aponta o que sobrou de cada lado; quem confirma é o operador.
+// O dinheiro não tem extrato: informa-se o valor contado na gaveta.
+let fcConferencia={}, fcStatus='aberto', fcDinheiroGaveta=null;
+
+function lancamentosDaForma(forma){
+  const out=[];
+  const F=f=>formaCanon(f)===forma;
+  fcVendas.forEach(v=>{
+    if(F(v.forma1)&&num(v.pago1))out.push({os:v.os||v.descricao||'',cliente:v.cliente||'',valor:num(v.pago1)});
+    if(F(v.forma2)&&num(v.pago2))out.push({os:v.os||v.descricao||'',cliente:v.cliente||'',valor:num(v.pago2)});
+  });
+  fcEntregas.forEach(e=>{
+    if(F(e.forma)&&num(e.valor))out.push({os:e.os||'',cliente:e.cliente||'',valor:num(e.valor)});
+    if(F(e.forma2)&&num(e.valor2))out.push({os:e.os||'',cliente:e.cliente||'',valor:num(e.valor2)});
+  });
+  return out;
+}
+
+function rnConferencia(){
+  const el=document.getElementById('fc-conf'); if(!el)return;
+  const t=totaisFech();
+  const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
+
+  // estado do dia
+  const est=document.getElementById('fc-estado');
+  const cores={aberto:'background:#FEF3C7;color:#92400E',
+               conferido:'background:#EFF6FF;color:#1D4ED8',
+               fechado:'background:#F0FDF4;color:#16A34A'};
+  const nomes={aberto:'Aberto',conferido:'Conferido',fechado:'Fechado'};
+  est.style.cssText='font-size:11px;font-weight:700;padding:5px 11px;border-radius:9px;'+(cores[fcStatus]||cores.aberto);
+  est.textContent=nomes[fcStatus]||'Aberto';
+  const btn=document.getElementById('fc-btn-conferido');
+  if(btn){
+    const faltam=formas.filter(f=>!fcConferencia[f]).length;
+    btn.style.display=(fcStatus==='aberto'&&formas.length)?'inline-block':'none';
+    btn.textContent=faltam?('Marcar como conferido ('+faltam+' pendente'+(faltam>1?'s':'')+')')
+                          :'Marcar como conferido';
+  }
+
+  if(!formas.length){el.innerHTML='<div class="er">Nada a conferir neste dia.</div>';return;}
+
+  el.innerHTML=formas.map(f=>{
+    const sistema=t.porForma[f];
+    const c=fcConferencia[f];
+    const ehDinheiro=(f==='Dinheiro');
+    let estado,cor;
+    if(!c){estado='a conferir';cor='background:#FFFBEB;color:#92400E;border:1px solid #FCD34D';}
+    else if(Math.abs(c.dif)<0.01){estado='bateu';cor='background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0';}
+    else{estado=(c.dif>0?'sobra ':'falta ')+rs(Math.abs(c.dif));cor='background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5';}
+
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;'
+      +'border-bottom:1px solid var(--bo);padding:9px 2px">'
+      +'<div style="flex:1;min-width:130px"><div style="font-size:12px;font-weight:800">'+f+'</div>'
+      +'<div style="font-size:10px;color:var(--mu)">sistema: <b>'+rs(sistema)+'</b>'
+      +(c?(' · '+(ehDinheiro?'gaveta':'extrato')+': <b>'+rs(c.extrato)+'</b>'):'')+'</div></div>'
+      +'<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;'+cor+'">'+estado.toUpperCase()+'</span>'
+      +(c&&c.obs?'<div style="flex:1 1 100%;font-size:10px;color:var(--mu)">'+c.obs+'</div>':'')
+      +'<button class="bex" onclick="opConf(\''+f.replace(/'/g,"\\'")+'\')">'
+      +(ehDinheiro?'Contar gaveta':(c?'Conferir de novo':'Conferir'))+'</button>'
+      +'</div>';
+  }).join('');
+}
+
+function opConf(forma){
+  const t=totaisFech();
+  const sistema=t.porForma[forma]||0;
+  const lanc=lancamentosDaForma(forma);
+
+  if(forma==='Dinheiro'){
+    const txt=prompt('Quanto foi contado na gaveta?\n\n'
+      +'O sistema registrou R$ '+sistema.toFixed(2)+' em dinheiro.',
+      fcConferencia[forma]?String(fcConferencia[forma].extrato):'');
+    if(txt===null)return;
+    const v=num(String(txt).replace(',','.'));
+    const dif=Math.round((v-sistema)*100)/100;
+    fcConferencia[forma]={sistema,extrato:v,dif,por:U.n,em:Date.now(),
+      obs:Math.abs(dif)<0.01?'Gaveta bateu com o sistema.'
+        :(dif>0?'Sobrou R$ '+dif.toFixed(2)+' na gaveta.':'Faltam R$ '+Math.abs(dif).toFixed(2)+' na gaveta.')};
+    fcDinheiroGaveta=v;
+    salvarRascunho();rnConferencia();
+    return;
+  }
+
+  document.getElementById('cf-forma').value=forma;
+  document.getElementById('cf-tit').textContent='Conferir — '+forma;
+  document.getElementById('cf-resumo').innerHTML=
+    'O sistema registrou <b>'+rs(sistema)+'</b> em '+forma+', em '+lanc.length+' lançamento(s).';
+  document.getElementById('cf-extrato').value='';
+  document.getElementById('cf-result').innerHTML='';
+  document.getElementById('cf-arq').value='';
+  document.getElementById('cfm').style.display='flex';
+  setTimeout(()=>document.getElementById('cf-extrato').focus(),90);
+}
+function clsConf(){document.getElementById('cfm').style.display='none';}
+
+// CSV e TXT são lidos direto; XLSX precisa da biblioteca, carregada sob demanda
+async function lerArquivoConf(input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  const nome=f.name.toLowerCase();
+  const campo=document.getElementById('cf-extrato');
+  try{
+    if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){
+      if(!window.XLSX){
+        await new Promise((ok,err)=>{
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload=ok;s.onerror=()=>err(new Error('sem internet para ler XLSX'));
+          document.head.appendChild(s);
+        });
+      }
+      const buf=await f.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      campo.value=wb.SheetNames.map(n=>XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n');
+    }else{
+      campo.value=await f.text();
+    }
+    setSy('ok','Arquivo lido — '+horaAgora());
+  }catch(e){alert('Não consegui ler o arquivo: '+e.message+'\n\nCole o conteúdo no campo acima.');}
+}
+
+async function conferirForma(){
+  const forma=document.getElementById('cf-forma').value;
+  const extrato=document.getElementById('cf-extrato').value.trim();
+  if(!extrato){alert('Cole o extrato ou escolha o arquivo.');return;}
+
+  const t=totaisFech();
+  const sistema=t.porForma[forma]||0;
+  const lanc=lancamentosDaForma(forma);
+  const btn=document.getElementById('cf-btn');
+  const res=document.getElementById('cf-result');
+  btn.textContent='Conferindo...';btn.disabled=true;
+  res.innerHTML='<div class="er" style="padding:1rem">A IA está comparando...</div>';
+
+  try{
+    const r=await fetch('/api/conciliar',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({forma,data:document.getElementById('fc-data').value,lancamentos:lanc,extrato})});
+    const d=await r.json();
+    if(!r.ok){res.innerHTML='<div class="wb">'+(d.erro||'A conferência falhou.')+'</div>';return;}
+
+    const dif=Number(d.diferenca)||0;
+    const ok=Math.abs(dif)<0.01;
+    const lista=(arr,tit,cor)=>(arr&&arr.length)
+      ? '<div style="margin-top:8px"><div style="font-size:10px;font-weight:800;color:'+cor+';text-transform:uppercase">'+tit+'</div>'
+        +arr.map(x=>'<div style="font-size:11px;padding:2px 0;border-bottom:1px solid var(--bo)">'
+          +(x.os||x.descricao||'—')+' · <b>'+rs(x.valor)+'</b></div>').join('')+'</div>'
+      : '';
+
+    res.innerHTML='<div style="border-radius:10px;padding:11px 13px;margin-top:4px;'
+      +(ok?'background:#F0FDF4;border:1px solid #BBF7D0':'background:#FEF2F2;border:1px solid #FCA5A5')+'">'
+      +'<div style="font-size:13px;font-weight:800;color:'+(ok?'#16A34A':'#B91C1C')+'">'
+      +(ok?'Bateu':(dif>0?'Sobra de '+rs(dif)+' no extrato':'Faltam '+rs(Math.abs(dif))+' no extrato'))+'</div>'
+      +'<div style="font-size:11px;margin-top:3px">Sistema <b>'+rs(d.totalSistema)+'</b> · Extrato <b>'+rs(d.totalExtrato)+'</b></div>'
+      +(d.resumo?'<div style="font-size:11px;color:var(--mu);margin-top:5px">'+d.resumo+'</div>':'')
+      +(d.provavelMotivo&&!ok?'<div style="font-size:11px;color:#B45309;margin-top:4px"><b>Provável motivo:</b> '+d.provavelMotivo+'</div>':'')
+      +lista(d.soNoExtrato,'só no extrato','#B45309')
+      +lista(d.soNoSistema,'só no sistema','#1D4ED8')
+      +'<button class="bsv" style="margin-top:10px;width:100%" onclick="aceitarConf()">Confirmar esta conferência</button>'
+      +'</div>';
+    window._confResultado={forma,sistema:d.totalSistema,extrato:d.totalExtrato,dif,
+      obs:d.resumo||''};
+  }catch(e){
+    res.innerHTML='<div class="wb">Erro: '+e.message+'</div>';
+  }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
+}
+
+function aceitarConf(){
+  const r=window._confResultado; if(!r)return;
+  fcConferencia[r.forma]={sistema:r.sistema,extrato:r.extrato,dif:r.dif,
+    por:U.n,em:Date.now(),obs:r.obs};
+  window._confResultado=null;
+  clsConf();salvarRascunho();rnConferencia();
+  setSy('ok','Conferência de '+r.forma+' registrada — '+horaAgora());
+}
+
+async function marcarConferido(){
+  const t=totaisFech();
+  const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
+  const faltam=formas.filter(f=>!fcConferencia[f]);
+  if(faltam.length){
+    if(!confirm('Ainda não conferiu: '+faltam.join(', ')+'.\n\nMarcar como conferido mesmo assim?'))return;
+  }
+  const dif=formas.reduce((s,f)=>s+Math.abs((fcConferencia[f]||{}).dif||0),0);
+  if(dif>0.01&&!confirm('Há diferenças somando '+rs(dif)+'.\n\nConfirma a conferência assim mesmo?'))return;
+  fcStatus='conferido';
+  salvarRascunho();rnConferencia();
+  setSy('ok','Caixa conferido — '+horaAgora());
 }
 
 // ── PROJEÇÃO DO CICLO ───────────────────────────────────────────────────────
@@ -6672,7 +6915,7 @@ document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Escape'
 const FECHAR_MODAL={
   'om':()=>clsOs(), 'labm':()=>clsLab(), 'rfm':()=>clsRf(), 'hm':()=>clsH(), 'em2':()=>clsEm(),
   'cr-modal':()=>clsNovoCr(), 'cr-baixa-modal':()=>clsCrBaixa(), 'cr-detalhe-modal':()=>clsCrDet(),
-  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>{_entDireta=false;clsEntrega();}, 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'cancm':()=>clsCancOs(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
+  'cr-edit-modal':()=>clsEditCr(), 'ig-modal':()=>clsNovoIG(), 'ped-modal':()=>clsPed(), 'entm':()=>{_entDireta=false;clsEntrega();}, 'pedm':()=>clsPedNum(), 'avm':()=>clsAvulsa(), 'sqm':()=>clsSaldoPago(), 'sobm':()=>clsSaldoObs(), 'cancm':()=>clsCancOs(), 'cfm':()=>clsConf(), 'mtm':()=>clsMetas(), 'usm':()=>clsUsuario(), 'senham':()=>clsMinhaSenha(), 'cr-reneg-modal':()=>clsReneg(), 'pem':()=>clsParcEdit()
 };
 function fecharModalTopo(){
   const abertos=Array.from(document.querySelectorAll('.mb')).filter(m=>m.style.display==='flex');
