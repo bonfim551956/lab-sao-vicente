@@ -14,7 +14,63 @@
 // ============================================================================
 
 const MODELO = 'claude-sonnet-4-6';
-const MAX_EXTRATO = 60000;   // caracteres; extrato maior que isso é cortado
+const MAX_EXTRATO = 60000;    // caracteres por bloco enviado à IA
+const MAX_BLOCOS  = 12;       // até isso, um extrato bem grande cabe
+
+// Extrato grande não cabe numa chamada só. Em vez de cortar e conferir pela
+// metade, dividimos em blocos por linha e somamos os resultados.
+function dividirEmBlocos(texto, tamanho) {
+  const linhas = String(texto).split(/\r?\n/);
+  const blocos = [];
+  let atual = '';
+  for (const l of linhas) {
+    if (atual.length + l.length + 1 > tamanho && atual) {
+      blocos.push(atual);
+      atual = '';
+      if (blocos.length >= MAX_BLOCOS) break;
+    }
+    atual += (atual ? '\n' : '') + l;
+  }
+  if (atual && blocos.length < MAX_BLOCOS) blocos.push(atual);
+  return blocos.length ? blocos : [''];
+}
+
+// Junta o resultado de vários blocos: soma os totais por forma e concatena
+// as listas. O resumo fica com o do último bloco que trouxe algo.
+function juntarResultados(partes) {
+  const porForma = {};
+  const naoIdent = [];
+  const porDia = {};
+  let resumo = '';
+  partes.forEach(p => {
+    (p.formas || []).forEach(f => {
+      const k = f.forma;
+      if (!porForma[k]) porForma[k] = { forma: k, totalExtrato: 0, encontrado: false,
+                                        soNoExtrato: [], soNoSistema: [],
+                                        provavelMotivo: '', resumo: '' };
+      porForma[k].totalExtrato += Number(f.totalExtrato) || 0;
+      if (f.encontrado !== false && (Number(f.totalExtrato) || 0) > 0) porForma[k].encontrado = true;
+      if (f.provavelMotivo && !porForma[k].provavelMotivo) porForma[k].provavelMotivo = f.provavelMotivo;
+      if (f.resumo && !porForma[k].resumo) porForma[k].resumo = f.resumo;
+      (f.soNoExtrato || []).forEach(x => porForma[k].soNoExtrato.push(x));
+      (f.soNoSistema || []).forEach(x => porForma[k].soNoSistema.push(x));
+    });
+    (p.naoIdentificado || []).forEach(x => naoIdent.push(x));
+    (p.porDia || []).forEach(x => {
+      const d = x.data;
+      if (!porDia[d]) porDia[d] = { data: d, sistema: 0, extrato: 0, resumo: x.resumo || '' };
+      porDia[d].sistema = Number(x.sistema) || porDia[d].sistema;
+      porDia[d].extrato += Number(x.extrato) || 0;
+    });
+    if (p.resumoGeral) resumo = p.resumoGeral;
+  });
+  return {
+    formas: Object.values(porForma),
+    naoIdentificado: naoIdent,
+    porDia: Object.values(porDia),
+    resumoGeral: resumo,
+  };
+}
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -119,7 +175,7 @@ async function conciliarTudo({ chave, data, formas, extrato }, res) {
     return res.status(400).json({ erro: 'Cole os extratos ou escolha os arquivos.' });
   }
 
-  const texto = String(extrato).slice(0, MAX_EXTRATO * 2);
+  const partesTexto = dividirEmBlocos(extrato, MAX_EXTRATO);
 
   const blocos = lista.map(f => {
     const linhas = Array.isArray(f.lancamentos) ? f.lancamentos : [];
@@ -128,7 +184,7 @@ async function conciliarTudo({ chave, data, formas, extrato }, res) {
 ${linhas.map(l => `  - OS ${l.os || '-'} | ${l.cliente || '-'} | R$ ${Number(l.valor || 0).toFixed(2)}`).join('\n') || '  (nenhum)'}`;
   }).join('\n\n');
 
-  const prompt =
+  const montarPrompt = (parteTexto, parteInfo) =>
 `Você confere o caixa de uma ótica. Compare o que o sistema registrou, separado por forma
 de pagamento, com os extratos que o operador colou. Os extratos vêm misturados: podem ser
 de maquininha, Asaas, banco ou vários juntos, cada um marcado com o nome do arquivo.
@@ -138,8 +194,8 @@ DATA: ${data || '(não informada)'}
 O QUE O SISTEMA REGISTROU:
 ${blocos}
 
-EXTRATOS COLADOS PELO OPERADOR:
-${texto}
+EXTRATOS COLADOS PELO OPERADOR${parteInfo}:
+${parteTexto}
 
 IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
 com }. Nada antes, nada depois, sem crases, sem markdown, sem explicação.
@@ -168,11 +224,18 @@ Regras:
 - "naoIdentificado" recebe o que existe nos extratos e não se encaixa em nenhuma forma.
 - Considere taxas de maquininha, pagamento que cai no dia seguinte, valor lançado
   trocado e venda não registrada como motivos possíveis.
-- Textos curtos, em português do Brasil.`;
+- Textos curtos, em português do Brasil.
+- Some apenas o que estiver NESTE trecho de extrato.`;
 
   let out;
   try {
-    out = await pedirJSON(chave, prompt, 4000);
+    const partes = [];
+    for (let i = 0; i < partesTexto.length; i++) {
+      const info = partesTexto.length > 1
+        ? ` (parte ${i + 1} de ${partesTexto.length})` : '';
+      partes.push(await pedirJSON(chave, montarPrompt(partesTexto[i], info), 4000));
+    }
+    out = partesTexto.length > 1 ? juntarResultados(partes) : partes[0];
   } catch (e) {
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
@@ -212,7 +275,7 @@ async function conciliarPeriodo({ chave, extrato, dias, periodo }, res) {
     return res.status(400).json({ erro: 'Cole os extratos ou escolha os arquivos.' });
   }
 
-  const texto = String(extrato).slice(0, MAX_EXTRATO * 3);
+  const partesTexto = dividirEmBlocos(extrato, MAX_EXTRATO);
 
   const porForma = {};
   lista.forEach(d => Object.entries(d.formas || {}).forEach(([f, v]) => {
@@ -225,7 +288,7 @@ async function conciliarPeriodo({ chave, extrato, dias, periodo }, res) {
     Object.entries(d.formas || {}).map(([f, v]) => `${f} R$ ${Number(v).toFixed(2)}`).join(', ')
   ).join('\n');
 
-  const prompt =
+  const montarPrompt = (parteTexto, parteInfo) =>
 `Você confere o caixa de uma ótica contra os extratos de um período.
 
 PERÍODO: ${periodo || '(não informado)'}
@@ -236,8 +299,8 @@ ${tabela}
 TOTAIS DO SISTEMA NO PERÍODO (R$ ${totalSistema.toFixed(2)}):
 ${Object.entries(porForma).map(([f, v]) => `  ${f}: R$ ${v.toFixed(2)}`).join('\n')}
 
-EXTRATOS COLADOS PELO OPERADOR:
-${texto}
+EXTRATOS COLADOS PELO OPERADOR${parteInfo}:
+${parteTexto}
 
 IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
 com }. Nada antes, nada depois, sem crases, sem markdown, sem explicação.
@@ -256,11 +319,18 @@ Regras:
   deixe "porDia" vazio e explique isso no "resumoGeral".
 - Considere que o dinheiro do cartão costuma cair dias depois da venda, e que taxas
   reduzem o valor creditado. Aponte isso em "provavelMotivo" quando fizer sentido.
-- Valores em número, ponto decimal, sem "R$". Textos curtos, em português do Brasil.`;
+- Valores em número, ponto decimal, sem "R$". Textos curtos, em português do Brasil.
+- Some apenas o que estiver NESTE trecho de extrato.`;
 
   let out;
   try {
-    out = await pedirJSON(chave, prompt, 6000);
+    const partes = [];
+    for (let i = 0; i < partesTexto.length; i++) {
+      const info = partesTexto.length > 1
+        ? ` (parte ${i + 1} de ${partesTexto.length})` : '';
+      partes.push(await pedirJSON(chave, montarPrompt(partesTexto[i], info), 6000));
+    }
+    out = partesTexto.length > 1 ? juntarResultados(partes) : partes[0];
   } catch (e) {
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
@@ -278,6 +348,7 @@ Regras:
   out.totalSistema = Math.round(totalSistema * 100) / 100;
   out.totalExtrato = Math.round(out.formas.reduce((s, f) => s + f.totalExtrato, 0) * 100) / 100;
   out.diferenca = Math.round((out.totalExtrato - out.totalSistema) * 100) / 100;
+  out.blocos = partesTexto.length;
 
   return res.status(200).json(out);
 }
