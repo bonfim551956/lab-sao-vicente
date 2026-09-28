@@ -3315,10 +3315,8 @@ async function conferirForma(){
   res.innerHTML='<div class="er" style="padding:1rem">A IA está comparando...</div>';
 
   try{
-    const r=await fetch('/api/conciliar',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({forma,data:document.getElementById('fc-data').value,lancamentos:lanc,extrato})});
-    const d=await r.json();
-    if(!r.ok){res.innerHTML='<div class="wb">'+(d.erro||'A conferência falhou.')+'</div>';return;}
+    const d=await chamarConciliar({forma,data:document.getElementById('fc-data').value,
+      lancamentos:lanc,extrato});
 
     const dif=Number(d.diferenca)||0;
     const ok=Math.abs(dif)<0.01;
@@ -3342,7 +3340,7 @@ async function conferirForma(){
     window._confResultado={forma,sistema:d.totalSistema,extrato:d.totalExtrato,dif,
       obs:d.resumo||''};
   }catch(e){
-    res.innerHTML='<div class="wb">Erro: '+e.message+'</div>';
+    res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
@@ -3442,10 +3440,8 @@ async function conferirTudo(){
   res.innerHTML='<div class="er" style="padding:1rem">A IA está separando os extratos por forma de pagamento...</div>';
 
   try{
-    const r=await fetch('/api/conciliar',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({modo:'tudo',data:document.getElementById('fc-data').value,formas,extrato})});
-    const d=await r.json();
-    if(!r.ok){res.innerHTML='<div class="wb">'+(d.erro||'A conferência falhou.')+'</div>';return;}
+    const d=await chamarConciliar({modo:'tudo',
+      data:document.getElementById('fc-data').value,formas,extrato});
 
     const linhas=(d.formas||[]).map(f=>{
       const ok=f.bateu, achou=f.encontrado!==false;
@@ -3476,7 +3472,7 @@ async function conferirTudo(){
       +'<button class="bsv" style="margin-top:10px;width:100%" onclick="aceitarConfTudo()">Confirmar todas as conferências</button></div>';
     window._confTudo=d.formas||[];
   }catch(e){
-    res.innerHTML='<div class="wb">Erro: '+e.message+'</div>';
+    res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
@@ -3499,6 +3495,28 @@ function aceitarConfTudo(){
 // Compara os fechamentos salvos de um intervalo com os extratos do mesmo
 // intervalo. O ganho está em apontar em QUE DIA está a diferença.
 let cpDias=[];
+
+async function chamarConciliar(corpo){
+  const r=await fetch('/api/conciliar',{method:'POST',
+    headers:{'content-type':'application/json'},body:JSON.stringify(corpo)});
+  const txt=await r.text();
+  let d;
+  try{ d=JSON.parse(txt); }
+  catch(e){
+    if(r.status===404){
+      throw new Error('A função de conferência não está publicada nesta loja.\n\n'
+        +'Suba o arquivo api/conciliar.js para o repositório e aguarde o deploy da Vercel.');
+    }
+    throw new Error('O servidor respondeu algo inesperado (status '+r.status+').\n\n'
+      +txt.slice(0,160));
+  }
+  if(!r.ok){
+    // quando a IA responde fora do formato, o servidor manda o começo do texto
+    throw new Error((d.erro||'A conferência falhou.')
+      +(d.bruto?('\n\nA IA respondeu:\n'+d.bruto.slice(0,240)):''));
+  }
+  return d;
+}
 
 function opConfPer(){
   if(!R||!R.cf){alert('Só o supervisor pode conferir o caixa.');return;}
@@ -3570,10 +3588,8 @@ async function conferirPeriodo(){
   res.innerHTML='<div class="er" style="padding:1rem">A IA está comparando '+cpDias.length+' dia(s) com os extratos...</div>';
 
   try{
-    const r=await fetch('/api/conciliar',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({modo:'periodo',periodo:dtBR(ini)+' a '+dtBR(fim),dias:cpDias,extrato})});
-    const d=await r.json();
-    if(!r.ok){res.innerHTML='<div class="wb">'+(d.erro||'A conferência falhou.')+'</div>';return;}
+    const d=await chamarConciliar({modo:'periodo',
+      periodo:dtBR(ini)+' a '+dtBR(fim),dias:cpDias,extrato});
 
     const ok=Math.abs(d.diferenca||0)<0.01;
     const formas=(d.formas||[]).map(f=>{
@@ -3620,7 +3636,7 @@ async function conferirPeriodo(){
       +'<button class="bsv" style="margin-top:10px;width:100%" onclick="salvarConfPer()">Guardar esta conferência</button>';
     window._confPer={ini,fim,d};
   }catch(e){
-    res.innerHTML='<div class="wb">Erro: '+e.message+'</div>';
+    res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
