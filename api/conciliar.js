@@ -184,8 +184,11 @@ Regras:
     porNome[f.forma] = linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
   });
 
+  const conhecidas = Object.keys(porNome);
   out.formas = (out.formas || []).map(f => {
-    const sistema = Math.round((porNome[f.forma] || 0) * 100) / 100;
+    const nome = casarForma(f.forma, conhecidas) || f.forma;
+    f.forma = nome;                       // devolve sempre o nome que o sistema usa
+    const sistema = Math.round((porNome[nome] || 0) * 100) / 100;
     const extratoV = Math.round((Number(f.totalExtrato) || 0) * 100) / 100;
     const dif = Math.round((extratoV - sistema) * 100) / 100;
     return { ...f, totalSistema: sistema, totalExtrato: extratoV, diferenca: dif,
@@ -262,8 +265,11 @@ Regras:
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
 
+  const conhecidasP = Object.keys(porForma);
   out.formas = (out.formas || []).map(f => {
-    const sistema = Math.round((porForma[f.forma] || 0) * 100) / 100;
+    const nome = casarForma(f.forma, conhecidasP) || f.forma;
+    f.forma = nome;
+    const sistema = Math.round((porForma[nome] || 0) * 100) / 100;
     const extratoV = Math.round((Number(f.totalExtrato) || 0) * 100) / 100;
     const dif = Math.round((extratoV - sistema) * 100) / 100;
     return { ...f, totalSistema: sistema, totalExtrato: extratoV, diferenca: dif,
@@ -332,4 +338,17 @@ async function pedirJSON(chave, prompt, maxTokens) {
   err.status = 502;
   err.bruto = txt.slice(0, 500);
   throw err;
+}
+
+// Casa o nome que a IA devolveu com o nome exato que usamos. Sem isto, uma
+// resposta com "Credito" em vez de "Crédito" criava uma forma desconhecida,
+// o total do sistema vinha zero e a conferência nunca batia.
+function casarForma(nome, conhecidas) {
+  if (!nome) return null;
+  const limpa = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+  const alvo = limpa(nome);
+  return conhecidas.find(c => limpa(c) === alvo)
+      || conhecidas.find(c => limpa(c).includes(alvo) || alvo.includes(limpa(c)))
+      || null;
 }
