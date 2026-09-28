@@ -3797,6 +3797,7 @@ async function conferirPeriodo(){
       +(ok?'O período bateu':(d.diferenca>0?'Sobra de '+rs(d.diferenca):'Faltam '+rs(Math.abs(d.diferenca))))+'</div>'
       +'<div style="font-size:11px;margin-top:3px">Sistema <b>'+rs(d.totalSistema)+'</b> · Extratos <b>'+rs(d.totalExtrato)+'</b></div>'
       +(d.resumoGeral?'<div style="font-size:11px;color:var(--mu);margin-top:5px">'+d.resumoGeral+'</div>':'')
+      +(d.blocos>1?'<div style="font-size:10px;color:var(--mu);margin-top:4px">O extrato foi lido em '+d.blocos+' partes por ser longo.</div>':'')
       +'</div>'+formas+dias+naoId
       +'<button class="bsv" style="margin-top:10px;width:100%" onclick="salvarConfPer()">Guardar esta conferência</button>';
     window._confPer={ini,fim,d};
@@ -3805,18 +3806,67 @@ async function conferirPeriodo(){
   }finally{btn.textContent='Conferir com a IA';btn.disabled=false;}
 }
 
+// Guarda a conferência do período E marca os dias envolvidos, para a lista
+// abaixo refletir o que foi conferido. Sem isso, a conferência ficava só
+// numa tabela à parte e os dias continuavam aparecendo como abertos.
 async function salvarConfPer(){
   const c=window._confPer; if(!c)return;
   const reg={id:'cp_'+U.un+'_'+c.ini+'_'+c.fim, unidade:U.un, dt_ini:c.ini, dt_fim:c.fim,
     formas:c.d.formas||[], por_dia:c.d.porDia||[], nao_ident:c.d.naoIdentificado||[],
     resumo:c.d.resumoGeral||null, total_sist:c.d.totalSistema, total_extr:c.d.totalExtrato,
     diferenca:c.d.diferenca, conferido_por:U.n};
+  const btn=document.querySelector('#cpm .bsv');
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;}
+  let dias=0, erro=null;
   try{
     await sbUpsert('conferencia_periodo',reg);
-    window._confPer=null;
-    clsConfPer();
-    setSy('ok','Conferência do período guardada — '+horaAgora());
-  }catch(e){alert('Erro ao salvar: '+e.message);}
+  }catch(e){
+    erro=e.message.includes('conferencia_periodo')
+      ? 'Falta rodar no Supabase o arquivo 29_conferencia_periodo.sql.'
+      : e.message;
+  }
+
+  // marca cada dia do período com o resultado por forma
+  const bateu={};
+  (c.d.formas||[]).forEach(f=>{ if(f.encontrado!==false)bateu[f.forma]=f; });
+  if(Object.keys(bateu).length){
+    for(const dia of cpDias){
+      try{
+        const r=await sbGet('fechamento_caixa','id=eq.'+('fc_'+U.un+'_'+dia.data));
+        const atual=(r&&r[0])?r[0]:null;
+        if(!atual)continue;
+        const conf=(atual.conferencia&&typeof atual.conferencia==='object')?atual.conferencia:{};
+        let mudou=false;
+        Object.keys(dia.formas||{}).forEach(f=>{
+          const res=bateu[f];
+          if(!res||conf[f])return;          // sem dado, ou já conferida antes
+          conf[f]={sistema:num(dia.formas[f]),extrato:num(dia.formas[f]),
+            dif:res.bateu?0:null, por:U.n, em:Date.now(),
+            obs:'Conferido no período '+dtBR(c.ini)+' a '+dtBR(c.fim)
+              +(res.bateu?'':' — período com diferença de '+rs(res.diferenca))};
+          mudou=true;
+        });
+        if(!mudou)continue;
+        const formasDia=Object.keys(dia.formas||{});
+        const todas=formasDia.every(f=>conf[f]);
+        const semDif=formasDia.every(f=>!conf[f]||conf[f].dif===0);
+        const novoStatus=(todas&&semDif&&atual.status==='aberto')?'conferido':(atual.status||'aberto');
+        await sbPatch('fechamento_caixa',
+          {conferencia:conf,status:novoStatus,conferido_por:U.n,conferido_em:Date.now()},
+          {id:'fc_'+U.un+'_'+dia.data});
+        dias++;
+      }catch(e){}
+    }
+  }
+
+  if(btn){btn.textContent='Guardar esta conferência';btn.disabled=false;}
+  window._confPer=null;
+  clsConfPer();
+  if(document.getElementById('cfs').style.display!=='none')rnConfLista();
+  if(fcDiaCarregado){fcDiaCarregado=null;rnFech();}
+  if(erro){alert('A conferência do período não foi guardada na tabela própria:\n\n'+erro
+    +(dias?('\n\nMas os '+dias+' dia(s) foram marcados normalmente.'):''));}
+  else setSy('ok','Período guardado · '+dias+' dia(s) marcado(s) — '+horaAgora());
 }
 
 
