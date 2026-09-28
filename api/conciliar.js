@@ -84,43 +84,12 @@ Regras:
 - Se o extrato não tiver valores reconhecíveis, devolva bateu=false e explique
   em "resumo".`;
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': chave,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    const dados = await r.json();
-    if (!r.ok) {
-      return res.status(502).json({
-        erro: (dados && dados.error && dados.error.message) || 'A IA não respondeu.',
-      });
-    }
-
-    const bruto = (dados.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('')
-      .replace(/```json|```/g, '')
-      .trim();
-
     let resultado;
-    try {
-      resultado = JSON.parse(bruto);
-    } catch (e) {
-      return res.status(502).json({
-        erro: 'A IA respondeu num formato inesperado.',
-        bruto: bruto.slice(0, 400),
-      });
-    }
+  try {
+    resultado = await pedirJSON(chave, prompt, 2000);
+  } catch (e) {
+    return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
+  }
 
     // o total do sistema é nosso, não da IA
     resultado.totalSistema = Math.round(totalSistema * 100) / 100;
@@ -197,42 +166,11 @@ Regras:
   trocado e venda não registrada como motivos possíveis.
 - Textos curtos, em português do Brasil.`;
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': chave,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODELO,
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  const dados = await r.json();
-  if (!r.ok) {
-    return res.status(502).json({
-      erro: (dados && dados.error && dados.error.message) || 'A IA não respondeu.',
-    });
-  }
-
-  const bruto = (dados.content || [])
-    .filter(b => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-    .replace(/```json|```/g, '')
-    .trim();
-
   let out;
   try {
-    out = JSON.parse(bruto);
+    out = await pedirJSON(chave, prompt, 4000);
   } catch (e) {
-    return res.status(502).json({
-      erro: 'A IA respondeu num formato inesperado.',
-      bruto: bruto.slice(0, 400),
-    });
+    return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
 
   // os totais do sistema são nossos, não da IA
@@ -311,42 +249,11 @@ Regras:
   reduzem o valor creditado. Aponte isso em "provavelMotivo" quando fizer sentido.
 - Valores em número, ponto decimal, sem "R$". Textos curtos, em português do Brasil.`;
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': chave,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODELO,
-      max_tokens: 6000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  const dados = await r.json();
-  if (!r.ok) {
-    return res.status(502).json({
-      erro: (dados && dados.error && dados.error.message) || 'A IA não respondeu.',
-    });
-  }
-
-  const bruto = (dados.content || [])
-    .filter(b => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-    .replace(/```json|```/g, '')
-    .trim();
-
   let out;
   try {
-    out = JSON.parse(bruto);
+    out = await pedirJSON(chave, prompt, 6000);
   } catch (e) {
-    return res.status(502).json({
-      erro: 'A IA respondeu num formato inesperado.',
-      bruto: bruto.slice(0, 400),
-    });
+    return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
 
   out.formas = (out.formas || []).map(f => {
@@ -361,4 +268,62 @@ Regras:
   out.diferenca = Math.round((out.totalExtrato - out.totalSistema) * 100) / 100;
 
   return res.status(200).json(out);
+}
+
+// ============================================================================
+// Chama a IA e devolve JSON. Duas defesas contra resposta fora do formato:
+//   1. o turno do assistente já começa com "{", então o modelo continua o JSON
+//   2. se ainda vier texto em volta, recortamos do primeiro { ao último }
+// ============================================================================
+async function pedirJSON(chave, prompt, maxTokens) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': chave,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODELO,
+      max_tokens: maxTokens || 2000,
+      messages: [
+        { role: 'user', content: prompt },
+        { role: 'assistant', content: '{' },   // obriga a resposta a ser JSON
+      ],
+    }),
+  });
+
+  const dados = await r.json();
+  if (!r.ok) {
+    const e = new Error((dados && dados.error && dados.error.message) || 'A IA não respondeu.');
+    e.status = 502;
+    throw e;
+  }
+
+  // 1. junta o texto e tira cercas de markdown, se vierem
+  let txt = (dados.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('')
+    .replace(/```json|```/g, '')
+    .trim();
+
+  // 2. tenta como veio; depois com a chave do prefill na frente;
+  //    por fim, recortando do primeiro { ao último }
+  const tentativas = [txt, '{' + txt];
+  const ini = txt.indexOf('{');
+  const fim = txt.lastIndexOf('}');
+  if (ini >= 0 && fim > ini) tentativas.push(txt.slice(ini, fim + 1));
+
+  for (const t of tentativas) {
+    try { return JSON.parse(t); } catch (e) {}
+  }
+
+  const truncou = dados.stop_reason === 'max_tokens';
+  const err = new Error(truncou
+    ? 'A resposta da IA foi cortada por ser longa demais. Tente um período menor ou um extrato com menos linhas.'
+    : 'A IA respondeu num formato inesperado.');
+  err.status = 502;
+  err.bruto = txt.slice(0, 500);
+  throw err;
 }
