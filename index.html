@@ -719,6 +719,26 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       Verde bateu, âmbar tem diferença, cinza ainda não foi conferida.
       Clique no dia para abri-lo no Fechamento.
     </div>
+    <div class="tw" style="margin-bottom:14px">
+      <div class="th2">
+        <span class="tt">Conferir o dia <span id="cf-dia-rot" style="font-weight:600;color:var(--mu)"></span></span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span id="fc-estado" style="font-size:11px;font-weight:700;padding:5px 11px;border-radius:9px"></span>
+          <button class="bex" onclick="opConfTudo()" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800">Conferir o dia</button>
+          <button class="bex" onclick="opConfPer()" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8;font-weight:800">Conferir período</button>
+          <button class="bex" id="fc-btn-conferido" onclick="marcarConferido()">Marcar como conferido</button>
+          <button class="bex" id="fc-btn-fechar" onclick="fecharCaixa()" style="background:#16A34A;color:#fff;border-color:#16A34A;font-weight:800">Fechar o caixa</button>
+          <button class="bex" id="fc-btn-reabrir" onclick="reabrirCaixa()">Reabrir</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px;font-weight:500">
+        Escolha um dia na lista abaixo e confira uma forma de pagamento por vez, ou use
+        <b>Conferir o dia</b> para colar todos os extratos de uma vez. No dinheiro, informe o
+        valor contado na gaveta.
+      </div>
+      <div id="fc-conf" style="padding:0 10px 10px"></div>
+    </div>
+
     <div class="tw"><div id="cl-body"><div class="er">Carregando...</div></div></div>
   </div>
 
@@ -851,26 +871,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div id="fc-consol"></div>
     </div>
 
-    <!-- Conferência: bater cada forma com o extrato -->
-    <div class="tw" style="margin-top:12px">
-      <div class="th2">
-        <span class="tt">Conferência do caixa</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span id="fc-estado" style="font-size:11px;font-weight:700;padding:5px 11px;border-radius:9px"></span>
-          <button class="bex" onclick="opConfTudo()" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800">Conferir o dia</button>
-          <button class="bex" onclick="opConfPer()" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8;font-weight:800">Conferir período</button>
-          <button class="bex" id="fc-btn-conferido" onclick="marcarConferido()">Marcar como conferido</button>
-          <button class="bex" id="fc-btn-fechar" onclick="fecharCaixa()" style="background:#16A34A;color:#fff;border-color:#16A34A;font-weight:800">Fechar o caixa</button>
-          <button class="bex" id="fc-btn-reabrir" onclick="reabrirCaixa()">Reabrir</button>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px;font-weight:500">
-        Confira uma forma de pagamento por vez. Cole o relatório da maquininha ou do Asaas e
-        clique em Conferir — a inteligência artificial aponta o que bateu e o que sobrou.
-        No dinheiro, informe o valor contado na gaveta.
-      </div>
-      <div id="fc-conf" style="padding:0 10px 10px"></div>
-    </div>
+
     <div class="tw" style="margin-top:12px">
       <div class="th2"><span class="tt">Avaliações Google e observação</span></div>
       <div style="padding:12px;display:grid;grid-template-columns:150px 1fr;gap:12px">
@@ -2220,7 +2221,12 @@ function sw(tab){
   if(tab==='pj')rnProj();
   if(tab==='k'&&_kanPendente)rnKan();
   if(tab==='us')rnUsuarios();
-  if(tab==='cf')rnConfLista();
+  if(tab==='cf'){
+    if(!fcDiaCarregado){const c=document.getElementById('fc-data');
+      if(c){if(!c.value)c.value=hojeBR();rnFech();}}
+    else rnConferencia();
+    rnConfLista();
+  }
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
@@ -3237,6 +3243,8 @@ function rnConferencia(){
   const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
 
   // estado do dia
+  const rot=document.getElementById('cf-dia-rot');
+  if(rot)rot.textContent=fcDiaCarregado?('— '+dtBR(fcDiaCarregado)):'— escolha um dia abaixo';
   const est=document.getElementById('fc-estado');
   const cores={aberto:'background:#FEF3C7;color:#92400E',
                conferido:'background:#EFF6FF;color:#1D4ED8',
@@ -3809,7 +3817,9 @@ async function rnConfLista(){
           <td style="font-weight:800;white-space:nowrap;color:${d.dif>0.01?'#B91C1C':'var(--mu)'}">${d.dif>0.01?rs(d.dif):'—'}</td>
           <td><span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;${cor}">${rot}</span></td>
           <td style="color:var(--mu);font-size:11px">${d.por||'—'}</td>
-          <td><button class="bex" onclick="abrirNoFechamento('${d.data}')">Abrir</button></td>
+          <td style="white-space:nowrap">
+            <button class="bex" style="background:var(--vl);color:var(--v);border-color:#99DDD8;font-weight:700" onclick="conferirDia('${d.data}')">Conferir</button>
+            <button class="bex" style="margin-left:4px" onclick="abrirNoFechamento('${d.data}')">Fechamento</button></td>
         </tr>`;}).join('')}
         <tr style="background:var(--vl)">
           <td style="font-weight:800">TOTAL</td>
@@ -3819,6 +3829,16 @@ async function rnConfLista(){
           <td colspan="3"></td>
         </tr></tbody></table>`;
   }catch(e){b.innerHTML='<div class="er">Erro: '+e.message+'</div>';}
+}
+
+// Carrega o dia escolhido sem sair da aba: o painel de cima passa a ser
+// daquele dia, e a lista continua logo abaixo.
+async function conferirDia(data){
+  const c=document.getElementById('fc-data');
+  if(c){c.value=data;fcDiaCarregado=null;await rnFech();}
+  rnConferencia();
+  const p=document.getElementById('fc-conf');
+  if(p)p.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function abrirNoFechamento(data){
