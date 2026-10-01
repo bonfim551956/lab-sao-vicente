@@ -2783,7 +2783,7 @@ function idFech(d){return 'fc_'+(U.un)+'_'+d;}
 function vendasDoDia(dia){
   // cancelada não entra no faturamento do dia
   return ST.cards.filter(c=>c.dtVenda===dia&&c.col!==COL_CANC).map(c=>({
-    cardId:c.id, os:c.descricao||c.os||'', cliente:c.cliente||'',
+    cardId:c.id, os:c.os||'', descricao:c.descricao||'', cliente:c.cliente||'',
     tipo:c.tipo, valorTotal:num(c.valorVenda),
     forma1:c.formaPag||(num(c.valorVenda)?'':'Garantia'), pago1:num(c.valorRecebido),
     forma2:c.formaPag2||'', pago2:num(c.valorRecebido2),
@@ -3016,7 +3016,7 @@ function rnFechLinhas(){
         +(auto?';background:#FBFDFC':(v._avulsa?';background:#EFF6FF':''))+'">'
       +(auto?'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
              +'<span style="font-size:9px;font-weight:800;color:#0D7A75;letter-spacing:.04em">DO SISTEMA'
-             +(v.cliente?' · '+v.cliente:'')+'</span>'
+             +(v.cliente?' · '+v.cliente:'')+(v.descricao?' · '+v.descricao:'')+'</span>'
              +(podeExcluirFech()?'<button onclick="delVenda('+i+')" title="Remover deste fechamento" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;cursor:pointer">x</button>':'')
              +'</div>'
             :'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
@@ -3200,7 +3200,7 @@ function expFcPDF(){
       const pago=num(v.pago1)+num(v.pago2);
       const saldo=num(v.valorTotal)-pago;
       return `<tr>
-        <td ${td}><b>${v.os||v.descricao||'—'}</b>${saldo>0.001?`<div style="font-size:8px;color:#B45309;font-weight:700">saldo ${rs(saldo)}</div>`:''}</td>
+        <td ${td}><b>${v.os||'—'}</b>${v.descricao?`<div style="font-size:8px;color:#64748B">${v.descricao}</div>`:''}${saldo>0.001?`<div style="font-size:8px;color:#B45309;font-weight:700">saldo ${rs(saldo)}</div>`:''}</td>
         <td ${td}>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}</td>
         <td ${tdN}>${num(v.valorTotal)?rs(v.valorTotal):'—'}</td>
         <td ${tdN}>${pago?rs(pago):'—'}</td></tr>`;}).join('')
@@ -3282,8 +3282,8 @@ function lancamentosDaForma(forma){
   const out=[];
   const F=f=>formaCanon(f)===forma;
   fcVendas.forEach(v=>{
-    if(F(v.forma1)&&num(v.pago1))out.push({os:v.os||v.descricao||'',cliente:v.cliente||'',valor:num(v.pago1)});
-    if(F(v.forma2)&&num(v.pago2))out.push({os:v.os||v.descricao||'',cliente:v.cliente||'',valor:num(v.pago2)});
+    if(F(v.forma1)&&num(v.pago1))out.push({os:v.os||'',cliente:v.cliente||v.descricao||'',valor:num(v.pago1)});
+    if(F(v.forma2)&&num(v.pago2))out.push({os:v.os||'',cliente:v.cliente||v.descricao||'',valor:num(v.pago2)});
   });
   fcEntregas.forEach(e=>{
     if(F(e.forma)&&num(e.valor))out.push({os:e.os||'',cliente:e.cliente||'',valor:num(e.valor)});
