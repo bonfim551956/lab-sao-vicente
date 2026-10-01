@@ -2131,12 +2131,17 @@ async function doLogin(){
   try{
     const cad=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&select=id&limit=1');
     temBanco=!!(cad&&cad.length);
-    const linhas=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&usuario=eq.'+encodeURIComponent(u));
-    const reg=linhas&&linhas[0];
+    // procura o cadastro desta loja; não havendo, aceita um supervisor
+    // marcado como global, que entra em qualquer loja com uma senha só
+    const linhas=await sbGet('usuarios','usuario=eq.'+encodeURIComponent(u));
+    const reg=(linhas||[]).find(x=>x.unidade===UNIDADE)
+           || (linhas||[]).find(x=>x.global&&x.perfil==='supervisor');
     if(reg){
       if(!reg.ativo){erroLogin('Usuário inativo. Fale com o supervisor.');return;}
       if(await conferirSenha(p,reg.salt,reg.senha_hash)){
-        f={u:reg.usuario,n:reg.nome,r:reg.perfil,un:reg.unidade,id:reg.id,tk:reg.senha_hash};
+        // a loja é sempre a do endereço acessado, não a do cadastro:
+        // sem isso o supervisor global entraria e não veria dado nenhum
+        f={u:reg.usuario,n:reg.nome,r:reg.perfil,un:UNIDADE,id:reg.id,tk:reg.senha_hash,gl:!!reg.global};
         sbPatch('usuarios',{ultimo_acesso:new Date().toISOString()},{id:reg.id}).catch(()=>{});
       }
     }
@@ -2574,6 +2579,48 @@ const PERFIS_DESC={
   posvendas:'Cria e entrega garantias e passagens. Vê crediário e saldos.'
 };
 
+// Supervisor global entra em qualquer loja com UM cadastro e UMA senha.
+// Como cada loja tinha o seu, com senha própria, ao liberar precisamos
+// escolher qual sobrevive — e dizer isso com todas as letras.
+async function tgGlobal(id, ligar){
+  if(!R||!R.cd){alert('Só o supervisor pode alterar isto.');return;}
+  try{
+    const r=await sbGet('usuarios','id=eq.'+id);
+    const reg=r&&r[0];
+    if(!reg){alert('Usuário não encontrado.');return;}
+    if(reg.perfil!=='supervisor'){alert('Só o perfil supervisor pode ser global.');return;}
+
+    if(!ligar){
+      if(!confirm('Prender '+reg.nome+' à loja '+reg.unidade+'?\n\n'
+        +'Ele deixa de entrar nas outras lojas.'))return;
+      await sbPatch('usuarios',{global:false},{id});
+      setSy('ok',reg.nome+' agora entra só em '+reg.unidade);
+      rnUsuarios();return;
+    }
+
+    // quantos cadastros esta pessoa tem, e em quais lojas
+    const todos=await sbGet('usuarios','usuario=eq.'+encodeURIComponent(reg.usuario));
+    const outros=(todos||[]).filter(x=>x.id!==id);
+    let aviso='Liberar '+reg.nome+' para entrar em TODAS as lojas?\n\n'
+      +'A senha que passa a valer em todas é a que ele usa hoje em '+reg.unidade+'.';
+    if(outros.length){
+      aviso+='\n\nOs outros '+outros.length+' cadastro(s) dele serão REMOVIDOS: '
+        +outros.map(x=>x.unidade).join(', ')
+        +'.\nAs senhas desses cadastros deixam de funcionar.';
+    }
+    if(!confirm(aviso))return;
+
+    await sbPatch('usuarios',{global:true},{id});
+    for(const o of outros){
+      try{ await sbDelete('usuarios',{id:o.id}); }catch(e){}
+    }
+    setSy('ok',reg.nome+' liberado para todas as lojas — senha de '+reg.unidade);
+    alert(reg.nome+' agora entra em qualquer loja.\n\n'
+      +'A senha é a que ele usava em '+reg.unidade+'.');
+    rnUsuarios();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
 async function rnUsuarios(){
   const body=document.getElementById('us-body');
   const verInativos=document.getElementById('us-inativos').checked;
@@ -2593,7 +2640,8 @@ async function rnUsuarios(){
     </tr></thead><tbody>${lista.map(u=>`<tr${u.ativo?'':' style="background:#FAFAF8;opacity:.7"'}>
       <td style="font-weight:700">${u.nome}${u.usuario===(U&&U.u)?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:var(--vl);color:var(--v);font-weight:800">VOCÊ</span>':''}</td>
       <td style="color:var(--mu)">${u.usuario}</td>
-      <td style="color:var(--tx);font-weight:600">${(RS[u.perfil]||{}).l||u.perfil}</td>
+      <td style="color:var(--tx);font-weight:600">${(RS[u.perfil]||{}).l||u.perfil}
+        ${u.global&&u.perfil==='supervisor'?'<div style="font-size:9px;font-weight:800;color:#5B21B6;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:5px;padding:1px 6px;display:inline-block;margin-top:3px">TODAS AS LOJAS</div>':''}</td>
       <td style="color:var(--mu);font-size:11px;white-space:nowrap">${fmt(u.ultimo_acesso)}</td>
       <td>${u.ativo
         ?'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;background:#F0FDF4;color:#16A34A">ATIVO</span>'
@@ -2601,6 +2649,11 @@ async function rnUsuarios(){
          +'<div style="font-size:9px;color:var(--mu);margin-top:2px">'+fmt(u.desativado_em)+'</div>'}</td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="bex" onclick="opUsuario('${u.id}')">Editar</button>
+        ${u.perfil==='supervisor'&&u.ativo
+          ? (u.global
+             ? '<button class="bex" onclick="tgGlobal(\''+u.id+'\',false)">Prender à loja</button>'
+             : '<button class="bex" style="background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE" onclick="tgGlobal(\''+u.id+'\',true)">Liberar todas as lojas</button>')
+          : ''}
         ${u.ativo
           ? (u.usuario===(U&&U.u) ? '' : '<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="tgAtivo(\''+u.id+'\',false)">Desativar</button>')
           : '<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="tgAtivo(\''+u.id+'\',true)">Reativar</button>'}
@@ -5346,10 +5399,10 @@ function expPrazosPDF(){
 
 // PDF Estoque
 function expListaPedidoPDF(){
-  const itens=Object.values(ST.estoque).filter(i=>i.qty<=3).sort((a,b)=>(a.esf-b.esf)||(a.cil-b.cil));
-  if(!itens.length){alert('Nenhuma lente abaixo de 3 unidades!');return;}
+  const itens=Object.values(ST.estoque).filter(i=>i.qty<EST_MIN).sort((a,b)=>(a.esf-b.esf)||(a.cil-b.cil));
+  if(!itens.length){alert('Nenhuma lente abaixo de '+EST_MIN+' unidades!');return;}
   const zerados=itens.filter(i=>i.qty===0);
-  const baixos=itens.filter(i=>i.qty>0&&i.qty<=3);
+  const baixos=itens.filter(i=>i.qty>0&&i.qty<EST_MIN);
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="kpi-label">Total p/ Pedir</div><div class="kpi-val" style="color:#DC2626">${itens.length}</div></div>
     <div class="kpi"><div class="kpi-label">Zeradas</div><div class="kpi-val" style="color:#DC2626">${zerados.length}</div></div>
@@ -5377,7 +5430,7 @@ function expEstPDF(){
   if(!itens.length){alert('Estoque vazio.');return;}
   const total=itens.reduce((s,i)=>s+i.qty,0);
   const zerados=itens.filter(i=>i.qty===0).length;
-  const baixos=itens.filter(i=>i.qty>0&&i.qty<=3).length;
+  const baixos=itens.filter(i=>i.qty>0&&i.qty<EST_MIN).length;
   const kpis=`<div class="kpis">
     <div class="kpi"><div class="kpi-label">Total lentes</div><div class="kpi-val">${total}</div></div>
     <div class="kpi"><div class="kpi-label">Tipos</div><div class="kpi-val">${itens.length}</div></div>
@@ -5386,8 +5439,8 @@ function expEstPDF(){
   </div>`;
   const tabela=`<table><thead><tr><th>Esférico</th><th>Cilíndrico</th><th>Quantidade</th><th>Status</th></tr></thead>
   <tbody>${itens.map(i=>{
-    const st=i.qty===0?'Zerado':i.qty<=3?'Repor':'OK';
-    const cor=i.qty===0?'#DC2626':i.qty<=3?'#D97706':'#16A34A';
+    const st=i.qty===0?'Zerado':i.qty<EST_MIN?'Repor':'OK';
+    const cor=i.qty===0?'#DC2626':i.qty<EST_MIN?'#D97706':'#16A34A';
     return`<tr><td>${i.esf>=0?'+':''}${Number(i.esf).toFixed(2)}</td><td>${Number(i.cil).toFixed(2)}</td><td><b>${i.qty}</b></td><td style="color:${cor};font-weight:700">${st}</td></tr>`;
   }).join('')}</tbody></table>`;
   abrirPDF('Relatório de Estoque', kpis+tabela);
@@ -7426,10 +7479,16 @@ async function svEst(){
   }
 }
 
+// Faixa ideal do estoque, por loja. Abaixo do mínimo é vermelho (repor),
+// dentro da faixa é verde, acima do máximo é amarelo (excesso).
+// São Vicente e Piracicaba trabalham com 4 a 6; Sorocaba e Campinas, 6 a 12.
+const EST_MIN = 4;
+const EST_MAX = 6;
+
 function cC(q){
   if(q===0)return'background:#FEF2F2;color:#DC2626;font-weight:700;border:2px solid #FCA5A5';
-  if(q<=3)return'background:#FEF2F2;color:#DC2626;font-weight:700';
-  if(q<=6)return'background:#E0F7F6;color:#0D7A75;font-weight:600';
+  if(q<EST_MIN)return'background:#FEF2F2;color:#DC2626;font-weight:700';
+  if(q<=EST_MAX)return'background:#E0F7F6;color:#0D7A75;font-weight:600';
   return'background:#FEF3C7;color:#92400E;font-weight:600';
 }
 
@@ -7481,7 +7540,7 @@ function rnEst(){
   const gQ=(e,c)=>{const k=eK(e,c);return ST.estoque[k]?ST.estoque[k].qty:0;};
   const its=Object.values(ST.estoque);
   const tot=its.reduce((s,v)=>s+v.qty,0);
-  const rep=its.filter(v=>v.qty>0&&v.qty<=3).length;
+  const rep=its.filter(v=>v.qty>0&&v.qty<EST_MIN).length;
   const ze=its.filter(v=>v.qty===0).length;
   document.getElementById('e0').textContent=tot;document.getElementById('e1').textContent=its.length;
   document.getElementById('e2').textContent=rep;document.getElementById('e3').textContent=ze;
@@ -7515,9 +7574,9 @@ function rnEst(){
   const tb=document.getElementById('etb');
   tb.innerHTML=mkT(NEG,'NEGATIVO','#C0392B')+mkT(POS,'POSITIVO','#1BA8A0');
   tb.innerHTML+=`<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.75rem;font-size:11px;color:var(--mu)">
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:3px;display:inline-block"></span>Acima de 6</span>
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#E0F7F6;border-radius:3px;display:inline-block"></span>4 a 6 — ideal</span>
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF2F2;border-radius:3px;display:inline-block"></span>1 a 3 — repor</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:3px;display:inline-block"></span>Acima de ${EST_MAX}</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#E0F7F6;border-radius:3px;display:inline-block"></span>${EST_MIN} a ${EST_MAX} — ideal</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF2F2;border-radius:3px;display:inline-block"></span>1 a ${EST_MIN-1} — repor</span>
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:3px;display:inline-block"></span>Zerado</span>
     <span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:#FDE047;box-shadow:inset 0 0 0 2px #A16207;border-radius:3px;display:inline-block"></span>Selecionada — 1 clique seleciona, 2 cliques lançam quantidade</span>
   </div>`;
@@ -7684,10 +7743,11 @@ document.addEventListener('keydown',e=>{
     const s=JSON.parse(saved);
     if(!s||!s.u)return;
     if(s.tk){
-      const linhas=await sbGet('usuarios','unidade=eq.'+UNIDADE+'&usuario=eq.'+encodeURIComponent(s.u));
-      const reg=linhas&&linhas[0];
+      const linhas=await sbGet('usuarios','usuario=eq.'+encodeURIComponent(s.u));
+      const reg=(linhas||[]).find(x=>x.unidade===UNIDADE)
+             || (linhas||[]).find(x=>x.global&&x.perfil==='supervisor');
       if(!reg||!reg.ativo||reg.senha_hash!==s.tk){localStorage.removeItem('idealize_session');return;}
-      U={u:reg.usuario,n:reg.nome,r:reg.perfil,un:reg.unidade,id:reg.id,tk:reg.senha_hash};
+      U={u:reg.usuario,n:reg.nome,r:reg.perfil,un:UNIDADE,id:reg.id,tk:reg.senha_hash,gl:!!reg.global};
     }else{
       const c=US.find(x=>x.u===s.u);
       if(!c){localStorage.removeItem('idealize_session');return;}
