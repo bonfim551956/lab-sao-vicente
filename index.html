@@ -1142,6 +1142,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
             <div class="mf"><label>Valor</label>
               <input id="frecebido2" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()"/></div>
           </div>
+          <div id="fpag-extras"></div>
+          <button type="button" id="btn-forma3" onclick="addFormaExtra()" class="os-add">+ outra forma de pagamento</button>
         </div>
         <div id="fsaldo-box" class="os-saldo"></div>
         <div class="mf" id="fretirada-wrap" style="display:none">
@@ -1974,6 +1976,7 @@ function mapCard(r){return upCard({
   saldoPagoValor:r.saldo_pago_valor,saldoPagoForma:r.saldo_pago_forma,saldoPagoData:r.saldo_pago_data,
   horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
   valorVenda:r.valor_venda,valorRecebido:r.valor_recebido,valorRecebido2:r.valor_recebido2,
+  pagamentos:Array.isArray(r.pagamentos)?r.pagamentos:null,
   formaPag:r.forma_pag,formaPag2:r.forma_pag2,aReceber:r.a_receber,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
   history:r.history||[],ts:r.ts,tsCreated:r.ts_created
@@ -2094,6 +2097,7 @@ async function saveCard(c){
       valor_recebido:(c.valorRecebido===0||c.valorRecebido)?c.valorRecebido:null,
       valor_recebido2:(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:null,
       forma_pag:c.formaPag||null,forma_pag2:c.formaPag2||null,
+      pagamentos:(Array.isArray(c.pagamentos)&&c.pagamentos.length)?c.pagamentos:null,
       a_receber:(c.aReceber===0||c.aReceber)?c.aReceber:null,
       obs_alert:!!c.obsAlert,pedidos:c.pedidos||[],
       history:c.history||[],ts:c.ts,ts_created:c.tsCreated
@@ -2787,6 +2791,8 @@ function vendasDoDia(dia){
     tipo:c.tipo, valorTotal:num(c.valorVenda),
     forma1:c.formaPag||(num(c.valorVenda)?'':'Garantia'), pago1:num(c.valorRecebido),
     forma2:c.formaPag2||'', pago2:num(c.valorRecebido2),
+    extras:(Array.isArray(c.pagamentos)&&c.pagamentos.length)
+      ? c.pagamentos.map(p=>({forma:p.forma,valor:num(p.valor)})) : null,
     _auto:true
   }));
 }
@@ -3041,7 +3047,8 @@ function rnFechLinhas(){
   document.getElementById('fc-vendas').innerHTML=cab+(!fcVendas.length
     ? '<div class="er" style="padding:1.2rem">Nenhuma venda neste dia.</div>'
     : fcVendas.map((v,i)=>{
-      const pago=num(v.pago1)+num(v.pago2);
+      const ext=Array.isArray(v.extras)?v.extras:[];
+      const pago=num(v.pago1)+num(v.pago2)+ext.reduce((s,p)=>s+num(p.valor),0);
       const saldo=num(v.valorTotal)-pago;
       const mostra2=v._dois||v.forma2||num(v.pago2)>0;
       const auto=!!v._auto;
@@ -3136,9 +3143,14 @@ function totaisFech(){
   const qtd=fcVendas.filter(v=>num(v.valorTotal)>0).length;
   const porForma={};
   const soma=(f,v)=>{if(!f||!v)return;if(f==='Sem saldo'||f==='Garantia')return;porForma[f]=(porForma[f]||0)+v;};
-  fcVendas.forEach(v=>{soma(v.forma1,num(v.pago1));soma(v.forma2,num(v.pago2));});
+  const extrasDe=v=>Array.isArray(v.extras)?v.extras:[];
+  fcVendas.forEach(v=>{
+    soma(v.forma1,num(v.pago1));soma(v.forma2,num(v.pago2));
+    extrasDe(v).forEach(p=>soma(p.forma,num(p.valor)));
+  });
   fcEntregas.forEach(e=>{soma(e.forma,num(e.valor));soma(e.forma2,num(e.valor2));});
-  const recVendas=fcVendas.reduce((s,v)=>s+num(v.pago1)+num(v.pago2),0);
+  const recVendas=fcVendas.reduce((s,v)=>s+num(v.pago1)+num(v.pago2)
+    +extrasDe(v).reduce((x,p)=>x+num(p.valor),0),0);
   const recEntregas=fcEntregas.reduce((s,e)=>s+num(e.valor)+num(e.valor2),0);
   const caixa=Object.values(porForma).reduce((s,v)=>s+v,0);
   return {ranking,qtd,caixa,recVendas,recEntregas,porForma,ticket:qtd?ranking/qtd:0};
@@ -3230,11 +3242,12 @@ function expFcPDF(){
     <thead><tr><th ${cab}>Nº OS / Item</th><th ${cab}>Forma</th>
       <th ${cab} style="text-align:right">Total</th><th ${cab} style="text-align:right">Pago</th></tr></thead>
     <tbody>${fcVendas.map(v=>{
-      const pago=num(v.pago1)+num(v.pago2);
+      const ext=Array.isArray(v.extras)?v.extras:[];
+      const pago=num(v.pago1)+num(v.pago2)+ext.reduce((s,p)=>s+num(p.valor),0);
       const saldo=num(v.valorTotal)-pago;
       return `<tr>
         <td ${td}><b>${v.os||'—'}</b>${v.descricao?`<div style="font-size:8px;color:#64748B">${v.descricao}</div>`:''}${saldo>0.001?`<div style="font-size:8px;color:#B45309;font-weight:700">saldo ${rs(saldo)}</div>`:''}</td>
-        <td ${td}>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}</td>
+        <td ${td}>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}${ext.length?' + '+ext.map(p=>p.forma).join(' + '):''}</td>
         <td ${tdN}>${num(v.valorTotal)?rs(v.valorTotal):'—'}</td>
         <td ${tdN}>${pago?rs(pago):'—'}</td></tr>`;}).join('')
       ||`<tr><td ${td} colspan="4">Nenhuma venda</td></tr>`}</tbody></table>`;
@@ -3317,6 +3330,9 @@ function lancamentosDaForma(forma){
   fcVendas.forEach(v=>{
     if(F(v.forma1)&&num(v.pago1))out.push({os:v.os||'',cliente:v.cliente||v.descricao||'',valor:num(v.pago1)});
     if(F(v.forma2)&&num(v.pago2))out.push({os:v.os||'',cliente:v.cliente||v.descricao||'',valor:num(v.pago2)});
+    (Array.isArray(v.extras)?v.extras:[]).forEach(p=>{
+      if(F(p.forma)&&num(p.valor))out.push({os:v.os||'',cliente:v.cliente||v.descricao||'',valor:num(p.valor)});
+    });
   });
   fcEntregas.forEach(e=>{
     if(F(e.forma)&&num(e.valor))out.push({os:e.os||'',cliente:e.cliente||'',valor:num(e.valor)});
@@ -5825,7 +5841,9 @@ async function rnHist(){
       const fForma=document.getElementById('hs-forma')?.value||'todos';
       if(fForma!=='todos'){
         const formas=[c.entrega_forma||c.entregaForma,c.entrega_forma2||c.entregaForma2,
-                      c.forma_pag||c.formaPag,c.forma_pag2||c.formaPag2].filter(Boolean).map(x=>UP(x));
+                      c.forma_pag||c.formaPag,c.forma_pag2||c.formaPag2]
+          .concat((Array.isArray(c.pagamentos)?c.pagamentos:[]).map(p=>p.forma))
+          .filter(Boolean).map(x=>UP(x));
         if(!formas.includes(UP(fForma)))return false;
       }
       const fSaldo=document.getElementById('hs-saldo')?.value||'todos';
@@ -5855,6 +5873,7 @@ async function rnHist(){
       const atual=selF.value;
       const usadas=new Set();
       (cards||[]).forEach(c=>[c.entrega_forma,c.entrega_forma2,c.forma_pag,c.forma_pag2]
+        .concat((Array.isArray(c.pagamentos)?c.pagamentos:[]).map(p=>p.forma))
         .filter(Boolean).forEach(f=>usadas.add(formaCanon(f))));
       selF.innerHTML='<option value="todos">Todas as formas</option>'
         +FORMAS.filter(f=>usadas.has(f)).map(f=>'<option value="'+f+'">'+f+'</option>').join('');
@@ -6185,10 +6204,79 @@ function pintarValorVenda(){
     : 'Valor da venda <span style="color:var(--re)">*</span>';
 }
 
+
+// ── MAIS DE DUAS FORMAS DE PAGAMENTO ────────────────────────────────────────
+// As duas primeiras continuam nos campos de sempre. Da terceira em diante
+// entram nesta lista, guardada em c.pagamentos. Assim nada do que já existe
+// muda de lugar, e as OS antigas continuam sendo lidas igual.
+let _pagSeq=0;
+
+function addFormaExtra(forma,valor){
+  const cx=document.getElementById('fpag-extras'); if(!cx)return;
+  const id='fpx_'+(++_pagSeq);
+  const div=document.createElement('div');
+  div.className='os-2';
+  div.id=id+'_wrap';
+  div.style.cssText='align-items:flex-end';
+  div.innerHTML='<div class="mf"><label>Forma</label><select id="'+id+'_f"></select></div>'
+    +'<div class="mf"><label>Valor</label>'
+    +'<div style="display:flex;gap:6px">'
+    +'<input id="'+id+'_v" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcSaldo()" style="flex:1"/>'
+    +'<button type="button" onclick="delFormaExtra(\''+id+'\')" title="Remover" '
+    +'style="padding:0 10px;border-radius:8px;border:1.5px solid #FECACA;background:#FEF2F2;'
+    +'color:#B91C1C;font-weight:800;cursor:pointer;font-family:inherit">×</button></div></div>';
+  cx.appendChild(div);
+  opcoesFormas(document.getElementById(id+'_f'));
+  document.getElementById(id+'_f').onchange=calcSaldo;
+  if(forma)document.getElementById(id+'_f').value=forma;
+  if(valor||valor===0)document.getElementById(id+'_v').value=valor;
+  calcSaldo();
+}
+
+function delFormaExtra(id){
+  const el=document.getElementById(id+'_wrap');
+  if(el)el.remove();
+  calcSaldo();
+}
+
+// Lê as formas extras da tela, descartando linhas vazias
+function lerFormasExtras(){
+  const cx=document.getElementById('fpag-extras');
+  if(!cx)return [];
+  return [...cx.querySelectorAll('.os-2')].map(d=>{
+    const f=d.querySelector('select'), v=d.querySelector('input');
+    return {forma:f?f.value:'', valor:num(v?v.value:0)};
+  }).filter(p=>p.forma&&p.valor);
+}
+
+function limparFormasExtras(){
+  const cx=document.getElementById('fpag-extras');
+  if(cx)cx.innerHTML='';
+}
+
+// Soma de tudo que foi recebido, incluindo as formas extras
+function somaRecebido(c){
+  return Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)
+    +(Array.isArray(c.pagamentos)?c.pagamentos.reduce((s,p)=>s+Number(p.valor||0),0):0);
+}
+
+// Todas as formas de uma OS, na ordem em que foram lançadas
+function formasDaOS(c){
+  const out=[];
+  if(c.formaPag&&Number(c.valorRecebido||0))out.push({forma:c.formaPag,valor:Number(c.valorRecebido)});
+  if(c.formaPag2&&Number(c.valorRecebido2||0))out.push({forma:c.formaPag2,valor:Number(c.valorRecebido2)});
+  (Array.isArray(c.pagamentos)?c.pagamentos:[]).forEach(p=>{
+    if(p.forma&&Number(p.valor||0))out.push({forma:p.forma,valor:Number(p.valor)});
+  });
+  return out;
+}
+
 function calcSaldo(){
   pintarValorVenda();
   const venda=num(document.getElementById('fvenda').value);
-  const rec=num(document.getElementById('frecebido').value)+num(document.getElementById('frecebido2').value);
+  const rec=num(document.getElementById('frecebido').value)
+    +num(document.getElementById('frecebido2').value)
+    +lerFormasExtras().reduce((s,p)=>s+p.valor,0);
   // vindo do crediário, a parte parcelada sai da conta do saldo
   const parc=(window._credOrigem&&window._credOrigem.parcelado)||0;
   const saldo=Math.round((venda-rec-parc)*100)/100;
@@ -6323,7 +6411,9 @@ async function devolverAoFechamento(card){
   const linha={cardId:card.id, os:card.os||'', descricao:card.descricao||'',
     cliente:card.cliente||'', tipo:card.tipo,
     valorTotal:card.valorVenda, forma1:card.formaPag||'', pago1:card.valorRecebido,
-    forma2:card.formaPag2||'', pago2:card.valorRecebido2||0, _auto:true};
+    forma2:card.formaPag2||'', pago2:card.valorRecebido2||0,
+    extras:(Array.isArray(card.pagamentos)&&card.pagamentos.length)?card.pagamentos:null,
+    _auto:true};
   const st=(f.status==='fechado'||f.status==='conferido')?'aberto':(f.status||'aberto');
   try{
     await sbPatch('fechamento_caixa',{vendas:[...f.vendas,linha],status:st},{id:idFech(dia)});
@@ -6409,7 +6499,7 @@ function rnNaoRet(){
       const dias=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
       const corD=dias>60?'#B91C1C':dias>30?'#B45309':'var(--mu)';
       const ocs=ocDoCard(c);
-      const rec=Number(c.valorRecebido||0)+Number(c.valorRecebido2||0);
+      const rec=somaRecebido(c);
       const ult=(c.saldoObs&&c.saldoObs.length)?c.saldoObs[c.saldoObs.length-1]:null;
       return `<tr>
       <td style="color:var(--mu);font-size:11px">${i+1}</td>
@@ -7003,6 +7093,7 @@ function opOs(){
   document.getElementById('fforma2-wrap').style.display='block';tgForma2();
   document.getElementById('fsaldo-box').style.display='none';
   document.getElementById('fretirada-wrap').style.display='none';
+  limparFormasExtras();
   aplicarTiposPermitidos();
   rnOculos(1,[{}]);
   tgG('venda');
@@ -7032,7 +7123,7 @@ async function tirarDoFechamento(card, motivo){
   if(vendas.length===f.vendas.length)return;      // não estava lá
 
   const conf={...(f.conferencia&&typeof f.conferencia==='object'?f.conferencia:{})};
-  [card.formaPag,card.formaPag2].filter(Boolean).forEach(fo=>{
+  formasDaOS(card).map(p=>p.forma).forEach(fo=>{
     const k=formaCanon(fo);
     if(conf[k])delete conf[k];
   });
@@ -7094,13 +7185,15 @@ async function sincFechDepoisDeEditar(card, diaAntigo, diffs){
       mexeu=true;
       return {...v, valorTotal:card.valorVenda, pago1:card.valorRecebido,
               forma1:card.formaPag||'', pago2:card.valorRecebido2||0,
-              forma2:card.formaPag2||'', cliente:card.cliente||v.cliente||''};
+              forma2:card.formaPag2||'',
+              extras:(Array.isArray(card.pagamentos)&&card.pagamentos.length)?card.pagamentos:null,
+              cliente:card.cliente||v.cliente||''};
     });
     if(!mexeu)continue;
 
     // a conferência daquela forma deixa de valer: o valor mudou
     const conf={...(f.conferencia&&typeof f.conferencia==='object'?f.conferencia:{})};
-    [card.formaPag,card.formaPag2].filter(Boolean).forEach(fo=>{
+    formasDaOS(card).map(p=>p.forma).forEach(fo=>{
       const k=formaCanon(fo);
       if(conf[k])delete conf[k];
     });
@@ -7130,6 +7223,12 @@ function opEdit(id){
   document.getElementById('fdt').value=c.dtVenda||hojeBR();
   document.getElementById('fprazo').value=c.prazo||'';
   document.getElementById('furgente').checked=!!c.urgente;
+  limparFormasExtras();
+  (Array.isArray(c.pagamentos)?c.pagamentos:[]).forEach(p=>addFormaExtra(p.forma,p.valor));
+  if(Array.isArray(c.pagamentos)&&c.pagamentos.length){
+    document.getElementById('fforma2-wrap').style.display='block';
+    const b=document.getElementById('btn-forma2'); if(b)b.style.display='none';
+  }
   opcoesFormas(document.getElementById('fforma'));
   opcoesFormas(document.getElementById('fforma2'));
   document.getElementById('fvenda').value=(c.valorVenda===0||c.valorVenda)?c.valorVenda:'';
@@ -7231,10 +7330,12 @@ async function svOS(){
   if(valorRecebido2&&!formaPag2){
     alert('Selecione a 2ª forma de pagamento.');document.getElementById('fforma2').focus();return;
   }
+  const pagamentos=lerFormasExtras();
+  const recExtras=pagamentos.reduce((s,p)=>s+p.valor,0);
   // saldo deixa de ser marcado na mão: é o que falta receber.
   // Vindo do crediário, o valor parcelado não entra nessa conta.
   const credParcelado=credOrigem?Number(credOrigem.parcelado||0):0;
-  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2-credParcelado)*100)/100;
+  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2-recExtras-credParcelado)*100)/100;
   const saldo=saldoValor>0.001;
 
   const precisaRet=FIN_RETIRADA.includes(formaPag)||FIN_RETIRADA.includes(formaPag2);
@@ -7252,7 +7353,8 @@ async function svOS(){
     const ce=ST.cards.find(x=>x.id===editId);
     if(ce){
       const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',saldo:'Saldo',valorVenda:'Vl. Venda',valorRecebido:'Vl. Recebido',formaPag:'Forma pag.',aReceber:'A receber',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
-      const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',saldo:saldo?('Sim R$ '+saldoValor.toFixed(2)):'Não',valorVenda,valorRecebido,formaPag,aReceber,obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
+      const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',saldo:saldo?('Sim R$ '+saldoValor.toFixed(2)):'Não',valorVenda,valorRecebido,formaPag,
+        outrasFormas:pagamentos.map(p=>p.forma+' '+p.valor.toFixed(2)).join(' · ')||'—',aReceber,obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
       const ocAntigos=ocDoCard(ce);
       const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim R$ '+Number(ce.saldoValor||0).toFixed(2)):'Não',valorVenda:ce.valorVenda,valorRecebido:ce.valorRecebido,formaPag:ce.formaPag,aReceber:ce.aReceber,obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
@@ -7261,7 +7363,8 @@ async function svOS(){
       if(!await liberaEdicaoDoDia(diaAntigo,diffs))return;
       if(dtVenda!==diaAntigo&&!await liberaEdicaoDoDia(dtVenda,diffs))return;
       if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
-      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=valorRecebido;ce.valorRecebido2=valorRecebido2||null;ce.formaPag=formaPag;ce.formaPag2=formaPag2;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
+      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=valorRecebido;ce.valorRecebido2=valorRecebido2||null;ce.formaPag=formaPag;ce.formaPag2=formaPag2;
+      ce.pagamentos=pagamentos.length?pagamentos:null;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
       ce.pedidos=oculos;
       ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
@@ -7277,7 +7380,8 @@ async function svOS(){
   // Sem lapidação não passa pelo laboratório: nasce já em Pronto.
   // Com lapidação segue o fluxo normal, começando em Venda.
   const colInicial=(tipo==='gar-armacao-sem')?3:0;
-  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,aReceber,obs,respGar,receita,obsTxt,osCompra,
+  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,
+    pagamentos:pagamentos.length?pagamentos:null,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
     credId:credOrigem?credOrigem.id:null,
@@ -7377,8 +7481,8 @@ function rnKan(){
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
       div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
-        ${(c.valorRecebido||c.valorRecebido2)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${(Number(c.valorRecebido||0)+Number(c.valorRecebido2||0)).toFixed(2)}</b></span>`:''}
-        ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${c.formaPag}${c.formaPag2?' + '+c.formaPag2:''}</span>`:''}
+        ${somaRecebido(c)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${somaRecebido(c).toFixed(2)}</b></span>`:''}
+        ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${formasDaOS(c).map(p=>p.forma).join(' + ')||c.formaPag}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?(faltaDoSaldo(c)>0.01
         ? `<div class="cg" style="color:#B45309;font-weight:800;font-size:11px;background:#FFFBEB;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">PAGO PARCIAL · ${rs(c.saldoPagoValor)} em ${dtBR(c.saldoPagoData)}</div>`
         : `<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`):''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">${faltaDoSaldo(c)>0.01&&c.saldoPago?'FALTAM':'SALDO'}${(faltaDoSaldo(c)>0.01&&c.saldoPago)?' · R$ '+faltaDoSaldo(c).toFixed(2):(c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):'')}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
