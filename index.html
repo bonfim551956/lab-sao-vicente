@@ -2806,6 +2806,38 @@ function entregasDoDia(dia){
   return out;
 }
 
+// Saldo recebido ANTES da retirada entra no caixa no dia em que foi pago.
+// O id leva o prefixo 'saldo_' porque a entrega da mesma OS pode cair no
+// mesmo dia — são dois recebimentos distintos e os dois precisam aparecer.
+function saldosAntesDoDia(dia){
+  const out=[];
+  ST.cards.forEach(c=>{
+    if(c.col===COL_CANC)return;
+    if(!c.saldoPago||!num(c.saldoPagoValor))return;
+    if(String(c.saldoPagoData||'').slice(0,10)!==dia)return;
+    out.push({cardId:'saldo_'+c.id, os:c.os||'', cliente:c.cliente||'',
+      dtVenda:c.dtVenda||'', forma:c.saldoPagoForma||'Outro',
+      valor:num(c.saldoPagoValor), forma2:'', valor2:0, _saldoAntes:true});
+  });
+  return out;
+}
+
+// Saldo recebido ANTES da retirada entra no caixa no dia em que foi pago.
+// O id leva o prefixo 'saldo_' porque a entrega da mesma OS pode cair no
+// mesmo dia — são dois recebimentos distintos e os dois precisam aparecer.
+function saldosAntesDoDia(dia){
+  const out=[];
+  ST.cards.forEach(c=>{
+    if(c.col===COL_CANC)return;
+    if(!c.saldoPago||!num(c.saldoPagoValor))return;
+    if(String(c.saldoPagoData||'').slice(0,10)!==dia)return;
+    out.push({cardId:'saldo_'+c.id, os:c.os||'', cliente:c.cliente||'',
+      dtVenda:c.dtVenda||'', forma:c.saldoPagoForma||'Outro',
+      valor:num(c.saldoPagoValor), forma2:'', valor2:0, _saldoAntes:true});
+  });
+  return out;
+}
+
 // junta o que veio do sistema sem repetir o que já está na lista
 async function parcelasAsaasDoDia(dia){
   try{
@@ -2860,7 +2892,8 @@ async function rnFech(){
   const parcAsaas=await parcelasAsaasDoDia(dia);
   fcEntregas=(salvo&&Array.isArray(salvo.entregas))
     ? salvo.entregas
-    : entregasDoDia(dia).concat(parcAsaas).filter(e=>!fcRemovidos.includes(e.cardId));
+    : entregasDoDia(dia).concat(saldosAntesDoDia(dia)).concat(parcAsaas)
+        .filter(e=>!fcRemovidos.includes(e.cardId));
 
   const st=document.getElementById('fc-status');
   st.textContent=salvo?('Fechado por '+(salvo.fechado_por||'—')):'Ainda não fechado';
@@ -2905,7 +2938,7 @@ async function recarregarDoSistema(){
   if(!dia)return;
   const parc=await parcelasAsaasDoDia(dia);
   const v=juntar(fcVendas,vendasDoDia(dia));
-  const e=juntar(fcEntregas,entregasDoDia(dia).concat(parc));
+  const e=juntar(fcEntregas,entregasDoDia(dia).concat(saldosAntesDoDia(dia)).concat(parc));
   fcVendas=v.lista; fcEntregas=e.lista;
   salvarRascunho(); rnFechLinhas();
   alert(v.novos+' venda(s) e '+e.novos+' entrega(s) acrescentadas.\n\n'
@@ -2918,7 +2951,7 @@ async function sincEntregasFech(){
   if(!cam||!cam.value||fcDiaCarregado!==cam.value||fcTravado)return;
   const parc=await parcelasAsaasDoDia(cam.value);
   const v=juntar(fcVendas,vendasDoDia(cam.value));
-  const e=juntar(fcEntregas,entregasDoDia(cam.value).concat(parc));
+  const e=juntar(fcEntregas,entregasDoDia(cam.value).concat(saldosAntesDoDia(cam.value)).concat(parc));
   if(!v.novos&&!e.novos)return;
   fcVendas=v.lista; fcEntregas=e.lista;
   rnFechLinhas();
@@ -3027,7 +3060,7 @@ function rnFechLinhas(){
         ? '<div style="font-size:12px;font-weight:800">'+(v.os||'—')+'</div>'
           +'<div style="font-size:12px;font-weight:700;color:#1D4ED8">'+(num(v.valorTotal)?rs(v.valorTotal):'—')+'</div>'
           +'<div><span style="display:inline-block;font-size:10px;font-weight:800;padding:4px 9px;border-radius:7px;background:var(--bg);color:var(--mu)">'+(v.forma1||'—')+'</span></div>'
-          +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+(pago?rs(pago):'—')+'</div><div></div>'
+          +'<div style="font-size:12px;font-weight:800;color:#16A34A">'+(num(v.pago1)?rs(v.pago1):'—')+'</div><div></div>'
         : '<div>'+inp(v.descricao,"edVenda("+i+",'descricao',this.value)","Óculos de sol, armação...",'v_'+i+'_descricao')+'</div>'
           +'<div>'+inpN(v.valorTotal,"edVenda("+i+",'valorTotal',this.value)",'v_'+i+'_valorTotal')+'</div>'
           +'<div>'+selForma(v.forma1,"edVenda("+i+",'forma1',this.value)",'v_'+i+'_forma1')+'</div>'
@@ -4118,6 +4151,24 @@ let pjDias=[], pjMetas=null;
 
 function idMetas(ciclo){return 'pm_'+U.un+'_'+ciclo;}
 
+// Faixa do ticket médio: abaixo de 450 vermelho, até 700 amarelo,
+// acima disso verde.
+const TM_MIN = 450;
+const TM_BOM = 700;
+
+function corTicket(v){
+  v = Number(v) || 0;
+  if(v < TM_MIN) return '#DC2626';
+  if(v <= TM_BOM) return '#B45309';
+  return '#16A34A';
+}
+function faixaTicket(v){
+  v = Number(v) || 0;
+  return v < TM_MIN ? 'abaixo de '+rs(TM_MIN)
+       : v <= TM_BOM ? 'entre '+rs(TM_MIN)+' e '+rs(TM_BOM)
+       : 'acima de '+rs(TM_BOM);
+}
+
 async function rnProj(){
   const cam=document.getElementById('pj-ciclo');
   if(!cam.value)cam.value=hojeBR().slice(0,7);
@@ -4158,8 +4209,11 @@ async function rnProj(){
     <div class="rs2"><div class="rl">Ranking total</div><div class="rv i">${rs(ranking)}</div></div>
     <div class="rs2"><div class="rl">Caixa total</div><div class="rv v">${rs(caixa)}</div></div>
     <div class="rs2"><div class="rl">Total vendas</div><div class="rv">${vendas}</div></div>
-    <div class="rs2"><div class="rl">Ticket médio vendas</div><div class="rv" style="color:var(--vc)">${rs(tmVendas)}</div></div>
-    <div class="rs2"><div class="rl">Ticket médio diário</div><div class="rv" style="color:var(--vc)">${rs(tmDiario)}</div></div>
+    <div class="rs2"><div class="rl">Ticket médio vendas</div>
+      <div class="rv" style="color:${corTicket(tmVendas)}">${rs(tmVendas)}</div>
+      <div style="font-size:9px;font-weight:700;color:${corTicket(tmVendas)}">${faixaTicket(tmVendas)}</div></div>
+    <div class="rs2"><div class="rl">Ticket médio diário</div>
+      <div class="rv" style="color:var(--vc)">${rs(tmDiario)}</div></div>
     <div class="rs2"><div class="rl">Projeção do mês</div><div class="rv" style="color:#5B21B6">${rs(projecao)}</div></div>
     <div class="rs2"><div class="rl">Dias trabalhados</div><div class="rv">${nTrab} <span style="font-size:12px;color:var(--mu)">de ${dias}</span></div></div>
     <div class="rs2"><div class="rl">Média de vendas/dia</div><div class="rv">${mediaVendas}</div></div>`;
@@ -4200,16 +4254,21 @@ async function rnProj(){
         <td>${rs(rk)}</td>
         <td style="text-align:center">${vd||'—'}</td>
         <td style="font-weight:700;color:#16A34A">${rs(cx)}</td>
-        <td style="font-weight:700;color:var(--vc)">${vd?rs(rk/vd):'—'}</td>
+        <td style="font-weight:800;color:${vd?corTicket(rk/vd):'var(--mu)'}">${vd?rs(rk/vd):'—'}</td>
         <td style="text-align:center;color:var(--mu)">${d.google_avaliacoes||'—'}</td></tr>`;}).join('')}
       <tr style="background:var(--vl)">
         <td style="font-weight:800">TOTAL</td>
         <td style="font-weight:800">${rs(ranking)}</td>
         <td style="font-weight:800;text-align:center">${vendas}</td>
         <td style="font-weight:800;color:var(--v)">${rs(caixa)}</td>
-        <td style="font-weight:800">${vendas?rs(ranking/vendas):'—'}</td>
+        <td style="font-weight:800;color:${vendas?corTicket(ranking/vendas):'var(--mu)'}">${vendas?rs(ranking/vendas):'—'}</td>
         <td style="font-weight:800;text-align:center">${google}</td></tr>
-    </tbody></table>`;
+    </tbody></table>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10px;font-weight:600;color:var(--mu);padding:8px 2px 2px">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#DC2626;margin-right:4px"></span>abaixo de ${rs(TM_MIN)}</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#B45309;margin-right:4px"></span>${rs(TM_MIN)} a ${rs(TM_BOM)}</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16A34A;margin-right:4px"></span>acima de ${rs(TM_BOM)}</span>
+    </div>`;
 }
 
 function opMetas(){
@@ -5800,7 +5859,9 @@ async function rnHist(){
     if(body)body.innerHTML=`<table>
       <thead><tr>
         <th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Dt. Venda</th><th>Prazo</th>
-        <th>Grau OD</th><th>Grau OE</th><th>Lab</th><th>Vl. Recebido</th><th>Forma</th><th>Refeito</th><th>Entregue por</th><th>Data Entrega</th>
+        <th>Grau OD</th><th>Grau OE</th><th>Lab</th>
+        <th>Vl. Venda</th><th>Saldo</th><th>Receb. na retirada</th><th>Forma</th>
+        <th>Refeito</th><th>Entregue por</th><th>Data Entrega</th>
       </tr></thead>
       <tbody>${hsData.map((c,i)=>{
         const dtVenda=c.dt_venda?c.dt_venda.split('-').reverse().join('/'):'—';
@@ -5817,6 +5878,9 @@ async function rnHist(){
           <td style="font-size:11px">${grauOD}</td>
           <td style="font-size:11px">${grauOE}</td>
           <td style="color:var(--mu)">${c.lab||'—'}</td>
+          <td style="font-weight:700;color:${c.valor_venda?'#1D4ED8':'var(--mu)'}">${(c.valor_venda===0||c.valor_venda)?'R$ '+Number(c.valor_venda).toFixed(2):'—'}</td>
+          <td style="font-weight:700;color:${c.saldo_valor?'#B45309':'var(--mu)'}">${c.saldo_valor?'R$ '+Number(c.saldo_valor).toFixed(2):'—'}
+            ${c.saldo_pago?'<div style="font-size:9px;color:#16A34A;font-weight:700">quitado antes</div>':''}</td>
           <td style="font-weight:700;color:${c.entrega_valor?'#16A34A':'var(--mu)'}">${(c.entrega_valor===0||c.entrega_valor)?'R$ '+Number(c.entrega_valor).toFixed(2):'—'}</td>
           <td style="color:var(--mu)">${c.entrega_forma||'—'}</td>
           <td>${c.refeito?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#FEE2E2;color:#DC2626;font-weight:700">Sim</span>':'—'}</td>
@@ -5832,12 +5896,16 @@ async function rnHist(){
 function expHsCSV(){
   if(!hsData.length){alert('Nenhum dado.');return;}
   const fmtDt=ts=>ts?new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';
-  const csv=['OS,Pedido,Tipo,Dt.Venda,Prazo,Grau.OD,Grau.OE,Lab,Vl.Recebido,Forma,Refeito,Entregue Por,Data Entrega',
+  const csv=['OS,Pedido,Tipo,Dt.Venda,Prazo,Grau.OD,Grau.OE,Lab,Vl.Venda,Saldo,Receb.na retirada,Forma,Refeito,Entregue Por,Data Entrega',
     ...hsData.map(c=>[
       c.os,c.ped||'',tGL(c.tipo),c.dt_venda||'',c.prazo||'',
       c.esf_od!=null?c.esf_od+'/'+c.cil_od:'',
       c.esf_oe!=null?c.esf_oe+'/'+c.cil_oe:'',
-      c.lab||'',(c.entrega_valor===0||c.entrega_valor)?c.entrega_valor:'',c.entrega_forma||'',c.refeito?'Sim':'Não',c._entregaPor,fmtDt(c._entregaAt)
+      c.lab||'',
+      (c.valor_venda===0||c.valor_venda)?c.valor_venda:'',
+      c.saldo_valor||'',
+      (c.entrega_valor===0||c.entrega_valor)?c.entrega_valor:'',
+      c.entrega_forma||'',c.refeito?'Sim':'Não',c._entregaPor,fmtDt(c._entregaAt)
     ].join(','))
   ].join('\n');
   const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
@@ -6213,8 +6281,30 @@ async function svCancOs(){
   c.history.push({u:U.n,r:U.r,from:c.col,to:COL_CANC,at:now,mc:false,cancelado:true,motivo:texto});
   c.col=COL_CANC;c.ts=now;
   clsCancOs();atualizarTelas();
-  try{await saveCard(c);setSy('ok','OS cancelada — '+horaAgora());}
-  catch(e){alert('Erro ao salvar: '+e.message);}
+  try{
+    await saveCard(c);
+    await tirarDoFechamento(c,'cancelada');
+    setSy('ok','OS cancelada — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+// Reabrir devolve a OS ao caixa do dia da venda, se houver fechamento salvo
+async function devolverAoFechamento(card){
+  const dia=card&&card.dtVenda;
+  if(!dia)return;
+  const f=await fechamentoDoDia(dia);
+  if(!f||!Array.isArray(f.vendas))return;
+  if(f.vendas.some(v=>v.cardId===card.id))return;      // já está lá
+  const linha={cardId:card.id, os:card.os||'', descricao:card.descricao||'',
+    cliente:card.cliente||'', tipo:card.tipo,
+    valorTotal:card.valorVenda, forma1:card.formaPag||'', pago1:card.valorRecebido,
+    forma2:card.formaPag2||'', pago2:card.valorRecebido2||0, _auto:true};
+  const st=(f.status==='fechado'||f.status==='conferido')?'aberto':(f.status||'aberto');
+  try{
+    await sbPatch('fechamento_caixa',{vendas:[...f.vendas,linha],status:st},{id:idFech(dia)});
+    setSy('ok','Caixa de '+dtBR(dia)+' atualizado — OS reaberta');
+    if(fcDiaCarregado===dia){fcDiaCarregado=null;rnFech();}
+  }catch(e){}
 }
 
 // Volta para o quadro, na coluna Avisado
@@ -6227,10 +6317,14 @@ async function voltarDoArquivo(id,destino){
   if(!c.history)c.history=[];
   c.history.push({u:U.n,r:U.r,from:c.col,to:destino,at:now,mc:false,retomada:true});
   c.col=destino;c.ts=now;
+  const eraCancelada=!!c.canceladoEm;
   c.canceladoEm=null;c.canceladoPor=null;c.canceladoMotivo=null;
   c.naoRetEm=null;c.naoRetPor=null;
   atualizarTelas();
-  try{await saveCard(c);setSy('ok','OS reaberta — '+horaAgora());}
+  try{
+    await saveCard(c);
+    if(eraCancelada)await devolverAoFechamento(c);
+    setSy('ok','OS reaberta — '+horaAgora());}
   catch(e){alert('Erro ao salvar: '+e.message);}
 }
 
@@ -6772,7 +6866,9 @@ async function mvCardExec(id,lab,obsmv){
 
 async function dlCard(id){
   if(!R.cd){alert('Apenas supervisores podem excluir.');return;}
+  const c=ST.cards.find(x=>x.id===id);
   if(!confirm('Excluir esta OS?'))return;
+  if(c)await tirarDoFechamento(c,'excluída');
   ST.cards=ST.cards.filter(x=>x.id!==id);
   rnKan();
   await deleteCard(id);
@@ -6886,6 +6982,115 @@ function opOs(){
   document.getElementById('om').style.display='flex';
 }
 function clsOs(){document.getElementById('om').style.display='none';editId=null;}
+
+// ── OS EDITADA x FECHAMENTO JÁ SALVO ────────────────────────────────────────
+// Editar uma OS de um dia já salvo deixava a OS e o caixa com valores
+// diferentes, em silêncio — foi o que aconteceu na 2291585 de Campinas.
+// Agora o sistema procura o dia, avisa quem precisa saber e corrige a linha.
+
+// Só estes campos mexem no caixa. Mudar cliente ou prazo não exige nada.
+function mudouDinheiro(diffs){
+  const q=['Vl. Venda','Vl. Recebido','Forma pag.','Saldo','Dt. Venda'];
+  return (diffs||[]).some(d=>q.includes(d.campo));
+}
+
+// OS cancelada ou excluída não pode continuar somando no caixa de um dia
+// já salvo. Remove a linha dela e devolve o dia para conferência.
+async function tirarDoFechamento(card, motivo){
+  const dia=card&&card.dtVenda;
+  if(!dia)return;
+  const f=await fechamentoDoDia(dia);
+  if(!f||!Array.isArray(f.vendas))return;
+  const vendas=f.vendas.filter(v=>v.cardId!==card.id);
+  if(vendas.length===f.vendas.length)return;      // não estava lá
+
+  const conf={...(f.conferencia&&typeof f.conferencia==='object'?f.conferencia:{})};
+  [card.formaPag,card.formaPag2].filter(Boolean).forEach(fo=>{
+    const k=formaCanon(fo);
+    if(conf[k])delete conf[k];
+  });
+  const st=(f.status==='fechado'||f.status==='conferido')?'aberto':(f.status||'aberto');
+  try{
+    await sbPatch('fechamento_caixa',{vendas,conferencia:conf,status:st},{id:idFech(dia)});
+    setSy('ok','Caixa de '+dtBR(dia)+' atualizado — OS '+motivo);
+    if(fcDiaCarregado===dia){fcDiaCarregado=null;rnFech();}
+  }catch(e){
+    alert('A OS foi '+motivo+', mas a linha dela continua no caixa de '+dtBR(dia)+'.\n\n'
+      +'Abra o Fechamento daquele dia e remova pelo "x".');
+  }
+}
+
+async function fechamentoDoDia(dia){
+  if(!dia)return null;
+  try{
+    const r=await sbGet('fechamento_caixa','id=eq.'+idFech(dia));
+    return (r&&r[0])||null;
+  }catch(e){ return null; }
+}
+
+// Antes de salvar a edição: se o dia já foi fechado ou conferido, só o
+// supervisor passa — e sabendo o que está fazendo.
+async function liberaEdicaoDoDia(dia, diffs){
+  if(!mudouDinheiro(diffs))return true;
+  const f=await fechamentoDoDia(dia);
+  if(!f)return true;
+  const st=f.status||'aberto';
+  if(st==='aberto')return true;
+  const rot={conferido:'conferido',fechado:'fechado'}[st]||st;
+  if(!R||!R.cf){
+    alert('O caixa de '+dtBR(dia)+' já está '+rot+'.\n\n'
+      +'Só o supervisor pode alterar valores de um dia '+rot+'.');
+    return false;
+  }
+  return confirm('ATENÇÃO: o caixa de '+dtBR(dia)+' já está '+rot+'.\n\n'
+    +'Alterando o valor, o caixa daquele dia muda e a conferência daquela\n'
+    +'forma de pagamento volta a ficar pendente.\n\nConfirma?');
+}
+
+// Depois de salvar: atualiza a linha daquela OS no fechamento salvo.
+// Mexe só na linha vinda do sistema; o que foi lançado à mão fica intacto.
+async function sincFechDepoisDeEditar(card, diaAntigo, diffs){
+  if(!mudouDinheiro(diffs))return;
+  const dias=[...new Set([diaAntigo, card.dtVenda].filter(Boolean))];
+  for(const dia of dias){
+    const f=await fechamentoDoDia(dia);
+    if(!f||!Array.isArray(f.vendas))continue;
+
+    const saiu=(dia!==card.dtVenda);           // a venda mudou de data
+    let mexeu=false;
+    const vendas=f.vendas.filter(v=>{
+      if(v.cardId!==card.id)return true;
+      if(saiu){mexeu=true;return false;}       // sai do dia antigo
+      return true;
+    }).map(v=>{
+      if(v.cardId!==card.id||saiu)return v;
+      mexeu=true;
+      return {...v, valorTotal:card.valorVenda, pago1:card.valorRecebido,
+              forma1:card.formaPag||'', pago2:card.valorRecebido2||0,
+              forma2:card.formaPag2||'', cliente:card.cliente||v.cliente||''};
+    });
+    if(!mexeu)continue;
+
+    // a conferência daquela forma deixa de valer: o valor mudou
+    const conf={...(f.conferencia&&typeof f.conferencia==='object'?f.conferencia:{})};
+    [card.formaPag,card.formaPag2].filter(Boolean).forEach(fo=>{
+      const k=formaCanon(fo);
+      if(conf[k])delete conf[k];
+    });
+    const st=(f.status==='fechado'||f.status==='conferido')?'aberto':(f.status||'aberto');
+
+    try{
+      await sbPatch('fechamento_caixa',
+        {vendas, conferencia:conf, status:st}, {id:idFech(dia)});
+      setSy('ok','Caixa de '+dtBR(dia)+' atualizado — '+horaAgora());
+      if(fcDiaCarregado===dia){fcDiaCarregado=null;rnFech();}
+    }catch(e){
+      alert('A OS foi salva, mas não consegui atualizar o caixa de '+dtBR(dia)+':\n'
+        +e.message+'\n\nAbra o Fechamento daquele dia e confira a linha.');
+    }
+  }
+}
+
 function opEdit(id){
   if(!R||!R.ed){alert('Sem permissão para editar.');return;}
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
@@ -7025,6 +7230,9 @@ async function svOS(){
       const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim R$ '+Number(ce.saldoValor||0).toFixed(2)):'Não',valorVenda:ce.valorVenda,valorRecebido:ce.valorRecebido,formaPag:ce.formaPag,aReceber:ce.aReceber,obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
       const grauMudou=JSON.stringify(ocAntigos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]))!==JSON.stringify(oculos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]));
+      const diaAntigo=ce.dtVenda;
+      if(!await liberaEdicaoDoDia(diaAntigo,diffs))return;
+      if(dtVenda!==diaAntigo&&!await liberaEdicaoDoDia(dtVenda,diffs))return;
       if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
       ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=valorRecebido;ce.valorRecebido2=valorRecebido2||null;ce.formaPag=formaPag;ce.formaPag2=formaPag2;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
@@ -7035,6 +7243,7 @@ async function svOS(){
       ce.history.push({u:U.n,r:U.r,from:ce.col,to:ce.col,at:Date.now(),mc:false,edicao:true,diffs});
       clsOs();rnKan();
       await saveCard(ce);
+      await sincFechDepoisDeEditar(ce,diaAntigo,diffs);
     }
     return;
   }
