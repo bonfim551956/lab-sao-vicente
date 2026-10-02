@@ -4345,12 +4345,24 @@ function quandoEntregue(c){
   return h?h.at:null;
 }
 
+// Quanto já entrou deste saldo: o que foi pago antes da retirada mais o
+// que entrou na entrega.
+function recebidoDoSaldo(c){
+  return Number(c.saldoPagoValor||0)
+       + Number(c.entregaValor||0) + Number(c.entregaValor2||0);
+}
+function faltaDoSaldo(c){
+  return Math.round((Number(c.saldoValor||0)-recebidoDoSaldo(c))*100)/100;
+}
+
 function situacaoSaldo(c){
-  // Só a entrega de verdade (coluna 5) quita o saldo. Não retirado (6) e
-  // cancelada (7) não são entrega: o saldo continua em aberto.
-  if(c.col!==5)return 'aberto';
-  const rec=Number(c.entregaValor||0)+Number(c.entregaValor2||0), dev=Number(c.saldoValor||0);
-  return rec+0.001>=dev ? 'recebido' : 'parcial';
+  // Não retirado (6) e cancelada (7) não são entrega. Mas o saldo pago antes
+  // da retirada conta: o dinheiro entrou, mesmo sem o cliente ter buscado.
+  const dev=Number(c.saldoValor||0);
+  const rec=recebidoDoSaldo(c);
+  if(dev>0&&rec+0.001>=dev)return 'recebido';
+  if(rec>0.001)return 'parcial';
+  return 'aberto';
 }
 
 function rnSaldos(){
@@ -4361,7 +4373,9 @@ function rnSaldos(){
   const tt=document.getElementById('sd-tt'); if(tt)tt.textContent=lbs[perSd];
 
   sdDados=ST.cards.filter(c=>{
-    if(!c.saldo)return false;
+    // teve saldo é o que importa, não se ainda está pendente: quitado
+    // continua na lista, para saber quando e como foi recebido
+    if(!c.saldo&&!(c.saldoPago&&Number(c.saldoValor||0)>0))return false;
     if(c.col===COL_CANC)return false;      // cancelada não se cobra
     if(ini&&(!c.dtVenda||c.dtVenda<ini||c.dtVenda>fim))return false;
     const s=situacaoSaldo(c);
@@ -4374,9 +4388,9 @@ function rnSaldos(){
   const abertos=sdDados.filter(c=>c._sit==='aberto');
   const vlAberto=abertos.reduce((s,c)=>s+Number(c.saldoValor||0),0);
   const recebidos=sdDados.filter(c=>c._sit!=='aberto');
-  const vlRecebido=recebidos.reduce((s,c)=>s+Number(c.entregaValor||0),0);
+  const vlRecebido=recebidos.reduce((s,c)=>s+recebidoDoSaldo(c),0);
   const parciais=sdDados.filter(c=>c._sit==='parcial');
-  const vlFalta=parciais.reduce((s,c)=>s+(Number(c.saldoValor||0)-Number(c.entregaValor||0)),0);
+  const vlFalta=parciais.reduce((s,c)=>s+faltaDoSaldo(c),0);
 
   const kp=document.getElementById('sd-kpis');
   if(kp)kp.innerHTML=`
@@ -4405,9 +4419,16 @@ function rnSaldos(){
       <td style="color:var(--mu)">${c.dtVenda?dtBR(c.dtVenda):'—'}</td>
       <td style="font-weight:800;color:#B45309">R$ ${Number(c.saldoValor||0).toFixed(2)}</td>
       <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;${selo[c._sit]}">${rot[c._sit]}</span></td>
-      <td style="color:var(--mu);white-space:nowrap">${fmtDt(c._ent)}</td>
-      <td style="font-weight:700;color:${c._sit==='aberto'?'var(--mu)':'#16A34A'}">${(c.entregaValor===0||c.entregaValor)?'R$ '+Number(c.entregaValor).toFixed(2):'—'}</td>
-      <td style="color:var(--mu)">${c.entregaForma||'—'}</td>
+      <td style="color:var(--mu);white-space:nowrap">${c._ent?fmtDt(c._ent)
+        :(c.saldoPago&&c.saldoPagoEm?fmtDt(c.saldoPagoEm):'—')}</td>
+      <td style="font-weight:700;color:${c._sit==='aberto'?'var(--mu)':'#16A34A'}">
+        ${recebidoDoSaldo(c)?'R$ '+recebidoDoSaldo(c).toFixed(2):'—'}
+        ${faltaDoSaldo(c)>0.01?`<div style="font-size:9px;color:#B91C1C;font-weight:800">faltam R$ ${faltaDoSaldo(c).toFixed(2)}</div>`:''}</td>
+      <td style="color:var(--mu)">
+        ${c.saldoPago
+          ? `<div style="font-weight:700;color:#16A34A">${c.saldoPagoForma||'—'}</div>
+             <div style="font-size:9px">antes da retirada · ${c.saldoPagoData?dtBR(c.saldoPagoData):'—'}</div>`
+          : (c.entregaForma||'—')}</td>
       <td style="white-space:nowrap">
         ${(c.saldoObs&&c.saldoObs.length)?`<div style="font-size:10px;color:var(--tx);font-weight:600;max-width:190px;overflow:hidden;text-overflow:ellipsis">${c.saldoObs[c.saldoObs.length-1].txt}</div>
            <div style="font-size:9px;color:var(--mu)">${c.saldoObs.length} anotação(ões)</div>`:''}
@@ -6401,7 +6422,7 @@ function rnNaoRet(){
           ${c.valorVenda?`<div>Venda <b style="color:#1D4ED8">${rs(c.valorVenda)}</b></div>`:''}
           ${rec?`<div>Pago <b style="color:#16A34A">${rs(rec)}</b></div>`:''}
           ${c.saldo?`<div style="font-weight:800;color:#B45309">Saldo ${rs(c.saldoValor)}</div>`:''}
-          ${c.saldoPago?`<div style="font-weight:800;color:#16A34A">quitado ${dtBR(c.saldoPagoData)}</div>`:''}</td>
+          ${c.saldoPago?`<div style="font-weight:800;color:#16A34A">recebido ${rs(c.saldoPagoValor)} em ${dtBR(c.saldoPagoData)}</div>`:''}</td>
       <td style="font-weight:800;color:${corD};white-space:nowrap">${dias} dias
           ${c.naoRetPor&&c.naoRetPor.indexOf('Sistema')===0?'<div style="font-size:9px;font-weight:800;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:4px;padding:1px 5px;display:inline-block;margin-top:2px">AUTOMÁTICO</div>':''}
           <div style="font-size:9px;font-weight:600;color:var(--mu)">desde ${fmtDtH(c.naoRetEm)}</div>
@@ -6567,11 +6588,13 @@ async function svSaldoPago(){
   const dev=Number(c.saldoValor||0);
   if(v<dev-0.001){
     if(!confirm('O valor recebido (R$ '+v.toFixed(2)+') é menor que o saldo de R$ '+dev.toFixed(2)+'.\n\n'
-      +'O saldo será considerado quitado mesmo assim. Confirma?'))return;
+      +'Faltarão R$ '+(dev-v).toFixed(2)+', que continuam a receber. Confirma?'))return;
   }
   c.saldoPago=true;c.saldoPagoEm=Date.now();c.saldoPagoPor=U.n;
   c.saldoPagoValor=v;c.saldoPagoForma=forma;c.saldoPagoData=data;
-  c.saldo=false;                 // deixa de aparecer como pendente
+  // Recebeu menos que o devido? A diferença continua a receber. Antes a
+  // pendência inteira era zerada e o que faltava sumia do controle.
+  c.saldo=(v+0.001<dev);
   if(!c.history)c.history=[];
   c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,
     saldoPago:true,valor:v,forma,data});
