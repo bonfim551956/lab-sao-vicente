@@ -155,6 +155,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .bgr{background:#FEF3E2;color:#C05E0A;}
 .bhr{background:#FEF3E2;color:#C05E0A;}
 .bps{background:#EDE9FE;color:#5B21B6;}
+.bct{background:#E0F2FE;color:#0369A1;}
 .tm{font-size:11px;font-weight:700;}
 .tok{color:#16A34A;}.twn{color:#D97706;}.tal{color:#B91C1C;font-weight:800;}
 .cu{font-size:10px;color:var(--mu);margin-top:4px;font-weight:500;}
@@ -1116,7 +1117,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
             <option value="gar-armacao">Garantia — Armação c/ lapidação</option>
             <option value="gar-armacao-sem">Garantia — Armação s/ lapidação</option>
             <option value="gar-pedido">Garantia — Pedido</option>
-            <option value="passagem">Passagem — com lapidação</option>
+            <option value="contato">Venda — Lentes de contato</option>
+<option value="passagem">Passagem — com lapidação</option>
           </select>
         </div>
         <label class="os-chk">
@@ -2273,8 +2275,9 @@ function travarCil(el){
 }
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
-function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação'};return m[t]||t;}
-function tGC(t){if(t==='avulsa')return'bvd';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
+function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação',
+  contato:'Venda — Lentes de contato'};return m[t]||t;}
+function tGC(t){if(t==='avulsa')return'bvd';if(t==='contato')return'bct';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -4607,11 +4610,15 @@ async function svEntrega(){
 // Abre o WhatsApp com a mensagem pronta. Nada e enviado sozinho: quem
 // confirma o envio e o atendente. Para editar o texto, mexa aqui embaixo.
 // No WhatsApp: *negrito*, _itálico_. Juntos ficam *_assim_*
+// Horário da loja. Cada unidade tem o seu — o gerador troca estas duas linhas.
+const HORARIO_SEMANA = '9h às 19h';
+const HORARIO_SABADO = '9h às 15h';
+
 const MSG_PRONTO='Olá, tudo bem?\n'
   +'Somos das Óticas Idealize 🕶️ e venho lhe trazer uma ÓTIMA NOTÍCIA, '
   +'seu óculos da Ordem de Serviço nº {os}{nome} já está pronto! 😉\n\n'
-  +'*_Estamos abertos de segunda a sexta das 9h às 19h, '
-  +'e aos sábados e feriados das 9h às 15h._*';
+  +'*_Estamos abertos de segunda a sexta das '+HORARIO_SEMANA+', '
+  +'e aos sábados e feriados das '+HORARIO_SABADO+'._*';
 
 function mascTel(el){
   let v=el.value.replace(/\D/g,'').slice(0,11);
@@ -4708,8 +4715,11 @@ function lerOculosForm(){
     if(!document.getElementById('fp_'+i))break;
     const g=id=>{const e=document.getElementById(id+'_'+i);return e?e.value:'';};
     const chk=document.getElementById('oh_'+i);
+    const mp=document.getElementById('omp_'+i);
+    const ol=document.getElementById('omplado_'+i);
     out.push({ped:g('fp'),esfOD:g('fod'),cilOD:g('fcd'),esfOE:g('foe'),cilOE:g('fce'),
-              hora:chk?chk.checked:undefined});
+              hora:chk?chk.checked:undefined,
+              meioPar:(mp&&mp.checked)?((ol&&ol.value)||'OD'):null});
   }
   return out;
 }
@@ -4747,6 +4757,16 @@ function rnOculos(n,dados){
         <label>Número do pedido</label>
         <input id="fp_${i}" value="${pedVal}" placeholder="Ex: 115438859"/>
       </div>
+      ${ehHora?`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;border:1.5px dashed #FCD34D;border-radius:9px;background:#FFFBEB">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:#92400E;cursor:pointer" title="O cliente levou só uma lente: o estoque baixa 1 em vez de 2">
+          <input type="checkbox" id="omp_${i}" ${d.meioPar?'checked':''} onchange="edMeioPar(${i},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#B45309"/>
+          MEIO PAR
+        </label>
+        ${d.meioPar?`<select id="omplado_${i}" style="font-family:inherit;font-size:11px;font-weight:700;padding:4px 8px;border-radius:7px;border:1.5px solid #FCD34D;background:var(--bg);color:#92400E">
+          <option value="OD" ${d.meioPar==='OD'?'selected':''}>Só o olho direito</option>
+          <option value="OE" ${d.meioPar==='OE'?'selected':''}>Só o olho esquerdo</option>
+        </select>`:'<span style="font-size:10px;font-weight:600;color:#92400E">marque se o cliente levou só uma lente</span>'}
+      </div>`:''}
       ${grauAqui?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div style="grid-column:1/-1;font-size:10px;font-weight:800;color:#0D7A75;margin-bottom:2px">${ehHora&&!comGrau?'GRAU DA LENTE DO ESTOQUE — usado para dar baixa':'GRAU'}</div>
         <div class="mf" style="margin:0"><label>Esf. OD <span style="color:var(--re)">*</span></label><input id="fod_${i}" value="${v('esfOD')}" type="number" step="0.25" placeholder="Ex: -1.00"/></div>
@@ -4767,6 +4787,11 @@ function addOculos(){if(ocQtd<4)rnOculos(ocQtd+1);}
 function edOculosHora(i,marcado){
   const a=lerOculosForm();
   if(a[i])a[i].hora=marcado;
+  rnOculos(ocQtd,a);
+}
+function edMeioPar(i,marcado){
+  const a=lerOculosForm();
+  if(a[i])a[i].meioPar=marcado?'OD':null;
   rnOculos(ocQtd,a);
 }
 function removerOculos(i){const a=lerOculosForm();a.splice(i,1);rnOculos(ocQtd-1,a);}
@@ -6916,6 +6941,10 @@ function mvCard(id){
   // Se todos saem do estoque, passa direto.
   if(c.col===0&&ocDoCard(c).some(o=>ocPrecisaPedido(c,o))){opPedNum(id);return;}
 
+  // Lente de contato não passa pelo laboratório: não há o que montar.
+  // Do Pedido ela vai direto para Pronto, assim que chega do fornecedor.
+  if(c.col===1&&c.tipo==='contato'){ mvCardExec(id,null,null,3); return; }
+
   // Pedido -> Montagem: escolhe o laboratório e dá baixa no estoque
   if(c.col===1){
     // sem grau não há baixa: exige de quem sai do estoque
@@ -6954,11 +6983,12 @@ async function marcarHoraPronto(id){
   setSy('ok','Óculos de hora marcado como pronto — '+horaAgora());
 }
 
-async function mvCardExec(id,lab,obsmv){
+async function mvCardExec(id,lab,obsmv,destino){
   const c=ST.cards.find(x=>x.id===id);if(!c||!R)return;
   if(lab)c.lab=lab;
   if(obsmv)c.obsmv=obsmv;
-  const from=c.col;c.col=from+1;c.ts=Date.now();
+  // destino existe para quem pula etapa (lente de contato não é montada)
+  const from=c.col;c.col=(destino!=null)?destino:from+1;c.ts=Date.now();
   if(!c.history)c.history=[];
   // "montou" = saiu de Montagem para Pronto
   const mc=from===2;
@@ -6970,9 +7000,12 @@ async function mvCardExec(id,lab,obsmv){
   const ent=(from===4)?{entregaValor:c.entregaValor,entregaForma:c.entregaForma}:{};
   c.history.push({u:U.n,r:U.r,from,to:c.col,at:Date.now(),mc,garantia:isGarMc,passagem:isPassagem,...ent});
   if(baixa){
-    // 1 oculos = 2 lentes (OD + OE). 2 oculos = 4 lentes, e assim por diante.
+    // 1 óculos = 2 lentes (OD + OE). Marcado como MEIO PAR, sai só uma:
+    // o cliente levou uma lente, então o estoque baixa uma.
     const lentes=[];
     ocDoCard(c).filter(o=>ocEhHora(c,o)).forEach(o=>{
+      if(o.meioPar==='OD'){lentes.push([o.esfOD,o.cilOD||0]);return;}
+      if(o.meioPar==='OE'){lentes.push([o.esfOE,o.cilOE||0]);return;}
       lentes.push([o.esfOD,o.cilOD||0]);lentes.push([o.esfOE,o.cilOE||0]);});
     for(const [e,cl] of lentes){
       if(e===null||e===undefined)continue;
@@ -7300,6 +7333,7 @@ async function svOS(){
         +(ehHoraB&&!comGrau?'\n\nEste óculos está marcado como HORA: o grau é o que dá baixa no estoque.':''));return;
     }
     oculos.push({
+      meioPar:b.meioPar||null,
       hora:(b.hora===undefined)?undefined:!!b.hora,
       ped,
       esfOD:b.esfOD!==''&&b.esfOD!=null?parseFloat(b.esfOD):null,
