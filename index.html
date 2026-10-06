@@ -160,6 +160,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cr-aba[aria-pressed="true"]{background:var(--w);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .bacat{background:#EFF6FF;color:#1D4ED8;}
 .bct{background:#E0F2FE;color:#0369A1;}
+.bcor{background:#FDF2F8;color:#9D174D;}
 .tm{font-size:11px;font-weight:700;}
 .tok{color:#16A34A;}.twn{color:#D97706;}.tal{color:#B91C1C;font-weight:800;}
 .cu{font-size:10px;color:var(--mu);margin-top:4px;font-weight:500;}
@@ -1129,6 +1130,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
             <option value="gar-armacao-sem">Garantia — Armação s/ lapidação</option>
             <option value="gar-pedido">Garantia — Pedido</option>
             <option value="contato">Venda — Lentes de contato</option>
+<option value="cortesia-hora">Cortesia — óculos hora</option>
+<option value="cortesia-pedido">Cortesia — óculos pedido</option>
+<option value="cortesia-sol">Cortesia — óculos de sol</option>
 <option value="passagem">Passagem — com lapidação</option>
           </select>
         </div>
@@ -1871,8 +1875,8 @@ const RS={
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
 const CS=['Venda','Pedido','Montagem','Pronto','Avisado'];
-const COM_GRAU=['hora','gar-hora','gar-estoque'];
-const COM_BAIXA=['hora','gar-hora','gar-estoque'];
+const COM_GRAU=['hora','gar-hora','gar-estoque','cortesia-hora'];
+const COM_BAIXA=['hora','gar-hora','gar-estoque','cortesia-hora'];
 
 let U=null,R=null,ST={cards:[],estoque:{}},srch='',per='h',relR=[],filtroUrg=false,filtroAtivo='';
 
@@ -2287,8 +2291,11 @@ function travarCil(el){
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
 function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação',
-  contato:'Venda — Lentes de contato'};return m[t]||t;}
-function tGC(t){if(t==='avulsa')return'bvd';if(t==='contato')return'bct';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
+  contato:'Venda — Lentes de contato',
+  'cortesia-hora':'Cortesia — óculos hora',
+  'cortesia-pedido':'Cortesia — óculos pedido',
+  'cortesia-sol':'Cortesia — óculos de sol'};return m[t]||t;}
+function tGC(t){if(t==='avulsa')return'bvd';if(t==='contato')return'bct';if(String(t).startsWith('cortesia'))return'bcor';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -4710,7 +4717,7 @@ async function avisarWhats(id){
 
 // -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
 let ocQtd=1;
-const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','gar-armacao-sem','hora'];
+const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','gar-armacao-sem','hora','cortesia-hora','cortesia-sol'];
 
 // Lista de oculos de um card (cards antigos, sem "pedidos", viram 1 oculos)
 function ocDoCard(c){
@@ -6288,7 +6295,8 @@ function tgForma2(){
 // Nos demais tipos o valor é obrigatório: é ele que forma o faturamento do dia.
 function vendaOpcional(){
   const t=document.getElementById('ft').value||'';
-  return t.startsWith('gar');
+  // Garantia e cortesia não têm valor a cobrar do cliente.
+  return t.startsWith('gar')||t.startsWith('cortesia');
 }
 function pintarValorVenda(){
   const lb=document.getElementById('fvenda-lb');
@@ -7038,6 +7046,10 @@ function mvCard(id){
   // Venda -> Pedido: pede o número só dos óculos que vão ao fornecedor.
   // Se todos saem do estoque, passa direto.
   if(c.col===0&&ocDoCard(c).some(o=>ocPrecisaPedido(c,o))){opPedNum(id);return;}
+
+  // Óculos de sol não tem lente a pedir nem a montar: da Venda vai direto
+  // para Pronto, pronto para o cliente retirar.
+  if(c.col===0&&c.tipo==='cortesia-sol'){ mvCardExec(id,null,null,3); return; }
 
   // Lente de contato não passa pelo laboratório: não há o que montar.
   // Do Pedido ela vai direto para Pronto, assim que chega do fornecedor.
