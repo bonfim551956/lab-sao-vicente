@@ -155,6 +155,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .bgr{background:#FEF3E2;color:#C05E0A;}
 .bhr{background:#FEF3E2;color:#C05E0A;}
 .bps{background:#EDE9FE;color:#5B21B6;}
+.cr-aba{border:0;background:none;padding:6px 14px;border-radius:8px;font-size:12px;
+  font-weight:700;color:var(--mu);cursor:pointer;font-family:inherit;white-space:nowrap}
+.cr-aba[aria-pressed="true"]{background:var(--w);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.bacat{background:#EFF6FF;color:#1D4ED8;}
 .bct{background:#E0F2FE;color:#0369A1;}
 .tm{font-size:11px;font-weight:700;}
 .tok{color:#16A34A;}.twn{color:#D97706;}.tal{color:#B91C1C;font-weight:800;}
@@ -945,16 +949,23 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   <div id="crs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">Crediário</span>
+      <div style="display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:10px">
+        <button class="cr-aba" id="cr-aba-asaas" aria-pressed="true" onclick="trocarFin('asaas')">ASAAS</button>
+        <button class="cr-aba" id="cr-aba-multicredito" aria-pressed="false" onclick="trocarFin('multicredito')">Multicrediário</button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="pb" id="cr-ph" onclick="setPerCr('h')">Hoje</button>
         <button class="pb" id="cr-ps" onclick="setPerCr('s')">Esta semana</button>
         <button class="pb" id="cr-pm" onclick="setPerCr('m')">Este mês</button>
         <button class="pb active" id="cr-ptd" onclick="setPerCr('td')">Todos</button>
-        <select id="cr-fin" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
-          <option value="todos">Todas as financeiras</option>
-          <option value="multicredito">Multicrédito</option>
-          <option value="asaas">ASAAS</option>
-        </select>
+        <input type="hidden" id="cr-fin" value="asaas"/>
+        <span id="cr-acat-wrap" style="display:none">
+          <select id="cr-acat" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
+            <option value="todos">Acatamento: todos</option>
+            <option value="acatadas">Só com parcela acatada</option>
+            <option value="sem">Sem acatamento</option>
+          </select>
+        </span>
         <select id="cr-venc" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
           <option value="todos">Qualquer vencimento</option>
           <option value="3">Vence em até 3 dias</option>
@@ -5028,12 +5039,30 @@ async function svNovoCr(){
   }
 }
 
+// Troca a aba da financeira. O filtro antigo virou campo escondido, então o
+// resto da tela continua lendo o mesmo lugar de sempre.
+function trocarFin(fin){
+  const campo=document.getElementById('cr-fin');
+  if(campo)campo.value=fin;
+  ['asaas','multicredito'].forEach(f=>{
+    const b=document.getElementById('cr-aba-'+f);
+    if(b)b.setAttribute('aria-pressed', String(f===fin));
+  });
+  // acatamento só existe no Multicrediário
+  const w=document.getElementById('cr-acat-wrap');
+  if(w)w.style.display=(fin==='multicredito')?'inline-block':'none';
+  const s=document.getElementById('cr-acat');
+  if(s&&fin!=='multicredito')s.value='todos';
+  rnCr();
+}
+
 async function rnCr(){
   const un=U&&U.un?U.un:'saovicente';
   const finFiltro=document.getElementById('cr-fin')?.value||'todos';
   const statusFiltro=document.getElementById('cr-status')?.value||'todos';
   const busca=(document.getElementById('cr-busca')?.value||'').toLowerCase();
   const vencFiltro=document.getElementById('cr-venc')?.value||'todos';
+  const acatFiltro=document.getElementById('cr-acat')?.value||'todos';
   // janela de vencimento: de hoje ate hoje + N dias
   const hojeD=hojeBR();
   let limite=null;
@@ -5082,6 +5111,11 @@ async function rnCr(){
     const vlPago=pVivas.filter(p=>p.status==='pago').reduce((s,p)=>s+(p.valor||0),0);
     const vlAberto=pVivas.filter(p=>p.status!=='pago').reduce((s,p)=>s+(p.valor||0),0);
     const atrasados=pVivas.filter(p=>p.status==='atrasado').length;
+    // Acatadas: a financeira assumiu a dívida. É dinheiro garantido que ainda
+    // não caiu — por isso aparece separado do recebido e do em aberto.
+    const ehMultiAba=finFiltro==='multicredito';
+    const acatadas=pVivas.filter(p=>p.acatada&&p.status!=='pago');
+    const vlAcatado=acatadas.reduce((s,p)=>s+(p.valor||0),0);
 
     const kpis=document.getElementById('cr-kpis');
     if(kpis)kpis.innerHTML=`
@@ -5090,6 +5124,7 @@ async function rnCr(){
       <div class="rs2"><div class="rl">Vl. Recebido</div><div class="rv v">R$ ${vlPago.toFixed(2)}</div></div>
       <div class="rs2"><div class="rl">Vl. Em aberto</div><div class="rv d">R$ ${vlAberto.toFixed(2)}</div></div>
       <div class="rs2"><div class="rl">Parc. Atrasadas</div><div class="rv d">${atrasados}</div></div>
+      ${ehMultiAba?`<div class="rs2" style="border-color:#BFDBFE;background:#EFF6FF"><div class="rl" style="color:#1D4ED8">Acatado a receber</div><div class="rv" style="color:#1D4ED8">R$ ${vlAcatado.toFixed(2)}</div><div style="font-size:10px;font-weight:700;color:#1D4ED8">${acatadas.length} parcela${acatadas.length===1?'':'s'}</div></div>`:''}
       ${cancelados.size?`<div class="rs2" style="border-color:#FECACA;background:#FEF2F2"><div class="rl" style="color:#B91C1C">Cancelados</div><div class="rv d">${cancelados.size}</div></div>`:''}`;
 
     // A ENTRADA também vence. Enquanto não for paga, ela conta junto
@@ -5130,6 +5165,10 @@ async function rnCr(){
       const entAtrasada=entradaAberta(c)&&dtEntrada(c)<hojeD;
       if(statusFiltro==='atrasado'&&!cParcs.some(p=>p.status==='atrasado')&&!entAtrasada)return false;
       if(statusFiltro==='aberto'&&!cParcs.some(p=>p.status==='aberto'))return false;
+      // Acatadas: só no Multicrediário, onde a financeira assume a dívida
+      // do cliente que atrasou.
+      if(acatFiltro==='acatadas'&&!cParcs.some(p=>p.acatada))return false;
+      if(acatFiltro==='sem'&&cParcs.some(p=>p.acatada))return false;
       return true;
     });
 
@@ -5232,6 +5271,9 @@ async function opCrDet(cid){
     const stStyle={aberto:'background:#EFF6FF;color:#1D4ED8',atrasado:'background:#FEF2F2;color:#B91C1C',pago:'background:#F0FDF4;color:#16A34A',cancelado:'background:#F1F5F9;color:#64748B',renegociado:'background:#FFFBEB;color:#92400E'};
     const stLabel={aberto:'Em aberto',atrasado:'Atrasado',pago:'Pago',cancelado:'Cancelado',renegociado:'Renegociada'};
     const finLabel={multicredito:'Multicrédito',asaas:'ASAAS'};
+    // O acatamento só existe no Multicrediário: é a financeira assumindo a
+    // dívida do cliente que atrasou. No Asaas não há essa garantia.
+    const ehMulti=String(c.financeira||'').toLowerCase().startsWith('multicred');
 
     document.getElementById('cr-det-body').innerHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:10px">
@@ -5256,9 +5298,13 @@ async function opCrDet(cid){
           :'Em aberto')):'—'}</div></div>
         ${c.valor_entrada&&(!c.entrada_paga||faltaEntradaCred(c)>0.001)&&R&&R.ed?`<div style="grid-column:1/-1"><button onclick="crBaixaEntrada('${c.id}')" style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--v);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar Entrada</button></div>`:''}
       </div>
+      ${(ehMulti&&c.valor_com_juros)?`<div style="padding:10px 12px;margin-bottom:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;font-size:12px;color:#1D4ED8;font-weight:600">
+        Total parcelado com juros da financeira: <b>R$ ${Number(c.valor_com_juros).toFixed(2)}</b>
+        <div style="font-size:11px;font-weight:500;margin-top:2px">É o que o cliente paga à financeira. No caixa entra o valor da venda, R$ ${Number(c.valor_compra||0).toFixed(2)}.</div>
+      </div>`:''}
       <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:8px">Parcelas (${parcs.filter(p=>p.status==='pago').length}/${parcs.filter(p=>p.status!=='renegociado').length} pagas)${c.renegociado?' <span style="font-size:10px;padding:2px 8px;border-radius:5px;background:#FEF3C7;color:#92400E;font-weight:800">CONTRATO RENEGOCIADO</span>':''}</div>
       <table>
-        <thead><tr><th>#</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Pago em</th><th>Por</th>${R&&R.ed?'<th>Ação</th>':''}</tr></thead>
+        <thead><tr><th>#</th><th>Valor</th><th>Vencimento</th><th>Status</th>${ehMulti?'<th>Acatamento</th>':''}<th>Pago em</th><th>Por</th>${R&&R.ed?'<th>Ação</th>':''}</tr></thead>
         <tbody>${parcs.map(p=>{
           const venc=p.dt_vencimento?p.dt_vencimento.split('-').reverse().join('/'):'—';
           const pago=p.dt_pagamento?p.dt_pagamento.split('-').reverse().join('/'):'—';
@@ -5268,9 +5314,14 @@ async function opCrDet(cid){
             <td style="font-weight:700">R$ ${(p.valor||0).toFixed(2)}</td>
             <td style="color:${st==='atrasado'?'#DC2626':'var(--tx)'};font-weight:${st==='atrasado'?'700':'400'}">${venc}</td>
             <td><span style="font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700;${stStyle[st]}">${stLabel[st]}</span></td>
+            ${ehMulti?`<td>${p.acatada
+              ? `<span style="font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700;background:#EFF6FF;color:#1D4ED8">ACATADA ${dtBR(p.dt_acatada)}</span>`
+              : (st==='atrasado'
+                 ? '<span style="font-size:10px;color:var(--mu);font-weight:600">a acatar</span>'
+                 : '<span style="color:var(--mu)">—</span>')}</td>`:''}
             <td style="color:var(--mu)">${pago}</td>
             <td style="color:var(--mu);font-size:11px">${p.baixado_por||'—'}</td>
-            ${R&&R.ed?`<td>${(st!=='pago'&&st!=='renegociado')?`<button onclick="opCrBaixa('${p.id}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid rgba(27,168,160,.3);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar</button>`:''}${(st!=='pago'&&st!=='renegociado')?`<button onclick="opParcEdit('${p.id}')" title="Editar valor ou vencimento" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--mu);cursor:pointer;font-weight:700;margin-left:4px">Editar</button>`:''}${(st==='pago'||st==='renegociado')?'—':''}</td>`:''}
+            ${R&&R.ed?`<td>${(ehMulti&&!p.acatada&&st!=='pago'&&st!=='renegociado')?`<button onclick="acatarParcela('${p.id}')" title="A financeira assumiu esta parcela" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;margin-right:4px">Acatar</button>`:''}${(st!=='pago'&&st!=='renegociado')?`<button onclick="opCrBaixa('${p.id}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid rgba(27,168,160,.3);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar</button>`:''}${(st!=='pago'&&st!=='renegociado')?`<button onclick="opParcEdit('${p.id}')" title="Editar valor ou vencimento" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bo);background:var(--bg);color:var(--mu);cursor:pointer;font-weight:700;margin-left:4px">Editar</button>`:''}${(st==='pago'||st==='renegociado')?'—':''}</td>`:''}
           </tr>`;
         }).join('')}</tbody>
       </table>`;
@@ -5279,6 +5330,22 @@ async function opCrDet(cid){
   }
 }
 function clsCrDet(){document.getElementById('cr-detalhe-modal').style.display='none';}
+
+// Acatar: a financeira aceitou assumir a dívida da parcela atrasada. A partir
+// daqui o dinheiro está garantido — falta só o repasse cair, que é a baixa.
+async function acatarParcela(pid){
+  if(!R||!R.ed){alert('Sem permissão.');return;}
+  const dt=prompt('Data em que a financeira acatou a parcela:', hojeBR());
+  if(!dt)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){alert('Use o formato AAAA-MM-DD.');return;}
+  try{
+    await sbPatch('crediario_parcelas',
+      {acatada:true, dt_acatada:dt, acatada_por:U.n},{id:pid});
+    setSy('ok','Parcela acatada — '+horaAgora());
+    if(window._crDetId)opCrDet(window._crDetId);
+    rnCr();
+  }catch(e){ alert('Não consegui registrar o acatamento: '+e.message); }
+}
 
 function opCrBaixa(pid){
   document.getElementById('cr-detalhe-modal').style.display='none';
@@ -6298,13 +6365,34 @@ function formasDaOS(c){
   return out;
 }
 
+
+// ── ASAAS NÃO É DINHEIRO RECEBIDO ───────────────────────────────────────────
+// No Asaas a loja recebe parcela a parcela, conforme o cliente paga. Lançar
+// o valor como recebido infla o caixa do dia — foi o que aconteceu em
+// Piracicaba nos dias 2 e 3. O valor é financiado: vai para cred_parcelado,
+// que fica fora do caixa e entra a cada baixa.
+//
+// No Multicrediário é o contrário: a financeira garante o pagamento, a loja
+// dá baixa integral na venda e o valor entra no caixa do dia normalmente.
+function ehFinanciado(forma){
+  return String(forma||'').toLowerCase().includes('asaas');
+}
+
+// Quanto desta OS é financiado pelo Asaas (fora do caixa)
+function parteFinanciada(formas){
+  return (formas||[]).reduce((s,p)=>s+(ehFinanciado(p.forma)?Number(p.valor||0):0),0);
+}
+
 function calcSaldo(){
   pintarValorVenda();
   tgRetirada();
   const venda=num(document.getElementById('fvenda').value);
-  const rec=num(document.getElementById('frecebido').value)
-    +num(document.getElementById('frecebido2').value)
-    +lerFormasExtras().reduce((s,p)=>s+p.valor,0);
+  const todasFormas=[
+    {forma:document.getElementById('fforma').value,  valor:num(document.getElementById('frecebido').value)},
+    {forma:document.getElementById('fforma2').value, valor:num(document.getElementById('frecebido2').value)}
+  ].concat(lerFormasExtras());
+  const rec=todasFormas.reduce((s,p)=>s+p.valor,0);
+  const financiado=parteFinanciada(todasFormas);
   // vindo do crediário, a parte parcelada sai da conta do saldo
   const parc=(window._credOrigem&&window._credOrigem.parcelado)||0;
   const saldo=Math.round((venda-rec-parc)*100)/100;
@@ -6315,6 +6403,16 @@ function calcSaldo(){
     box.style.cssText+=';background:#F5F3FF;border:1px solid #DDD6FE;color:#5B21B6';
     box.innerHTML='Parcelado no crediário: <b>R$ '+parc.toFixed(2)+'</b>'
       +(saldo>0.001?(' · saldo da entrada a receber: <b>R$ '+saldo.toFixed(2)+'</b>'):' · entrada quitada');
+    return;
+  }
+  if(financiado>0.001){
+    box.style.display='block';
+    box.style.cssText+=';background:#F5F3FF;border:1px solid #DDD6FE;color:#5B21B6';
+    const naLoja=rec-financiado;
+    box.innerHTML='Financiado no Asaas: <b>R$ '+financiado.toFixed(2)+'</b>'
+      +' — não entra no caixa de hoje, entra a cada parcela.'
+      +(naLoja>0.001?('<br>Entra no caixa agora: <b>R$ '+naLoja.toFixed(2)+'</b>'):'')
+      +(saldo>0.001?('<br>Ainda falta: <b>R$ '+saldo.toFixed(2)+'</b>'):'');
     return;
   }
   if(!venda&&!rec){box.style.display='none';}
@@ -7377,10 +7475,37 @@ async function svOS(){
   }
   const pagamentos=lerFormasExtras();
   const recExtras=pagamentos.reduce((s,p)=>s+p.valor,0);
+
+  // O que for Asaas sai do dinheiro recebido e vira parcelado: a loja ainda
+  // não recebeu, e esse valor entra no caixa só quando a parcela for baixada.
+  const _formasTodas=[{forma:formaPag,valor:valorRecebido},
+                      {forma:formaPag2,valor:valorRecebido2}].concat(pagamentos);
+  const _financiado=parteFinanciada(_formasTodas);
+  if(_financiado>0.001&&!window._credOrigem){
+    if(!confirm('R$ '+_financiado.toFixed(2)+' em Asaas é valor financiado:\n\n'
+      +'ele NÃO entra no caixa de hoje e passa a ser crediário.\n'
+      +'O ideal é criar o contrato na aba Crediário.\n\nContinuar assim mesmo?'))return;
+  }
   // saldo deixa de ser marcado na mão: é o que falta receber.
   // Vindo do crediário, o valor parcelado não entra nessa conta.
   const credParcelado=credOrigem?Number(credOrigem.parcelado||0):0;
-  const saldoValor=Math.round((valorVenda-valorRecebido-valorRecebido2-recExtras-credParcelado)*100)/100;
+  // As formas de Asaas saem do recebido e viram parcelado.
+  let _recebido=valorRecebido, _recebido2=valorRecebido2, _pagamentos=pagamentos;
+  let _formaPag=formaPag, _formaPag2=formaPag2;
+  let _credParc=credParcelado;
+  if(_financiado>0.001){
+    if(ehFinanciado(formaPag)){ _credParc+=valorRecebido; _recebido=0; _formaPag=''; }
+    if(ehFinanciado(formaPag2)){ _credParc+=valorRecebido2; _recebido2=0; _formaPag2=''; }
+    _pagamentos=pagamentos.filter(p=>{
+      if(ehFinanciado(p.forma)){ _credParc+=p.valor; return false; }
+      return true;
+    });
+    // se a 1ª forma virou vazia, a 2ª sobe para o lugar dela
+    if(!_formaPag&&_formaPag2){ _formaPag=_formaPag2; _recebido=_recebido2; _formaPag2=''; _recebido2=0; }
+    if(!_formaPag&&_pagamentos.length){ const p=_pagamentos.shift(); _formaPag=p.forma; _recebido=p.valor; }
+  }
+  const _recExtras=_pagamentos.reduce((s,p)=>s+p.valor,0);
+  const saldoValor=Math.round((valorVenda-_recebido-_recebido2-_recExtras-_credParc)*100)/100;
   const saldo=saldoValor>0.001;
 
   const precisaRet=FIN_RETIRADA.includes(formaPag)||FIN_RETIRADA.includes(formaPag2);
@@ -7408,8 +7533,9 @@ async function svOS(){
       if(!await liberaEdicaoDoDia(diaAntigo,diffs))return;
       if(dtVenda!==diaAntigo&&!await liberaEdicaoDoDia(dtVenda,diffs))return;
       if(grauMudou)diffs.push({campo:'Graus',de:'—',para:oculos.map((o,n)=>'Óculos '+(n+1)+': OD '+fG(o.esfOD,o.cilOD)+' / OE '+fG(o.esfOE,o.cilOE)).join('  |  ')});
-      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=valorRecebido;ce.valorRecebido2=valorRecebido2||null;ce.formaPag=formaPag;ce.formaPag2=formaPag2;
-      ce.pagamentos=pagamentos.length?pagamentos:null;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
+      ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=_recebido;ce.valorRecebido2=_recebido2||null;ce.formaPag=_formaPag;ce.formaPag2=_formaPag2;
+      ce.pagamentos=_pagamentos.length?_pagamentos:null;
+      ce.credParcelado=_credParc||null;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
       ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
       ce.pedidos=oculos;
       ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
@@ -7425,8 +7551,10 @@ async function svOS(){
   // Sem lapidação não passa pelo laboratório: nasce já em Pronto.
   // Com lapidação segue o fluxo normal, começando em Venda.
   const colInicial=(tipo==='gar-armacao-sem')?3:0;
-  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido,valorRecebido2:valorRecebido2||null,formaPag,formaPag2,
-    pagamentos:pagamentos.length?pagamentos:null,aReceber,obs,respGar,receita,obsTxt,osCompra,
+  const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido:_recebido,valorRecebido2:_recebido2||null,
+    formaPag:_formaPag,formaPag2:_formaPag2,
+    pagamentos:_pagamentos.length?_pagamentos:null,
+    credParcelado:_credParc||null,aReceber,obs,respGar,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
     credId:credOrigem?credOrigem.id:null,
