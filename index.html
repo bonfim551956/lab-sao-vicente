@@ -1994,6 +1994,7 @@ function mapCard(r){return upCard({
   horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
   valorVenda:r.valor_venda,valorRecebido:r.valor_recebido,valorRecebido2:r.valor_recebido2,
   pagamentos:Array.isArray(r.pagamentos)?r.pagamentos:null,
+  saldoPagamentos:Array.isArray(r.saldo_pagamentos)?r.saldo_pagamentos:null,
   formaPag:r.forma_pag,formaPag2:r.forma_pag2,aReceber:r.a_receber,
   obsAlert:r.obs_alert,pedidos:r.pedidos||[],
   history:r.history||[],ts:r.ts,tsCreated:r.ts_created
@@ -2115,6 +2116,7 @@ async function saveCard(c){
       valor_recebido2:(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:null,
       forma_pag:c.formaPag||null,forma_pag2:c.formaPag2||null,
       pagamentos:(Array.isArray(c.pagamentos)&&c.pagamentos.length)?c.pagamentos:null,
+      saldo_pagamentos:(Array.isArray(c.saldoPagamentos)&&c.saldoPagamentos.length)?c.saldoPagamentos:null,
       a_receber:(c.aReceber===0||c.aReceber)?c.aReceber:null,
       obs_alert:!!c.obsAlert,pedidos:c.pedidos||[],
       history:c.history||[],ts:c.ts,ts_created:c.tsCreated
@@ -2862,19 +2864,6 @@ function entregasDoDia(dia){
 // Saldo recebido ANTES da retirada entra no caixa no dia em que foi pago.
 // O id leva o prefixo 'saldo_' porque a entrega da mesma OS pode cair no
 // mesmo dia — são dois recebimentos distintos e os dois precisam aparecer.
-function saldosAntesDoDia(dia){
-  const out=[];
-  ST.cards.forEach(c=>{
-    if(c.col===COL_CANC)return;
-    if(!c.saldoPago||!num(c.saldoPagoValor))return;
-    if(String(c.saldoPagoData||'').slice(0,10)!==dia)return;
-    out.push({cardId:'saldo_'+c.id, os:c.os||'', cliente:c.cliente||'',
-      dtVenda:c.dtVenda||'', forma:c.saldoPagoForma||'Outro',
-      valor:num(c.saldoPagoValor), forma2:'', valor2:0, _saldoAntes:true});
-  });
-  return out;
-}
-
 // Saldo recebido ANTES da retirada entra no caixa no dia em que foi pago.
 // O id leva o prefixo 'saldo_' porque a entrega da mesma OS pode cair no
 // mesmo dia — são dois recebimentos distintos e os dois precisam aparecer.
@@ -2882,11 +2871,24 @@ function saldosAntesDoDia(dia){
   const out=[];
   ST.cards.forEach(c=>{
     if(c.col===COL_CANC)return;
-    if(!c.saldoPago||!num(c.saldoPagoValor))return;
-    if(String(c.saldoPagoData||'').slice(0,10)!==dia)return;
-    out.push({cardId:'saldo_'+c.id, os:c.os||'', cliente:c.cliente||'',
-      dtVenda:c.dtVenda||'', forma:c.saldoPagoForma||'Outro',
-      valor:num(c.saldoPagoValor), forma2:'', valor2:0, _saldoAntes:true});
+    if(!c.saldoPago)return;
+
+    // Cada pagamento do saldo entra no caixa do SEU dia. Antes o card
+    // guardava só o último, e um saldo pago em duas vezes lançava o total
+    // na data da segunda — contando o primeiro de novo.
+    const lista=Array.isArray(c.saldoPagamentos)&&c.saldoPagamentos.length
+      ? c.saldoPagamentos
+      : [{valor:num(c.saldoPagoValor), forma:c.saldoPagoForma,
+          data:c.saldoPagoData}];     // contratos antigos: um pagamento só
+
+    lista.forEach((p,i)=>{
+      if(!num(p.valor))return;
+      if(String(p.data||'').slice(0,10)!==dia)return;
+      out.push({cardId:'saldo_'+c.id+(i?('_'+i):''), os:c.os||'',
+        cliente:c.cliente||'', dtVenda:c.dtVenda||'',
+        forma:p.forma||'Outro', valor:num(p.valor),
+        forma2:'', valor2:0, _saldoAntes:true});
+    });
   });
   return out;
 }
@@ -4384,6 +4386,18 @@ function opcoesFormas(sel,vazio){
     +FORMAS.map(f=>'<option value="'+f+'">'+f+'</option>').join('');
 }
 
+// Nos recebimentos — entrega e saldo — as financeiras não aparecem: ali só
+// entra dinheiro que o cliente pagou de fato. Elas seguem no formulário da
+// venda, onde quem manda é o contrato do crediário.
+function opcoesFormasRecebimento(sel,vazio){
+  if(!sel)return;
+  const atual=sel.value;
+  sel.innerHTML='<option value="">'+(vazio||'Selecione...')+'</option>'
+    +FORMAS.filter(f=>!/asaas|multicred/i.test(f))
+           .map(f=>'<option value="'+f+'">'+f+'</option>').join('');
+  if(atual&&!/asaas|multicred/i.test(atual))sel.value=atual;
+}
+
 // -- SALDOS A RECEBER ------------------------------------------------------
 // Lista as OS marcadas com saldo. Enquanto nao entrega, esta em aberto.
 // Na entrega, mostra quando foi, quanto entrou e por qual forma.
@@ -4577,8 +4591,8 @@ function opEntrega(id){
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   document.getElementById('ent-id').value=id;
   document.getElementById('ent-tit').textContent='Confirmar entrega — '+(c.os||'');
-  opcoesFormas(document.getElementById('ent-forma'));
-  opcoesFormas(document.getElementById('ent-forma2'));
+  opcoesFormasRecebimento(document.getElementById('ent-forma'));
+  opcoesFormasRecebimento(document.getElementById('ent-forma2'));
   const av=document.getElementById('ent-saldo');
   if(c.saldo){
     av.style.display='block';
@@ -4618,6 +4632,17 @@ async function svEntrega(){
     if(isNaN(valor2)||valor2<=0){alert('Informe o valor da 2ª forma.');document.getElementById('ent-valor2').focus();return;}
     if(!forma2){alert('Selecione a 2ª forma de pagamento.');document.getElementById('ent-forma2').focus();return;}
   }
+  // Asaas e Multicrediário são financiamento, não dinheiro na gaveta.
+  // Na retirada só entra o que o cliente pagou de fato.
+  const _finEnt=[[forma,valor],[forma2,dois?valor2:0]]
+    .filter(([f,x])=>x>0&&/asaas|multicred/i.test(String(f||'')));
+  if(_finEnt.length){
+    alert('"'+_finEnt[0][0]+'" é financiamento, não entra como recebido na retirada.\n\n'
+      +'Se o cliente parcelou, registre pelo contrato na aba Crediário.\n'
+      +'Se não há nada a receber agora, escolha "Sem saldo".');
+    return;
+  }
+
   const total=valor+(valor2||0);
   if(total===0&&forma!=='Sem saldo'){
     if(!confirm('Valor recebido está zerado.\nSe não há nada a receber, escolha "Sem saldo".\n\nConfirma mesmo assim?'))return;
@@ -6841,11 +6866,17 @@ function opSaldoPago(id){
   if(!R||!R.ed){alert('Sem permissão para receber saldo.');return;}
   document.getElementById('sq-id').value=id;
   document.getElementById('sq-tit').textContent='Receber saldo — OS '+(c.os||'');
+  const _jaPago=Number(c.saldoPagoValor||0);
+  const _falta=Math.round((Number(c.saldoValor||0)-_jaPago)*100)/100;
   document.getElementById('sq-info').textContent=
-    'Saldo em aberto: R$ '+Number(c.saldoValor||0).toFixed(2)
+    (_jaPago>0.001
+      ? ('Saldo R$ '+Number(c.saldoValor||0).toFixed(2)
+         +'  ·  já recebido R$ '+_jaPago.toFixed(2)
+         +'  ·  faltam R$ '+_falta.toFixed(2))
+      : ('Saldo em aberto: R$ '+Number(c.saldoValor||0).toFixed(2)))
     +(c.cliente?('  ·  '+c.cliente):'');
-  document.getElementById('sq-valor').value=c.saldoValor||'';
-  opcoesFormas(document.getElementById('sq-forma'));
+  document.getElementById('sq-valor').value=(_falta>0.001?_falta:Number(c.saldoValor||0))||'';
+  opcoesFormasRecebimento(document.getElementById('sq-forma'));
   document.getElementById('sq-forma').value='';
   document.getElementById('sq-data').value=hojeBR();
   document.getElementById('sqm').style.display='flex';
@@ -6863,15 +6894,23 @@ async function svSaldoPago(){
   if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('sq-forma').focus();return;}
   if(!data){alert('Informe a data do recebimento.');return;}
   const dev=Number(c.saldoValor||0);
-  if(v<dev-0.001){
-    if(!confirm('O valor recebido (R$ '+v.toFixed(2)+') é menor que o saldo de R$ '+dev.toFixed(2)+'.\n\n'
-      +'Faltarão R$ '+(dev-v).toFixed(2)+', que continuam a receber. Confirma?'))return;
+  const jaPago=Number(c.saldoPagoValor||0);
+  const faltava=Math.round((dev-jaPago)*100)/100;
+  if(v<faltava-0.001){
+    if(!confirm('O valor recebido (R$ '+v.toFixed(2)+') é menor que o que falta, '
+      +'R$ '+faltava.toFixed(2)+'.\n\n'
+      +'Sobrarão R$ '+(faltava-v).toFixed(2)+' a receber. Confirma?'))return;
   }
+
+  // O saldo pode ser pago em várias vezes. Cada recebimento SOMA ao que já
+  // foi pago, em vez de substituir — antes o segundo apagava o primeiro.
+  const totalPago=Math.round((jaPago+v)*100)/100;
   c.saldoPago=true;c.saldoPagoEm=Date.now();c.saldoPagoPor=U.n;
-  c.saldoPagoValor=v;c.saldoPagoForma=forma;c.saldoPagoData=data;
-  // Recebeu menos que o devido? A diferença continua a receber. Antes a
-  // pendência inteira era zerada e o que faltava sumia do controle.
-  c.saldo=(v+0.001<dev);
+  c.saldoPagoValor=totalPago;c.saldoPagoForma=forma;c.saldoPagoData=data;
+  // Cada parcela do saldo fica registrada, com valor, forma e data
+  if(!Array.isArray(c.saldoPagamentos))c.saldoPagamentos=[];
+  c.saldoPagamentos.push({valor:v,forma,data,por:U.n});
+  c.saldo=(totalPago+0.001<dev);
   if(!c.history)c.history=[];
   c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,
     saldoPago:true,valor:v,forma,data});
