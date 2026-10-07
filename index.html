@@ -2446,10 +2446,34 @@ function criarOsDoCrediario(){
   if(c.telefone)document.getElementById('ftel').value=c.telefone;
   document.getElementById('fdt').value=dataPagamentoCred(c,d.parcs);
   document.getElementById('fvenda').value=total.toFixed(2);
+  // As duas financeiras nascem do contrato, mas o dinheiro se comporta
+  // diferente:
+  //   ASAAS          a loja recebe só a entrada hoje; o parcelado entra a
+  //                  cada baixa. Por isso só a entrada vai para o caixa.
+  //   MULTICREDIÁRIO a financeira garante o pagamento, então a loja dá baixa
+  //                  integral: entrada pela forma usada + resto como
+  //                  Multicrediário, somando o valor da venda no caixa.
+  const ehMultiCred=String(c.financeira||'').toLowerCase().startsWith('multicred');
+  const formaEntrada=c.entrada_forma||'';
+
   document.getElementById('frecebido').value=pago||'';
-  document.getElementById('fforma').value=(c.financeira==='asaas')?'Asaas':'Multicrediário';
+  document.getElementById('fforma').value=
+    ehMultiCred ? (formaEntrada||'Dinheiro') : (formaEntrada||'Asaas');
+
+  if(ehMultiCred){
+    // o que a financeira cobre entra agora, como 2ª forma
+    const pelaFinanceira=Math.round((total-pago)*100)/100;
+    if(pelaFinanceira>0.001){
+      const w=document.getElementById('fforma2-wrap');
+      if(w)w.style.display='block';
+      const b=document.getElementById('btn-forma2');
+      if(b)b.style.display='none';
+      document.getElementById('fforma2').value='Multicrediário';
+      document.getElementById('frecebido2').value=pelaFinanceira.toFixed(2);
+    }
+  }
   tgRetirada();
-  document.getElementById('fretirada').value=falta.toFixed(2);
+  document.getElementById('fretirada').value=(ehMultiCred?0:falta).toFixed(2);
   calcSaldo();
 
   // um aviso no alto do formulário, para ninguém preencher pagamento de novo
@@ -3255,10 +3279,10 @@ function expFcPDF(){
   const google=document.getElementById('fc-google').value||'—';
   const obs=document.getElementById('fc-obs').value||'';
 
-  const cab='style="font-size:7.5px;font-weight:800;color:#fff;background:#0F1923;'
-    +'text-align:left;padding:2px 4px;text-transform:uppercase;letter-spacing:.03em"';
-  const td='style="padding:1.5px 4px;border-bottom:1px solid #E2E8F0;font-size:8px;line-height:1.25"';
-  const tdN='style="padding:1.5px 4px;border-bottom:1px solid #E2E8F0;font-size:8px;text-align:right;white-space:nowrap;line-height:1.25"';
+  const cab='style="font-size:9px;font-weight:800;color:#fff;background:#0F1923;'
+    +'text-align:left;padding:3px 5px;text-transform:uppercase;letter-spacing:.03em"';
+  const td='style="padding:2.5px 5px;border-bottom:1px solid #E2E8F0;font-size:10px;line-height:1.3"';
+  const tdN='style="padding:2.5px 5px;border-bottom:1px solid #E2E8F0;font-size:10px;text-align:right;white-space:nowrap;line-height:1.3"';
 
   // ── coluna 1: vendas do dia ──
   const vendas=`<table style="width:100%;border-collapse:collapse">
@@ -3286,7 +3310,7 @@ function expFcPDF(){
       // de onde veio o dinheiro importa; o nome e as datas, não
       const orig=e._parcela?'parcela':e._saldoAntes?'saldo antes':'';
       return `<tr>
-        <td ${td}><b>${e.os||'—'}</b>${orig?`<span style="font-size:7px;color:#5B21B6;font-weight:700"> ${orig}</span>`:''}</td>
+        <td ${td}><b>${e.os||'—'}</b>${orig?`<span style="font-size:8px;color:#5B21B6;font-weight:700"> ${orig}</span>`:''}</td>
         <td ${td}>${val?(e.forma||'—'):'Sem saldo'}</td>
         <td ${tdN}>${val?rs(val):'—'}</td></tr>`;}).join('')
       ||`<tr><td ${td} colspan="3">Nenhum recebimento</td></tr>`}</tbody></table>`;
@@ -3307,7 +3331,7 @@ function expFcPDF(){
   const tabelaFormas=(titulo,mapa,cor)=>{
     const total=Object.values(mapa).reduce((s,v)=>s+v,0);
     return `<div style="margin-bottom:6px">
-      <div style="font-size:7.5px;font-weight:800;color:#fff;background:${cor};padding:2px 4px;text-transform:uppercase">${titulo}</div>
+      <div style="font-size:9px;font-weight:800;color:#fff;background:${cor};padding:3px 5px;text-transform:uppercase">${titulo}</div>
       <table style="width:100%;border-collapse:collapse">${FORMAS.filter(f=>f!=='Sem saldo'&&f!=='Garantia').map(f=>
         `<tr><td ${td}>${f}</td><td ${tdN}${mapa[f]?' ':''}>${mapa[f]?'<b>'+rs(mapa[f])+'</b>':'—'}</td></tr>`).join('')}
         <tr style="background:#F0F4F8"><td ${td}><b>Total</b></td><td ${tdN}><b>${rs(total)}</b></td></tr>
@@ -5303,7 +5327,8 @@ async function opCrDet(cid){
           ?(faltaEntradaCred(c)>0.001
             ?('<span style="color:#B45309;font-weight:700">Parcial: R$ '+entradaPagaCred(c).toFixed(2)
               +' · faltam R$ '+faltaEntradaCred(c).toFixed(2)+'</span>')
-            :'<span style="color:#16A34A;font-weight:700">Pago</span>')
+            :('<span style="color:#16A34A;font-weight:700">Pago</span>'
+               +(c.entrada_forma?(' <span style="color:var(--mu);font-weight:600">em '+c.entrada_forma+'</span>'):'')))
           :'Em aberto')):'—'}</div></div>
         ${c.valor_entrada&&(!c.entrada_paga||faltaEntradaCred(c)>0.001)&&R&&R.ed?`<div style="grid-column:1/-1"><button onclick="crBaixaEntrada('${c.id}')" style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--v);background:var(--vl);color:var(--v);cursor:pointer;font-weight:700">Baixar Entrada</button></div>`:''}
       </div>
@@ -5403,10 +5428,22 @@ async function crBaixaEntrada(cid){
       +'acordada de R$ '+devida.toFixed(2)+'.\n\nConfirma mesmo assim?'))return;
   }
 
+  // A forma importa: a entrada entra no caixa por ela, e no Multicrediário
+  // é ela que aparece ao lado do valor coberto pela financeira.
+  const formas=(typeof FORMAS!=='undefined'&&FORMAS.length)
+    ? FORMAS.filter(f=>!/asaas|multicred|sem saldo|garantia/i.test(f))
+    : ['Dinheiro','Pix','Débito','Crédito'];
+  const escolha=prompt('Como o cliente pagou a entrada?\n\n'
+    +formas.map((f,i)=>(i+1)+' — '+f).join('\n')+'\n\nDigite o número:','1');
+  if(escolha===null)return;
+  const forma=formas[Number(escolha)-1];
+  if(!forma){alert('Opção inválida.');return;}
+
   const dt=hojeBR();
   try{
     await sbPatch('crediario',
-      {entrada_paga:true,entrada_paga_valor:pago,dt_entrada_paga:dt,entrada_paga_por:U.n},{id:cid});
+      {entrada_paga:true,entrada_paga_valor:pago,dt_entrada_paga:dt,
+       entrada_paga_por:U.n,entrada_forma:forma},{id:cid});
     await opCrDet(cid);
     const falta=Math.round((devida-pago)*100)/100;
     setSy('ok','Entrada baixada'+(falta>0.001?(' — faltam R$ '+falta.toFixed(2)):'')+' — '+horaAgora());
@@ -7497,10 +7534,18 @@ async function svOS(){
   const _formasTodas=[{forma:formaPag,valor:valorRecebido},
                       {forma:formaPag2,valor:valorRecebido2}].concat(pagamentos);
   const _financiado=parteFinanciada(_formasTodas);
-  if(_financiado>0.001&&!window._credOrigem){
-    if(!confirm('R$ '+_financiado.toFixed(2)+' em Asaas é valor financiado:\n\n'
-      +'ele NÃO entra no caixa de hoje e passa a ser crediário.\n'
-      +'O ideal é criar o contrato na aba Crediário.\n\nContinuar assim mesmo?'))return;
+
+  // Toda venda de financeira nasce do contrato. É de lá que saem o valor da
+  // entrada, o parcelado e as parcelas a acompanhar — sem ele o dinheiro
+  // entra errado no caixa e não há onde dar baixa depois.
+  const _temFinanceira=_formasTodas.some(p=>
+    p.valor>0 && /asaas|multicred/i.test(String(p.forma||'')));
+  if(_temFinanceira&&!window._credOrigem){
+    alert('Venda no crediário precisa começar pelo contrato.\n\n'
+      +'Vá na aba Crediário, crie o contrato com a entrada e as parcelas,\n'
+      +'e use o botão "Criar OS" no detalhe dele.\n\n'
+      +'Assim o caixa e as parcelas ficam certos.');
+    return;
   }
   // saldo deixa de ser marcado na mão: é o que falta receber.
   // Vindo do crediário, o valor parcelado não entra nessa conta.
