@@ -3255,25 +3255,27 @@ function expFcPDF(){
   const google=document.getElementById('fc-google').value||'—';
   const obs=document.getElementById('fc-obs').value||'';
 
-  const cab='style="font-size:9px;font-weight:800;color:#fff;background:#0F1923;'
-    +'text-align:left;padding:4px 6px;text-transform:uppercase;letter-spacing:.03em"';
-  const td='style="padding:3px 6px;border-bottom:1px solid #E2E8F0;font-size:10px"';
-  const tdN='style="padding:3px 6px;border-bottom:1px solid #E2E8F0;font-size:10px;text-align:right;white-space:nowrap"';
+  const cab='style="font-size:7.5px;font-weight:800;color:#fff;background:#0F1923;'
+    +'text-align:left;padding:2px 4px;text-transform:uppercase;letter-spacing:.03em"';
+  const td='style="padding:1.5px 4px;border-bottom:1px solid #E2E8F0;font-size:8px;line-height:1.25"';
+  const tdN='style="padding:1.5px 4px;border-bottom:1px solid #E2E8F0;font-size:8px;text-align:right;white-space:nowrap;line-height:1.25"';
 
   // ── coluna 1: vendas do dia ──
   const vendas=`<table style="width:100%;border-collapse:collapse">
-    <thead><tr><th ${cab}>Nº OS / Item</th><th ${cab}>Forma</th>
-      <th ${cab} style="text-align:right">Total</th><th ${cab} style="text-align:right">Pago</th></tr></thead>
+    <thead><tr><th ${cab}>Nº OS</th><th ${cab}>Forma</th>
+      <th ${cab} style="text-align:right">Total</th><th ${cab} style="text-align:right">Pago</th>
+      <th ${cab} style="text-align:right">Saldo</th></tr></thead>
     <tbody>${fcVendas.map(v=>{
       const ext=Array.isArray(v.extras)?v.extras:[];
       const pago=num(v.pago1)+num(v.pago2)+ext.reduce((s,p)=>s+num(p.valor),0);
       const saldo=num(v.valorTotal)-pago;
       return `<tr>
-        <td ${td}><b>${v.os||'—'}</b>${v.descricao?`<div style="font-size:8px;color:#64748B">${v.descricao}</div>`:''}${saldo>0.001?`<div style="font-size:8px;color:#B45309;font-weight:700">saldo ${rs(saldo)}</div>`:''}</td>
+        <td ${td}><b>${v.os||'—'}</b></td>
         <td ${td}>${v.forma1||'—'}${v.forma2?' + '+v.forma2:''}${ext.length?' + '+ext.map(p=>p.forma).join(' + '):''}</td>
         <td ${tdN}>${num(v.valorTotal)?rs(v.valorTotal):'—'}</td>
-        <td ${tdN}>${pago?rs(pago):'—'}</td></tr>`;}).join('')
-      ||`<tr><td ${td} colspan="4">Nenhuma venda</td></tr>`}</tbody></table>`;
+        <td ${tdN}>${pago?rs(pago):'—'}</td>
+        <td ${tdN}>${saldo>0.001?'<b style="color:#B45309">'+rs(saldo)+'</b>':'—'}</td></tr>`;}).join('')
+      ||`<tr><td ${td} colspan="5">Nenhuma venda</td></tr>`}</tbody></table>`;
 
   // ── coluna 2: recebimentos ──
   const receb=`<table style="width:100%;border-collapse:collapse">
@@ -3281,11 +3283,10 @@ function expFcPDF(){
       <th ${cab} style="text-align:right">Valor</th></tr></thead>
     <tbody>${fcEntregas.map(e=>{
       const val=num(e.valor)+num(e.valor2);
-      const orig=e._parcela?'parcela crediário':e._saldoAntes?'saldo antecipado'
-        :(e.dtVenda&&e.dtVenda!==dia)?('venda '+dtBR(e.dtVenda)):'';
+      // de onde veio o dinheiro importa; o nome e as datas, não
+      const orig=e._parcela?'parcela':e._saldoAntes?'saldo antes':'';
       return `<tr>
-        <td ${td}><b>${e.os||'—'}</b>${e.cliente?`<div style="font-size:8px;color:#64748B">${e.cliente}</div>`:''}
-          ${orig?`<div style="font-size:8px;color:#5B21B6">${orig}</div>`:''}</td>
+        <td ${td}><b>${e.os||'—'}</b>${orig?`<span style="font-size:7px;color:#5B21B6;font-weight:700"> ${orig}</span>`:''}</td>
         <td ${td}>${val?(e.forma||'—'):'Sem saldo'}</td>
         <td ${tdN}>${val?rs(val):'—'}</td></tr>`;}).join('')
       ||`<tr><td ${td} colspan="3">Nenhum recebimento</td></tr>`}</tbody></table>`;
@@ -3305,28 +3306,29 @@ function expFcPDF(){
 
   const tabelaFormas=(titulo,mapa,cor)=>{
     const total=Object.values(mapa).reduce((s,v)=>s+v,0);
-    return `<div style="margin-bottom:10px">
-      <div style="font-size:9px;font-weight:800;color:#fff;background:${cor};padding:4px 6px;text-transform:uppercase">${titulo}</div>
+    return `<div style="margin-bottom:6px">
+      <div style="font-size:7.5px;font-weight:800;color:#fff;background:${cor};padding:2px 4px;text-transform:uppercase">${titulo}</div>
       <table style="width:100%;border-collapse:collapse">${FORMAS.filter(f=>f!=='Sem saldo'&&f!=='Garantia').map(f=>
         `<tr><td ${td}>${f}</td><td ${tdN}${mapa[f]?' ':''}>${mapa[f]?'<b>'+rs(mapa[f])+'</b>':'—'}</td></tr>`).join('')}
         <tr style="background:#F0F4F8"><td ${td}><b>Total</b></td><td ${tdN}><b>${rs(total)}</b></td></tr>
       </table></div>`;
   };
 
-  const kpis=`<div style="display:flex;gap:8px;margin-bottom:12px">
+  // As avaliações do Google saíram: não têm relação com o dinheiro do dia
+  // e ocupavam espaço que faz falta para caber tudo numa folha.
+  const kpis=`<div style="display:flex;gap:6px;margin-bottom:8px">
     ${[['Ranking (vendido)',rs(t.ranking),'#1D4ED8'],['Caixa (entrou)',rs(t.caixa),'#16A34A'],
-       ['Vendas',String(t.qtd),'#0F1923'],['Ticket médio',rs(t.ticket),'#0D7A75'],
-       ['Avaliações Google',String(google),'#92400E']]
-      .map(([l,v,c])=>`<div style="flex:1;background:#F0F4F8;border-radius:7px;padding:7px 10px">
-        <div style="font-size:8px;font-weight:800;color:#64748B;text-transform:uppercase">${l}</div>
-        <div style="font-size:15px;font-weight:800;color:${c}">${v}</div></div>`).join('')}
+       ['Vendas',String(t.qtd),'#0F1923'],['Ticket médio',rs(t.ticket),'#0D7A75']]
+      .map(([l,v,c])=>`<div style="flex:1;background:#F0F4F8;border-radius:6px;padding:5px 8px">
+        <div style="font-size:7px;font-weight:800;color:#64748B;text-transform:uppercase">${l}</div>
+        <div style="font-size:13px;font-weight:800;color:${c}">${v}</div></div>`).join('')}
   </div>`;
 
   const secao=(t2,conteudo)=>`<div>
-    <div style="font-size:11px;font-weight:800;color:#0F1923;margin-bottom:4px">${t2}</div>${conteudo}</div>`;
+    <div style="font-size:9px;font-weight:800;color:#0F1923;margin-bottom:3px">${t2}</div>${conteudo}</div>`;
 
   const corpo=kpis
-    +`<div style="display:grid;grid-template-columns:1.25fr 1fr 0.85fr;gap:14px;align-items:start">
+    +`<div style="display:grid;grid-template-columns:1.25fr 1fr 0.85fr;gap:9px;align-items:start">
       ${secao('Vendas do dia',vendas)}
       ${secao('Recebimentos do dia',receb)}
       <div>
@@ -5525,8 +5527,10 @@ function abrirPDF(titulo, conteudoHTML, imprimir, paisagem){
     .kpi-val{font-size:20px;font-weight:800;color:#1BA8A0;margin-top:2px}
     .badge{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:700}
     .footer{margin-top:16px;border-top:1px solid #E2E8F0;padding-top:8px;font-size:10px;color:#64748B;display:flex;justify-content:space-between}
-    ${paisagem?'@page{size:A4 landscape;margin:8mm}':''}
-    @media print{body{padding:12px}.no-print{display:none}}
+    ${paisagem?'@page{size:A4 landscape;margin:6mm}':''}
+    ${paisagem?'.header{margin-bottom:8px;padding-bottom:6px}.footer{margin-top:8px;padding-top:5px;font-size:8px}':''}
+    @media print{body{padding:${paisagem?'6px':'12px'}}.no-print{display:none}
+      ${paisagem?'table{page-break-inside:auto}tr{page-break-inside:avoid}':''}}
   </style></head><body>
   <div class="header">
     <div><img src="${LOGO_DOC}" alt="Óticas Idealize" style="height:30px;display:block;margin-bottom:5px"/><div class="sub">${titulo}</div></div>
