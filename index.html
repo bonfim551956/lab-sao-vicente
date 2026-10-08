@@ -547,7 +547,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       </div>
     </div>
     <div class="srb" id="srb"><span id="srt"></span><button onclick="clrSrch()" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--in);font-family:inherit">Limpar</button></div>
-    <div class="sy"><div class="sd" id="sd"></div><span id="sx">Conectando...</span></div>
+    <div class="sy"><div class="sd" id="sd"></div><span id="sx">Conectando...</span><span id="vsn" title="versao do sistema" style="font-size:10px;color:var(--in);opacity:.7;margin-left:7px"></span></div>
     <div class="ab" id="ab"></div>
     <div class="lg">
       <div class="li"><div class="ld" style="background:#EF4444"></div>Acima de 48h</div>
@@ -2425,7 +2425,14 @@ function faltaEntradaCred(c){
 
 function mostrarCriarOs(c){
   const b=document.getElementById('cr-det-criaros-btn');
-  if(b)b.style.display=(c&&c.os_fake&&R&&R.ca)?'inline-block':'none';
+  if(!b)return;
+  if(!c||!R||!R.ca){b.style.display='none';return;}
+  // O botao fica disponivel enquanto o contrato nao tiver uma OS de verdade
+  // no quadro. Serve para OS provisoria, campo de OS vazio e tambem para
+  // contrato em que alguem digitou o numero mas o card ainda nao existe.
+  const num=UP(String(c.os||'').trim());
+  const temCard=!!(num&&ST.cards.find(x=>UP(String(x.os||'').trim())===num));
+  b.style.display=temCard?'none':'inline-block';
 }
 
 function criarOsDoCrediario(){
@@ -7489,6 +7496,12 @@ function opEdit(id){
 
 async function svOS(){
   if(!R||!R.ca){alert('Sem permissão.');return;}
+  // Tela com codigo antigo nao grava: as regras novas nao estariam valendo.
+  if(await versaoMudou()){
+    alert('O sistema foi atualizado enquanto esta tela estava aberta.\n\n'
+      +'A página vai recarregar agora. Depois disso, lance a OS de novo.');
+    location.reload();return;
+  }
   const os=UP(document.getElementById('fo').value.trim());
   const cliente=UP(document.getElementById('fcli').value.trim());
   const telefone=document.getElementById('ftel').value.trim();
@@ -7579,7 +7592,14 @@ async function svOS(){
   // entra errado no caixa e não há onde dar baixa depois.
   const _temFinanceira=_formasTodas.some(p=>
     p.valor>0 && /asaas|multicred/i.test(String(p.forma||'')));
-  if(_temFinanceira&&!window._credOrigem){
+  // OS lancada antes desta regra continua editavel, senao ninguem
+  // conseguiria mais corrigir os dados dela.
+  const _ce=editId?ST.cards.find(x=>x.id===editId):null;
+  const _jaEraFinanceira=!!(_ce&&(
+       /asaas|multicred/i.test(String(_ce.formaPag||'')+' '+String(_ce.formaPag2||''))
+    || Number(_ce.credParcelado||0)>0
+    || (Array.isArray(_ce.pagamentos)&&_ce.pagamentos.some(p=>/asaas|multicred/i.test(String(p.forma||''))))));
+  if(_temFinanceira&&!window._credOrigem&&!_jaEraFinanceira){
     alert('Venda no crediário precisa começar pelo contrato.\n\n'
       +'Vá na aba Crediário, crie o contrato com a entrada e as parcelas,\n'
       +'e use o botão "Criar OS" no detalhe dele.\n\n'
@@ -8403,6 +8423,69 @@ document.addEventListener('keydown',e=>{
   }catch(e){localStorage.removeItem('idealize_session');}
 })();
 
+// -- VERSAO DA PAGINA -------------------------------------------------------
+// O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
+// pagina, o navegador segue rodando o codigo antigo e as regras novas nao
+// valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
+const VERSAO_SISTEMA='2026-10-08';
+let _digitalPagina=null,_novaVersaoVista=false;
+
+async function digitalDoServidor(){
+  try{
+    const r=await fetch(location.pathname+'?_v='+Date.now(),{method:'HEAD',cache:'no-store'});
+    if(!r.ok)return null;
+    return r.headers.get('etag')||r.headers.get('last-modified')||r.headers.get('content-length')||null;
+  }catch(e){return null;}
+}
+
+async function guardarDigital(){
+  const d=await digitalDoServidor();
+  if(d)_digitalPagina=d;
+  const v=document.getElementById('vsn');
+  if(v)v.textContent='v'+VERSAO_SISTEMA;
+}
+
+// Responde true so quando temos certeza de que o arquivo no servidor e outro.
+// Sem internet ou sem resposta, responde false: ninguem e barrado por engano.
+async function versaoMudou(){
+  if(!_digitalPagina)return false;
+  const d=await digitalDoServidor();
+  if(!d)return false;
+  return d!==_digitalPagina;
+}
+
+function temRascunhoDeFechamento(){
+  try{return !!(fcDiaCarregado&&lerRascunho(fcDiaCarregado));}catch(e){return false;}
+}
+
+function avisarNovaVersao(){
+  if(_novaVersaoVista)return;
+  _novaVersaoVista=true;
+  const b=document.createElement('div');
+  b.id='barra-versao';
+  b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:#F47700;'
+    +'color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:11px 16px;'
+    +'display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;'
+    +'box-shadow:0 2px 10px rgba(0,0,0,.18)';
+  b.innerHTML='<span>Saiu uma versao nova do sistema. Atualize para continuar com as regras certas.</span>'
+    +'<button onclick="location.reload()" style="background:#fff;color:#F47700;border:none;'
+    +'border-radius:999px;padding:7px 16px;font-weight:700;font-size:12px;cursor:pointer;'
+    +'font-family:inherit">Atualizar agora</button>';
+  document.body.appendChild(b);
+  // Recarrega sozinho quando ninguem estiver no meio de um lancamento.
+  const tentar=()=>{
+    if(modalAberto()||temRascunhoDeFechamento())return setTimeout(tentar,5000);
+    location.reload();
+  };
+  setTimeout(tentar,8000);
+}
+
+async function conferirVersao(){
+  if(await versaoMudou())avisarNovaVersao();
+}
+
+guardarDigital();
+
 setInterval(()=>{
   if(!U)return;
   if(document.hidden)return;      // aba do navegador em segundo plano
@@ -8412,12 +8495,13 @@ setInterval(()=>{
   // A cada 5 minutos, pede ao servidor para soltar as mensagens agendadas
   // do Indique e Ganhe. Como depende do sistema aberto, nada sai fora do
   // horário da loja. Falha aqui é ignorada de propósito.
+  if(_ciclo%10===0)conferirVersao();
   if(_ciclo%10===0&&R&&R.wa){
     fetch('/api/whatsapp-fila',{method:'POST'}).catch(()=>{});
   }
 },30000);
 // Ao voltar para a aba do navegador, sincroniza na hora
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&U&&!modalAberto())loadData();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&U&&!modalAberto()){loadData();conferirVersao();}});
 
 // Avisa antes de sair da página com fechamento não salvo
 window.addEventListener('beforeunload',e=>{
