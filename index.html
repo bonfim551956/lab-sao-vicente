@@ -4400,9 +4400,9 @@ function opcoesFormasRecebimento(sel,vazio){
   if(!sel)return;
   const atual=sel.value;
   sel.innerHTML='<option value="">'+(vazio||'Selecione...')+'</option>'
-    +FORMAS.filter(f=>!/asaas|multicred/i.test(f))
+    +FORMAS.filter(f=>!ehFinanceira(f))
            .map(f=>'<option value="'+f+'">'+f+'</option>').join('');
-  if(atual&&!/asaas|multicred/i.test(atual))sel.value=atual;
+  if(atual&&!ehFinanceira(atual))sel.value=atual;
 }
 
 // -- SALDOS A RECEBER ------------------------------------------------------
@@ -4642,7 +4642,7 @@ async function svEntrega(){
   // Asaas e Multicrediário são financiamento, não dinheiro na gaveta.
   // Na retirada só entra o que o cliente pagou de fato.
   const _finEnt=[[forma,valor],[forma2,dois?valor2:0]]
-    .filter(([f,x])=>x>0&&/asaas|multicred/i.test(String(f||'')));
+    .filter(([f,x])=>x>0&&ehFinanceira(f));
   if(_finEnt.length){
     alert('"'+_finEnt[0][0]+'" é financiamento, não entra como recebido na retirada.\n\n'
       +'Se o cliente parcelou, registre pelo contrato na aba Crediário.\n'
@@ -5463,7 +5463,7 @@ async function crBaixaEntrada(cid){
   // A forma importa: a entrada entra no caixa por ela, e no Multicrediário
   // é ela que aparece ao lado do valor coberto pela financeira.
   const formas=(typeof FORMAS!=='undefined'&&FORMAS.length)
-    ? FORMAS.filter(f=>!/asaas|multicred|sem saldo|garantia/i.test(f))
+    ? FORMAS.filter(f=>!ehFinanceira(f)&&!/sem saldo|garantia/i.test(f))
     : ['Dinheiro','Pix','Débito','Crédito'];
   const escolha=prompt('Como o cliente pagou a entrada?\n\n'
     +formas.map((f,i)=>(i+1)+' — '+f).join('\n')+'\n\nDigite o número:','1');
@@ -6353,7 +6353,7 @@ function clrSrch(){srch='';document.getElementById('si').value='';document.getEl
 // O saldo deixou de ser caixinha marcada: é a conta valor da venda menos o
 // que foi recebido. Some a chance de marcar saldo e esquecer o valor.
 // Asaas e Multicrediário pedem quanto ainda será recebido na retirada.
-const FIN_RETIRADA=['Asaas','Link Asaas','Multicrediário'];
+const FIN_RETIRADA=['Asaas','Multicrediário'];
 
 function tgForma2(){
   const w=document.getElementById('fforma2-wrap');
@@ -6455,8 +6455,24 @@ function formasDaOS(c){
 //
 // No Multicrediário é o contrário: a financeira garante o pagamento, a loja
 // dá baixa integral na venda e o valor entra no caixa do dia normalmente.
+// "Link Asaas" NAO e crediario: e link de pagamento no cartao de credito.
+// O valor entra integral e antecipado, igual a qualquer cartao. E dinheiro
+// recebido de verdade, entra no caixa do dia e pode ser usado na retirada
+// e no recebimento de saldo.
+function ehLinkPagamento(forma){
+  return /link/i.test(String(forma||''));
+}
+// Financeira de verdade: nasce de contrato e tem parcelas a acompanhar.
+// "Asaas" (crediario parcelado no boleto) e "Multicrediario".
+function ehFinanceira(forma){
+  const s=String(forma||'');
+  if(ehLinkPagamento(s))return false;
+  return /asaas|multicred/i.test(s);
+}
 function ehFinanciado(forma){
-  return String(forma||'').toLowerCase().includes('asaas');
+  const s=String(forma||'');
+  if(ehLinkPagamento(s))return false;
+  return /asaas/i.test(s);
 }
 
 // Quanto desta OS é financiado pelo Asaas (fora do caixa)
@@ -7590,15 +7606,14 @@ async function svOS(){
   // Toda venda de financeira nasce do contrato. É de lá que saem o valor da
   // entrada, o parcelado e as parcelas a acompanhar — sem ele o dinheiro
   // entra errado no caixa e não há onde dar baixa depois.
-  const _temFinanceira=_formasTodas.some(p=>
-    p.valor>0 && /asaas|multicred/i.test(String(p.forma||'')));
+  const _temFinanceira=_formasTodas.some(p=>p.valor>0&&ehFinanceira(p.forma));
   // OS lancada antes desta regra continua editavel, senao ninguem
   // conseguiria mais corrigir os dados dela.
   const _ce=editId?ST.cards.find(x=>x.id===editId):null;
   const _jaEraFinanceira=!!(_ce&&(
-       /asaas|multicred/i.test(String(_ce.formaPag||'')+' '+String(_ce.formaPag2||''))
+       ehFinanceira(_ce.formaPag) || ehFinanceira(_ce.formaPag2)
     || Number(_ce.credParcelado||0)>0
-    || (Array.isArray(_ce.pagamentos)&&_ce.pagamentos.some(p=>/asaas|multicred/i.test(String(p.forma||''))))));
+    || (Array.isArray(_ce.pagamentos)&&_ce.pagamentos.some(p=>ehFinanceira(p.forma)))));
   if(_temFinanceira&&!window._credOrigem&&!_jaEraFinanceira){
     alert('Venda no crediário precisa começar pelo contrato.\n\n'
       +'Vá na aba Crediário, crie o contrato com a entrada e as parcelas,\n'
