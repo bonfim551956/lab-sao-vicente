@@ -2449,7 +2449,13 @@ function criarOsDoCrediario(){
   const pago=entradaPagaCred(c);
   const falta=faltaEntradaCred(c);
   const total=Number(c.valor_compra||0)||(parcelado+pago+falta);
-  window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,parcelado};
+  const ehMultiCred=String(c.financeira||'').toLowerCase().startsWith('multicred');
+  // No Multicrediario o valor coberto pela financeira entra AGORA no caixa,
+  // como forma de pagamento. Por isso ele nao pode tambem ficar marcado como
+  // parcelado: seria descontado duas vezes da conta do saldo, e um saldo de
+  // verdade ficaria escondido.
+  window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,
+                      parcelado:ehMultiCred?0:parcelado};
 
   document.getElementById('fcli').value=UP(c.nome||'');
   if(c.telefone)document.getElementById('ftel').value=c.telefone;
@@ -2462,7 +2468,6 @@ function criarOsDoCrediario(){
   //   MULTICREDIÁRIO a financeira garante o pagamento, então a loja dá baixa
   //                  integral: entrada pela forma usada + resto como
   //                  Multicrediário, somando o valor da venda no caixa.
-  const ehMultiCred=String(c.financeira||'').toLowerCase().startsWith('multicred');
   const formaEntrada=c.entrada_forma||'';
 
   document.getElementById('frecebido').value=pago||'';
@@ -2471,7 +2476,10 @@ function criarOsDoCrediario(){
 
   if(ehMultiCred){
     // o que a financeira cobre entra agora, como 2ª forma
-    const pelaFinanceira=Math.round((total-pago)*100)/100;
+    // A financeira cobre a venda menos a entrada ACORDADA. Se o cliente
+    // pagou so parte da entrada, o que falta e saldo da loja a receber na
+    // retirada, nao dinheiro da financeira.
+    const pelaFinanceira=Math.round((total-Number(c.valor_entrada||0))*100)/100;
     if(pelaFinanceira>0.001){
       const w=document.getElementById('fforma2-wrap');
       if(w)w.style.display='block';
@@ -2482,7 +2490,7 @@ function criarOsDoCrediario(){
     }
   }
   tgRetirada();
-  document.getElementById('fretirada').value=(ehMultiCred?0:falta).toFixed(2);
+  document.getElementById('fretirada').value=falta.toFixed(2);
   calcSaldo();
 
   // um aviso no alto do formulário, para ninguém preencher pagamento de novo
@@ -7081,10 +7089,11 @@ function osMista(c){
   return ocs.some(o=>ocEhHora(c,o))&&ocs.some(o=>ocPrecisaPedido(c,o));
 }
 function ocPrecisaPedido(c,o){
-  // Só troca de armação, com ou sem lapidação, usa a lente que o cliente já
-  // tem: não há pedido ao fornecedor. Passagem também não.
-  const temLente=!['passagem','gar-armacao','gar-armacao-sem'].includes(c.tipo);
-  return temLente&&!ocEhHora(c,o);
+  // A lista SEM_PEDIDO manda: troca de armacao usa a lente que o cliente ja
+  // tem, passagem nao leva lente, e oculos de sol nao tem lente a pedir.
+  // Fora dessa lista, o que sai do estoque (hora) tambem nao gera pedido.
+  if(SEM_PEDIDO.includes(c.tipo))return false;
+  return !ocEhHora(c,o);
 }
 
 function opPedNum(id){
@@ -7693,7 +7702,7 @@ async function svOS(){
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
     credId:credOrigem?credOrigem.id:null,
-    credParcelado:credParcelado||null};
+    credParcelado:_credParc||null};
   const isVenda=tipo==='venda'||tipo==='hora';
   c.history.push({u:U.n,r:U.r,from:-1,to:colInicial,at:now,mc:false,venda:isVenda,garantia:false,qtdOculos:oculos.length});
   ST.cards.unshift(c);clsOs();rnKan();
