@@ -4680,9 +4680,13 @@ async function svEntrega(){
   }
   c.entregaValor=valor;c.entregaForma=forma;
   c.entregaValor2=dois?valor2:null;c.entregaForma2=dois?forma2:null;
+  // guarda a marca ANTES de fechar o modal: clsEntrega() zera _entDireta,
+  // e sem isso a entrega direta caia no movimento comum, que avanca uma
+  // coluna -- de Nao retirado ia para Cancelada e o dinheiro saia do caixa
+  const _direta=_entDireta;
   clsEntrega();
 
-  if(_entDireta){
+  if(_direta){
     // veio de Saldos ou de Não retirados: vai direto para Entregue
     _entDireta=false;
     const now=Date.now();
@@ -7227,7 +7231,17 @@ async function mvCardExec(id,lab,obsmv,destino){
   if(lab)c.lab=lab;
   if(obsmv)c.obsmv=obsmv;
   // destino existe para quem pula etapa (lente de contato não é montada)
-  const from=c.col;c.col=(destino!=null)?destino:from+1;c.ts=Date.now();
+  const from=c.col;
+  const prox=(destino!=null)?destino:from+1;
+  // o passo a passo vai da Venda ate Entregue (0..5) e para ali. Nao
+  // retirado (6) e Cancelada (7) exigem destino declarado -- ninguem cai
+  // nelas por avancar uma coluna.
+  if(destino==null&&prox>5){
+    alert('Esta OS está em '+(from===6?'Não retirados':'Canceladas')
+      +'.\n\nUse os botões próprios dessa aba para movimentá-la.');
+    return;
+  }
+  c.col=prox;c.ts=Date.now();
   if(!c.history)c.history=[];
   // "montou" = saiu de Montagem para Pronto
   const mc=from===2;
@@ -8468,7 +8482,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-15';
+const VERSAO_SISTEMA='2026-10-16';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
