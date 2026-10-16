@@ -1870,7 +1870,10 @@ const RS={
   // 'tp' limita os tipos de OS que o perfil pode criar e movimentar.
   // Sem 'tp', o perfil trabalha com todos os tipos.
   posvendas:{l:'Pós-vendas',c:'rb-p',se:[0,1,2,3,4],mv:[4],ca:true,cd:false,cn:false,cf:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false,
-    tp:['gar-hora','gar-armacao','gar-armacao-sem','gar-pedido','passagem','passagem-sem']},
+    // Pos-vendas tambem registra cortesia e venda avulsa (oculos de sol,
+    // armacao) -- produto pronto, que nao passa pelo laboratorio.
+    tp:['gar-hora','gar-armacao','gar-armacao-sem','gar-pedido','passagem','passagem-sem',
+        'cortesia-hora','cortesia-pedido','cortesia-sol','avulsa']},
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[2],ca:false,cd:false,cn:false,cf:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
@@ -4449,6 +4452,12 @@ function faltaDoSaldo(c){
   return Math.round((Number(c.saldoValor||0)-recebidoDoSaldo(c))*100)/100;
 }
 
+// Saldo em aberto de verdade: a marca antiga vale, e tambem vale quando
+// sobrou pedaco de um saldo pago pela metade. Era por isso que um saldo
+// parcial desaparecia da tela de nao retirados.
+function temSaldoAberto(c){
+  return !!c.saldo || faltaDoSaldo(c) > 0.001;
+}
 function situacaoSaldo(c){
   // Não retirado (6) e cancelada (7) não são entrega. Mas o saldo pago antes
   // da retirada conta: o dinheiro entrou, mesmo sem o cliente ter buscado.
@@ -4609,7 +4618,7 @@ function opEntrega(id){
   opcoesFormasRecebimento(document.getElementById('ent-forma'));
   opcoesFormasRecebimento(document.getElementById('ent-forma2'));
   const av=document.getElementById('ent-saldo');
-  if(c.saldo){
+  if(temSaldoAberto(c)){
     av.style.display='block';
     const falta=faltaDoSaldo(c);
     av.textContent=(c.saldoPago&&falta>0.01)
@@ -4662,9 +4671,12 @@ async function svEntrega(){
   if(total===0&&forma!=='Sem saldo'){
     if(!confirm('Valor recebido está zerado.\nSe não há nada a receber, escolha "Sem saldo".\n\nConfirma mesmo assim?'))return;
   }
-  if(c.saldo&&total<Number(c.saldoValor||0)){
-    if(!confirm('O recebido (R$ '+total.toFixed(2)+') é menor que o saldo de R$ '
-      +Number(c.saldoValor||0).toFixed(2)+'.\n\nConfirma a entrega assim mesmo?'))return;
+  // compara com o que ainda falta, nao com o saldo cheio: num saldo pago
+  // pela metade o cliente deve so o resto
+  const _faltaEnt=faltaDoSaldo(c);
+  if(temSaldoAberto(c)&&total<_faltaEnt){
+    if(!confirm('O recebido (R$ '+total.toFixed(2)+') é menor que o que falta do saldo: R$ '
+      +_faltaEnt.toFixed(2)+'.\n\nConfirma a entrega assim mesmo?'))return;
   }
   c.entregaValor=valor;c.entregaForma=forma;
   c.entregaValor2=dois?valor2:null;c.entregaForma2=dois?forma2:null;
@@ -6704,8 +6716,8 @@ function rnNaoRet(){
     .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.telefone||'')
       +' '+ocDoCard(c).map(o=>o.ped||'').join(' ')).toLowerCase().includes(busca))
     .filter(c=>{
-      if(fSaldo==='com'&&!c.saldo)return false;
-      if(fSaldo==='sem'&&c.saldo)return false;
+      if(fSaldo==='com'&&!temSaldoAberto(c))return false;
+      if(fSaldo==='sem'&&temSaldoAberto(c))return false;
       if(fEspera){
         const d=c.naoRetEm?Math.floor((Date.now()-c.naoRetEm)/86400000):0;
         if(d<fEspera)return false;
@@ -6721,7 +6733,7 @@ function rnNaoRet(){
   const cont=document.getElementById('nr-cont');
   if(cont){
     const total=ST.cards.filter(c=>c.col===COL_NAO_RET).length;
-    const comSaldo=ST.cards.filter(c=>c.col===COL_NAO_RET&&c.saldo).length;
+    const comSaldo=ST.cards.filter(c=>c.col===COL_NAO_RET&&temSaldoAberto(c)).length;
     cont.textContent=total+' no total'+(comSaldo?(' · '+comSaldo+' com saldo em aberto'):'');
   }
   if(!lista.length){
@@ -6754,8 +6766,13 @@ function rnNaoRet(){
       <td style="white-space:nowrap;font-size:11px">
           ${c.valorVenda?`<div>Venda <b style="color:#1D4ED8">${rs(c.valorVenda)}</b></div>`:''}
           ${rec?`<div>Pago <b style="color:#16A34A">${rs(rec)}</b></div>`:''}
-          ${c.saldo?`<div style="font-weight:800;color:#B45309">Saldo ${rs(c.saldoValor)}</div>`:''}
-          ${c.saldoPago?`<div style="font-weight:800;color:#16A34A">recebido ${rs(c.saldoPagoValor)} em ${dtBR(c.saldoPagoData)}</div>`:''}</td>
+          ${c.saldoPago?`<div style="color:#16A34A">do saldo <b>${rs(c.saldoPagoValor)}</b>${c.saldoPagoData?(' em '+dtBR(c.saldoPagoData)):''}</div>`:''}
+          ${c.credParcelado?`<div style="color:#5B21B6">crediário <b>${rs(c.credParcelado)}</b></div>`:''}
+          ${(()=>{const f=faltaDoSaldo(c);
+             if(f>0.001)return `<div style="font-weight:800;color:#B45309">Falta ${rs(f)}</div>`;
+             if(c.saldo)return `<div style="font-weight:800;color:#B45309">Saldo ${rs(c.saldoValor)}</div>`;
+             if(c.saldoPago)return `<div style="font-weight:700;color:#16A34A">saldo quitado</div>`;
+             return '';})()}</td>
       <td style="font-weight:800;color:${corD};white-space:nowrap">${dias} dias
           ${c.naoRetPor&&c.naoRetPor.indexOf('Sistema')===0?'<div style="font-size:9px;font-weight:800;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:4px;padding:1px 5px;display:inline-block;margin-top:2px">AUTOMÁTICO</div>':''}
           <div style="font-size:9px;font-weight:600;color:var(--mu)">desde ${fmtDtH(c.naoRetEm)}</div>
@@ -6767,8 +6784,8 @@ function rnNaoRet(){
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="bex" onclick="opSaldoObs('${c.id}')">Anotar</button>
         ${(c.telefone&&R&&R.wa)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="avisarWhats('${c.id}')">WhatsApp</button>`:''}
-        ${(R&&R.ed)?`<button class="bex" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800" onclick="opEntregarAgora('${c.id}')">${c.saldo?'Receber e entregar':'Entregar'}</button>`:''}
-        ${(c.saldo&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Só receber saldo</button>`:''}
+        ${(R&&R.ed)?`<button class="bex" style="background:#0D7A75;color:#fff;border-color:#0D7A75;font-weight:800" onclick="opEntregarAgora('${c.id}')">${temSaldoAberto(c)?'Receber e entregar':'Entregar'}</button>`:''}
+        ${(temSaldoAberto(c)&&R&&R.ed)?`<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="opSaldoPago('${c.id}')">Só receber saldo</button>`:''}
         ${R&&R.cn?`<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="opCancOs('${c.id}')">Cancelar</button>`:''}
       </div></td></tr>`;}).join('')}</tbody></table>`;
 }
@@ -8451,7 +8468,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-08';
+const VERSAO_SISTEMA='2026-10-15';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
