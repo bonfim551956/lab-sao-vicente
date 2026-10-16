@@ -2434,7 +2434,9 @@ function mostrarCriarOs(c){
   // no quadro. Serve para OS provisoria, campo de OS vazio e tambem para
   // contrato em que alguem digitou o numero mas o card ainda nao existe.
   const num=UP(String(c.os||'').trim());
-  const temCard=!!(num&&ST.cards.find(x=>UP(String(x.os||'').trim())===num));
+  // card cancelado nao conta: a venda foi desfeita, a OS precisa poder nascer
+  const temCard=!!(num&&ST.cards.find(x=>UP(String(x.os||'').trim())===num
+                                        &&x.col!==COL_CANC));
   b.style.display=temCard?'none':'inline-block';
 }
 
@@ -7565,9 +7567,12 @@ async function svOS(){
   const dtVenda=document.getElementById('fdt').value;
   if(!os||!dtVenda){alert('Preencha o número da OS e a data da venda.');return;}
 
-  // não pode existir duas OS com o mesmo número na mesma loja
+  // não pode existir duas OS com o mesmo número na mesma loja -- mas uma OS
+  // cancelada não ocupa mais o número: ela foi desfeita. Antes travava, e a
+  // saída era lançar com um traço no fim ("2310592-"), o que separava a venda
+  // do contrato e deixava a OS com um número que não é o do papel.
   const repetida=ST.cards.find(x=>x.id!==editId&&UP(String(x.os||'').trim())===os);
-  if(repetida){
+  if(repetida&&repetida.col!==COL_CANC){
     alert('Já existe a OS '+os+' nesta loja.\n\n'
       +'Ela está em: '+(CF[repetida.col]||'?')
       +(repetida.cliente?('\nCliente: '+repetida.cliente):'')
@@ -7575,6 +7580,11 @@ async function svOS(){
     document.getElementById('fo').focus();
     document.getElementById('fo').select();
     return;
+  }
+  if(repetida&&repetida.col===COL_CANC){
+    if(!confirm('A OS '+os+' já existe nesta loja, mas está CANCELADA'
+      +(repetida.cliente?(' (cliente: '+repetida.cliente+')'):'')+'.\n\n'
+      +'Lançar de novo com o mesmo número?'))return;
   }
 
   const comGrau=COM_GRAU.includes(tipo);
@@ -8482,7 +8492,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-16';
+const VERSAO_SISTEMA='2026-10-16b';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
