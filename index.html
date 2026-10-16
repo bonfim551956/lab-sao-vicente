@@ -6189,6 +6189,17 @@ async function opCancelarCr(cid){
   hist.push({u:U.n,at:new Date().toISOString(),acao:'Cancelou o contrato'});
   try{
     await sbPatch('crediario',{status:'cancelado',historico:hist},{id:cid});
+    // parcela de contrato cancelado nao e divida: tem que sair do valor em
+    // aberto, senao o total a receber mostra dinheiro que ninguem deve.
+    // O contrato e cancelado primeiro de proposito -- se o segundo passo
+    // falhar, o aviso aparece; o contrario esconderia divida de verdade.
+    try{
+      await sbPatch('crediario_parcelas',{status:'cancelado'},
+                    {crediario_id:cid,status:'aberto'});
+    }catch(e){
+      alert('O contrato foi cancelado, mas as parcelas em aberto não foram.\n\n'
+        +'Abra o contrato e confira antes de olhar o total a receber.\n\n'+e.message);
+    }
     await opCrDet(cid);
     await rnCr();
     setSy('ok','Contrato cancelado.');
@@ -8492,7 +8503,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-16b';
+const VERSAO_SISTEMA='2026-10-16c';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
