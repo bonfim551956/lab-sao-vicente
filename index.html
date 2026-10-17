@@ -2462,6 +2462,11 @@ function criarOsDoCrediario(){
   window._credOrigem={id:c.id,nome:c.nome,valor:total,pago,falta,
                       parcelado:ehMultiCred?0:parcelado};
 
+  // opOs() montou as listas de forma antes do contrato entrar em cena.
+  // Refaz agora para a financeira sumir das opcoes.
+  opcoesFormas(document.getElementById('fforma'));
+  opcoesFormas(document.getElementById('fforma2'));
+
   document.getElementById('fcli').value=UP(c.nome||'');
   if(c.telefone)document.getElementById('ftel').value=c.telefone;
   document.getElementById('fdt').value=dataPagamentoCred(c,d.parcs);
@@ -2476,8 +2481,12 @@ function criarOsDoCrediario(){
   const formaEntrada=c.entrada_forma||'';
 
   document.getElementById('frecebido').value=pago||'';
+  // Asaas nao e forma de pagamento aqui -- o parcelado ja vem do contrato.
+  // Sem entrada paga a venda nasce sem forma nenhuma, que e a verdade:
+  // nada entrou no caixa hoje. Com entrada paga sem forma registrada, quem
+  // lanca escolhe; o sistema nao chuta a forma de um dinheiro real.
   document.getElementById('fforma').value=
-    ehMultiCred ? (formaEntrada||'Dinheiro') : (formaEntrada||'Asaas');
+    ehMultiCred ? (formaEntrada||'Dinheiro') : (formaEntrada||'');
 
   if(ehMultiCred){
     // o que a financeira cobre entra agora, como 2ª forma
@@ -4402,8 +4411,13 @@ function expPjPDF(){
 const FORMAS=['Dinheiro','Pix','Débito','Crédito','Multicrediário','Brasilcard',
               'Link Asaas','Asaas','Garantia','Sem saldo','Outro'];
 function opcoesFormas(sel,vazio){
+  // Numa OS que nasceu de contrato, o parcelado ja vem de la. Oferecer a
+  // financeira de novo como forma de pagamento so leva a somar o mesmo
+  // dinheiro duas vezes.
+  const doContrato=!!(window._credOrigem&&Number(window._credOrigem.parcelado||0)>0.001);
   sel.innerHTML='<option value="">'+(vazio||'Selecione...')+'</option>'
-    +FORMAS.map(f=>'<option value="'+f+'">'+f+'</option>').join('');
+    +FORMAS.filter(f=>!(doContrato&&ehFinanciado(f)))
+           .map(f=>'<option value="'+f+'">'+f+'</option>').join('');
 }
 
 // Nos recebimentos — entrega e saldo — as financeiras não aparecem: ali só
@@ -6536,7 +6550,9 @@ function calcSaldo(){
     box.style.display='block';
     box.style.cssText+=';background:#F5F3FF;border:1px solid #DDD6FE;color:#5B21B6';
     box.innerHTML='Parcelado no crediário: <b>R$ '+parc.toFixed(2)+'</b>'
-      +(saldo>0.001?(' · saldo da entrada a receber: <b>R$ '+saldo.toFixed(2)+'</b>'):' · entrada quitada');
+      +(saldo>0.001
+        ? (' · falta receber <b>R$ '+saldo.toFixed(2)+'</b> — vira saldo, cobrado na retirada')
+        : ' · nada a receber além das parcelas');
     return;
   }
   if(financiado>0.001){
@@ -7549,6 +7565,15 @@ function opEdit(id){
   document.getElementById('fforma2').value=c.formaPag2||'';
   document.getElementById('frecebido2').value=(c.valorRecebido2===0||c.valorRecebido2)?c.valorRecebido2:'';
   document.getElementById('fretirada').value=(c.aReceber===0||c.aReceber)?c.aReceber:'';
+  // Card vindo do crediario carrega o parcelado do contrato. Sem reconstruir
+  // isso aqui, salvar uma edicao zerava o parcelado e inventava um saldo do
+  // tamanho dele -- a loja via o cliente devendo o que ja esta financiado.
+  // As listas de forma acima ficam completas de proposito: card antigo pode
+  // ter a financeira gravada e precisa continuar editavel.
+  window._credOrigem=(c.credId||Number(c.credParcelado||0)>0.001)
+    ? {id:c.credId||null,nome:c.cliente||'',valor:num(c.valorVenda),
+       pago:num(c.valorRecebido),falta:0,parcelado:num(c.credParcelado)}
+    : null;
   calcSaldo();
   document.getElementById('ft').value=c.tipo||'venda';
   document.getElementById('fobs').value=c.obs||'';
@@ -7682,6 +7707,21 @@ async function svOS(){
       +'Assim o caixa e as parcelas ficam certos.');
     return;
   }
+  // O parcelado ja vem do contrato. Preencher a financeira de novo como
+  // forma de pagamento somaria o mesmo dinheiro duas vezes -- foi o que
+  // aconteceu na OS 2327850: 840 do contrato + 840 digitados = 1680.
+  const _parcContrato=credOrigem?Number(credOrigem.parcelado||0):0;
+  if(_parcContrato>0.001){
+    const _dup=_formasTodas.find(p=>p.valor>0.001&&ehFinanciado(p.forma));
+    if(_dup){
+      alert('O crediário desta venda já vem do contrato: R$ '+_parcContrato.toFixed(2)+'.\n\n'
+        +'Não preencha "'+_dup.forma+'" como forma de pagamento — esse valor entraria duas vezes.\n\n'
+        +'Nas formas, deixe só o que o cliente pagou hoje. O que faltar para fechar a venda\n'
+        +'vira saldo e é cobrado na retirada.');
+      return;
+    }
+  }
+
   // saldo deixa de ser marcado na mão: é o que falta receber.
   // Vindo do crediário, o valor parcelado não entra nessa conta.
   const credParcelado=credOrigem?Number(credOrigem.parcelado||0):0;
@@ -8503,7 +8543,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-16c';
+const VERSAO_SISTEMA='2026-10-17';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
