@@ -160,6 +160,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cr-aba[aria-pressed="true"]{background:var(--w);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .bacat{background:#EFF6FF;color:#1D4ED8;}
 .bct{background:#E0F2FE;color:#0369A1;}
+.bmn{background:#F1F5F9;color:#334155;}
 .bcor{background:#FDF2F8;color:#9D174D;}
 .tm{font-size:11px;font-weight:700;}
 .tok{color:#16A34A;}.twn{color:#D97706;}.tal{color:#B91C1C;font-weight:800;}
@@ -1202,8 +1203,12 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       </div>
       <div class="mf"><label>OS de Compra</label><input id="foscompra" placeholder="Número da OS de compra"/></div>
       <div class="mf"><label>Responsável pela garantia <span style="color:var(--re)">*</span></label>
-        <input id="fresp-gar" placeholder="Nome do responsável"/>
+        <input id="fresp-gar" list="nomes-garantia" autocomplete="off" placeholder="Quem responde por esta garantia"/>
       </div>
+      <div class="mf"><label>Vendedor da venda <span style="color:var(--re)">*</span></label>
+        <input id="fvendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda original"/>
+      </div>
+      <datalist id="nomes-garantia"></datalist>
       <div class="mf"><label>Receita</label>
         <select id="freceita">
           <option value="">Selecione...</option>
@@ -1682,7 +1687,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 <div class="mb" id="avm" style="display:none">
   <div class="md md-avulsa">
     <div class="mh"><span>Venda avulsa</span><button class="mx" onclick="clsAvulsa()">&#10005;</button></div>
-    <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-weight:500">
+    <div id="av-dica" style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-weight:500">
       Óculos de sol, armação, acessório. Não passa pelo laboratório: entra já como entregue,
       conta no faturamento do dia e fica no Histórico.
     </div>
@@ -1693,6 +1698,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           <select id="av-tipo" onchange="tgAvulsaTipo()">
             <option value="avulsa">Venda avulsa — óculos de sol, armação</option>
             <option value="passagem-sem">Passagem sem lapidação</option>
+            <option value="manutencao">Manutenção — ajuste, limpeza, troca de peça</option>
           </select></div>
         <div class="mf"><label id="av-desc-lb">Produto <span style="color:var(--re)">*</span></label>
           <input id="av-desc" placeholder="Ex: Óculos de sol Ray-Ban"/></div>
@@ -1709,7 +1715,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="os-col">
         <div class="os-sec">Pagamento</div>
         <div class="os-2">
-          <div class="mf"><label>Valor da venda <span style="color:var(--re)">*</span></label>
+          <div class="mf"><label id="av-valor-lb">Valor da venda <span style="color:var(--re)">*</span></label>
             <input id="av-valor" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcAvulsa()"/></div>
           <div class="mf"><label>Valor recebido <span style="color:var(--re)">*</span></label>
             <input id="av-rec" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcAvulsa()"/></div>
@@ -1873,7 +1879,7 @@ const RS={
     // Pos-vendas tambem registra cortesia e venda avulsa (oculos de sol,
     // armacao) -- produto pronto, que nao passa pelo laboratorio.
     tp:['gar-hora','gar-armacao','gar-armacao-sem','gar-pedido','passagem','passagem-sem',
-        'cortesia-hora','cortesia-pedido','cortesia-sol','avulsa']},
+        'cortesia-hora','cortesia-pedido','cortesia-sol','avulsa','manutencao']},
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[2],ca:false,cd:false,cn:false,cf:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
 const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
@@ -1956,7 +1962,7 @@ let _ultimoTs=0,_sincronizando=false,_ciclo=0;
 // financeira, premio), nem em datas, numeros, ids ou senhas.
 function UP(v){return typeof v==='string'?v.toLocaleUpperCase('pt-BR'):v;}
 function upCampos(o,campos){if(o)campos.forEach(k=>{if(typeof o[k]==='string')o[k]=UP(o[k]);});return o;}
-const CAMPOS_OS=['os','ped','lab','obs','respGar','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','descricao'];
+const CAMPOS_OS=['os','ped','lab','obs','respGar','vendedor','receita','obsTxt','osCompra','motivoRefeito','obsmv','cliente','descricao'];
 // O que já foi gravado em maiúsculas volta ao formato da lista, senão
 // continuaria fora da soma por forma de pagamento.
 function formaCanon(f){
@@ -1982,7 +1988,7 @@ function upCard(c){
 function mapCard(r){return upCard({
   id:r.id,unidade:r.unidade,os:r.os,ped:r.ped,tipo:r.tipo,
   dtVenda:r.dt_venda,prazo:r.prazo,urgente:r.urgente,col:r.col,
-  lab:r.lab,obs:r.obs,respGar:r.resp_gar,receita:r.receita,
+  lab:r.lab,obs:r.obs,respGar:r.resp_gar,vendedor:r.vendedor,receita:r.receita,
   obsTxt:r.obs_txt,osCompra:r.os_compra,
   esfOD:r.esf_od,cilOD:r.cil_od,esfOE:r.esf_oe,cilOE:r.cil_oe,
   refeito:r.refeito,motivoRefeito:r.motivo_refeito,
@@ -2094,7 +2100,8 @@ async function saveCard(c){
     await sbUpsert('os_cards',{
       id:c.id,unidade:c.unidade||'saovicente',os:c.os,ped:c.ped,tipo:c.tipo,
       dt_venda:c.dtVenda||null,prazo:c.prazo||null,urgente:!!c.urgente,col:c.col,
-      lab:c.lab||null,obs:c.obs||null,resp_gar:c.respGar||null,receita:c.receita||null,
+      lab:c.lab||null,obs:c.obs||null,resp_gar:c.respGar||null,
+      vendedor:c.vendedor||null,receita:c.receita||null,
       obs_txt:c.obsTxt||null,os_compra:c.osCompra||null,
       esf_od:c.esfOD!=null?c.esfOD:null,cil_od:c.cilOD!=null?c.cilOD:null,
       esf_oe:c.esfOE!=null?c.esfOE:null,cil_oe:c.cilOE!=null?c.cilOE:null,
@@ -2295,12 +2302,42 @@ function travarCil(el){
 }
 
 function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
-function tGL(t){if(t==='avulsa')return'Venda avulsa';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação',
+// Sugere os nomes que a loja ja usou nestes dois campos. Sao de digitacao
+// livre, e por isso "NATHAN" e "NATAN" conviviam no mesmo relatorio: a
+// sugestao faz a segunda vez escolher a grafia da primeira.
+async function sugerirNomesGarantia(){
+  const d=document.getElementById('nomes-garantia');
+  if(!d)return;
+  // O quadro na tela nao serve de fonte: o pos-vendas, que e quem mais lanca
+  // garantia, ve so as colunas antes de Entregue -- e garantia entregue e a
+  // regra. Por isso os nomes vem do banco, uma vez por sessao.
+  if(!window._nomesGar){
+    window._nomesGar=[];
+    try{
+      const un=(U&&U.un)||UNIDADE;
+      const rs=await sbGet('os_cards','select=resp_gar,vendedor'
+        +'&unidade=eq.'+encodeURIComponent(un)
+        +'&resp_gar=not.is.null&limit=2000');
+      window._nomesGar=(rs||[]).reduce((a,r)=>a.concat([r.resp_gar,r.vendedor]),[]);
+    }catch(e){
+      // sem rede a sugestao fica vazia; o campo continua de digitacao livre
+      window._nomesGar=[];
+    }
+  }
+  const nomes=new Set();
+  window._nomesGar
+    .concat((ST.cards||[]).reduce((a,c)=>a.concat([c.vendedor,c.respGar]),[]))
+    .forEach(n=>{const v=UP(String(n||'').trim());if(v.length>1)nomes.add(v);});
+  d.innerHTML=[...nomes].sort((a,b)=>a.localeCompare(b,'pt-BR'))
+    .map(n=>'<option value="'+n.replace(/"/g,'&quot;')+'"></option>').join('');
+}
+
+function tGL(t){if(t==='avulsa')return'Venda avulsa';if(t==='manutencao')return'Manutenção';const m={venda:'Venda — Pedido',hora:'Venda — Hora','gar-hora':'Gar. Hora','gar-armacao':'Gar. Armação c/ lap.','gar-armacao-sem':'Gar. Armação s/ lap.','gar-estoque':'Gar. Estoque','gar-pedido':'Gar. Pedido',passagem:'Passagem c/ lapidação','passagem-sem':'Passagem s/ lapidação',
   contato:'Venda — Lentes de contato',
   'cortesia-hora':'Cortesia — óculos hora',
   'cortesia-pedido':'Cortesia — óculos pedido',
   'cortesia-sol':'Cortesia — óculos de sol'};return m[t]||t;}
-function tGC(t){if(t==='avulsa')return'bvd';if(t==='contato')return'bct';if(String(t).startsWith('cortesia'))return'bcor';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
+function tGC(t){if(t==='manutencao')return'bmn';if(t==='avulsa')return'bvd';if(t==='contato')return'bct';if(String(t).startsWith('cortesia'))return'bcor';if(t==='gar-armacao-sem')return'bgr';if(t==='venda')return'bv';if(t==='passagem')return'bps';if(t&&t.startsWith('gar'))return'bgr';return'bhr';}
 function tgUrgente(checked){
   const d=new Date();
   d.setDate(d.getDate()+(checked?3:10));
@@ -2879,7 +2916,7 @@ function entregasDoDia(dia){
   const out=[];
   ST.cards.forEach(c=>{
     // registradas pela venda avulsa já entram como venda do dia
-    if(c.tipo==='avulsa'||c.tipo==='passagem-sem')return;
+    if(c.tipo==='avulsa'||c.tipo==='passagem-sem'||c.tipo==='manutencao')return;
     if(c.col===COL_CANC)return;            // cancelada não entra no caixa
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
@@ -5677,8 +5714,8 @@ function expGarPDF(){
     <div class="kpi"><div class="kpi-label">Gar. Armação</div><div class="kpi-val">${garR.filter(r=>r.tipo==='gar-armacao').length}</div></div>
   </div>`;
   const CF2=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
-  const tabela=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp.</th><th>OS Compra</th><th>Status</th><th>Data</th></tr></thead>
-  <tbody>${garR.map((r,i)=>`<tr><td>${i+1}</td><td><b>${r.os}</b></td><td>${r.ped}</td><td>${tGL(r.tipo)}</td><td>${r.obs||'—'}</td><td>${r.respGar||'—'}</td><td>${r.osCompra||'—'}</td><td>${CF2[r.col]||'—'}</td><td>${fd(r.at)}</td></tr>`).join('')}</tbody></table>`;
+  const tabela=`<table><thead><tr><th>#</th><th>OS</th><th>Cliente</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp.</th><th>Vendedor</th><th>OS Compra</th><th>Status</th><th>Data</th></tr></thead>
+  <tbody>${garR.map((r,i)=>`<tr><td>${i+1}</td><td><b>${r.os}</b></td><td>${r.cliente||'—'}</td><td>${r.ped}</td><td>${tGL(r.tipo)}</td><td>${r.obs||'—'}</td><td>${r.respGar||'—'}</td><td>${r.vendedor||'—'}</td><td>${r.osCompra||'—'}</td><td>${CF2[r.col]||'—'}</td><td>${fd(r.at)}</td></tr>`).join('')}</tbody></table>`;
   abrirPDF('Relatório de Garantias', kpis+tabela);
 }
 
@@ -7034,13 +7071,27 @@ function tgAvulsaTipo(){
   const t=document.getElementById('av-tipo').value;
   const lb=document.getElementById('av-desc-lb');
   const inp=document.getElementById('av-desc');
-  if(t==='passagem-sem'){
-    lb.innerHTML='Descrição do serviço <span style="color:var(--re)">*</span>';
+  const vlb=document.getElementById('av-valor-lb');
+  const obr=' <span style="color:var(--re)">*</span>';
+  if(t==='manutencao'){
+    lb.innerHTML='Serviço realizado'+obr;
+    inp.placeholder='Ex: troca de plaquetas e ajuste da armação';
+  }else if(t==='passagem-sem'){
+    lb.innerHTML='Descrição do serviço'+obr;
     inp.placeholder='Ex: passagem em armação do cliente';
   }else{
-    lb.innerHTML='Produto <span style="color:var(--re)">*</span>';
+    lb.innerHTML='Produto'+obr;
     inp.placeholder='Ex: Óculos de sol Ray-Ban';
   }
+  // Na manutencao o valor e opcional: boa parte e cortesia para cliente da
+  // casa. Sem valor, nao se cobra forma de pagamento nenhuma.
+  if(vlb)vlb.innerHTML='Valor da venda'+(t==='manutencao'?'':obr);
+  const ehManut=t==='manutencao';
+  const dica=document.getElementById('av-dica');
+  if(dica)dica.textContent=ehManut
+    ? 'Ajuste, limpeza, troca de peça. Não passa pelo laboratório. O valor é opcional: sem valor, entra como cortesia e não mexe no caixa.'
+    : 'Óculos de sol, armação, acessório. Não passa pelo laboratório: entra já como entregue, conta no faturamento do dia e fica no Histórico.';
+  calcAvulsa();
 }
 function tgAvulsa2(){
   const w=document.getElementById('av-wrap2');
@@ -7081,9 +7132,11 @@ async function svAvulsa(){
 
   if(!desc){alert('Informe o produto.');document.getElementById('av-desc').focus();return;}
   if(!cliente){alert('Informe o cliente.');document.getElementById('av-cli').focus();return;}
-  if(valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
+  // Manutencao pode ser cortesia: sem valor, nao se exige valor nem forma.
+  const ehManut=document.getElementById('av-tipo').value==='manutencao';
+  if(!ehManut&&valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
   if(!os){alert('Informe o número da OS.');document.getElementById('av-os').focus();return;}
-  if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
+  if(!forma&&(valor>0||rec>0)){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
   if(rec2&&!forma2){alert('Selecione a 2ª forma de pagamento.');return;}
 
   const repetida=ST.cards.find(x=>UP(String(x.os||'').trim())===os);
@@ -7356,7 +7409,10 @@ function opH(id){
   const chk=document.getElementById('obs-alert-chk');
   if(chk)chk.checked=false;
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
-  document.getElementById('hmt').textContent='Histórico — '+c.os;
+  // O cliente ao lado do numero: quem abre o historico nao precisa voltar
+  // ao card para saber de quem e a OS.
+  document.getElementById('hmt').textContent='Histórico — '+c.os
+    +(c.cliente?' · '+c.cliente:'');
 
   // As ações menos usadas ficam aqui, para não poluir o card
   const ac=document.getElementById('hm-acoes');
@@ -7405,9 +7461,11 @@ function opOs(){
   document.getElementById('ftel').value='';
   document.getElementById('fobs').value='';
   document.getElementById('fresp-gar').value='';
+  document.getElementById('fvendedor').value='';
   document.getElementById('freceita').value='';
   document.getElementById('fobs-txt').value='';
   document.getElementById('foscompra').value='';
+  sugerirNomesGarantia();
   document.getElementById('fdt').value=hojeBR();
   document.getElementById('ft').value='venda';
   const d=new Date();d.setDate(d.getDate()+10);
@@ -7583,6 +7641,8 @@ function opEdit(id){
   document.getElementById('ft').value=c.tipo||'venda';
   document.getElementById('fobs').value=c.obs||'';
   document.getElementById('fresp-gar').value=c.respGar||'';
+  document.getElementById('fvendedor').value=c.vendedor||'';
+  sugerirNomesGarantia();
   document.getElementById('freceita').value=c.receita||'';
   document.getElementById('fobs-txt').value=c.obsTxt||'';
   document.getElementById('foscompra').value=c.osCompra||'';
@@ -7661,6 +7721,7 @@ async function svOS(){
   const ehGarantia=String(document.getElementById('ft').value||'').startsWith('gar');
   const obs=document.getElementById('fobs').value;
   const respGar=document.getElementById('fresp-gar').value.trim();
+  const vendedor=document.getElementById('fvendedor').value.trim();
   const receita=document.getElementById('freceita').value;
   if(ehGarantia){
     const _w=document.getElementById('obs-wrap');
@@ -7672,6 +7733,10 @@ async function svOS(){
     if(!respGar){
       alert('Preencha o responsável pela garantia.');
       document.getElementById('fresp-gar').focus();return;
+    }
+    if(!vendedor){
+      alert('Informe o vendedor que realizou a venda.');
+      document.getElementById('fvendedor').focus();return;
     }
     if(!document.getElementById('fobs-txt').value.trim()){
       alert('Escreva o que aconteceu nesta garantia.\n\n'
@@ -7781,11 +7846,11 @@ async function svOS(){
   if(editId){
     const ce=ST.cards.find(x=>x.id===editId);
     if(ce){
-      const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',saldo:'Saldo',valorVenda:'Vl. Venda',valorRecebido:'Vl. Recebido',formaPag:'Forma pag.',aReceber:'A receber',obs:'Motivo',respGar:'Responsável',receita:'Receita',obsTxt:'Observação',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
+      const LABELS={os:'Nº OS',cliente:'Cliente',telefone:'WhatsApp',ped:'Pedido',tipo:'Tipo',dtVenda:'Dt. Venda',prazo:'Prazo',urgente:'Urgente',saldo:'Saldo',valorVenda:'Vl. Venda',valorRecebido:'Vl. Recebido',formaPag:'Forma pag.',aReceber:'A receber',obs:'Motivo',respGar:'Responsável',vendedor:'Vendedor',receita:'Receita',obsTxt:'O que aconteceu',osCompra:'OS Compra',qtdOculos:'Qtd. óculos'};
       const novos={os,cliente,telefone,ped:oculos.map(o=>o.ped).join(' · '),tipo,dtVenda,prazo,urgente:urgente?'Sim':'Não',saldo:saldo?('Sim R$ '+saldoValor.toFixed(2)):'Não',valorVenda,valorRecebido,formaPag,
-        outrasFormas:pagamentos.map(p=>p.forma+' '+p.valor.toFixed(2)).join(' · ')||'—',aReceber,obs,respGar,receita,obsTxt,osCompra,qtdOculos:oculos.length};
+        outrasFormas:pagamentos.map(p=>p.forma+' '+p.valor.toFixed(2)).join(' · ')||'—',aReceber,obs,respGar,vendedor,receita,obsTxt,osCompra,qtdOculos:oculos.length};
       const ocAntigos=ocDoCard(ce);
-      const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim R$ '+Number(ce.saldoValor||0).toFixed(2)):'Não',valorVenda:ce.valorVenda,valorRecebido:ce.valorRecebido,formaPag:ce.formaPag,aReceber:ce.aReceber,obs:ce.obs,respGar:ce.respGar,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
+      const antigos={os:ce.os,cliente:ce.cliente,telefone:ce.telefone,ped:ocAntigos.map(o=>o.ped).join(' · '),tipo:ce.tipo,dtVenda:ce.dtVenda,prazo:ce.prazo,urgente:ce.urgente?'Sim':'Não',saldo:ce.saldo?('Sim R$ '+Number(ce.saldoValor||0).toFixed(2)):'Não',valorVenda:ce.valorVenda,valorRecebido:ce.valorRecebido,formaPag:ce.formaPag,aReceber:ce.aReceber,obs:ce.obs,respGar:ce.respGar,vendedor:ce.vendedor,receita:ce.receita,obsTxt:ce.obsTxt,osCompra:ce.osCompra,qtdOculos:ocAntigos.length};
       const diffs=Object.keys(LABELS).filter(k=>String(novos[k]||'')!==String(antigos[k]||'')).map(k=>({campo:LABELS[k],de:antigos[k]||'—',para:novos[k]||'—'}));
       const grauMudou=JSON.stringify(ocAntigos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]))!==JSON.stringify(oculos.map(o=>[o.esfOD,o.cilOD,o.esfOE,o.cilOE]));
       const diaAntigo=ce.dtVenda;
@@ -7795,7 +7860,7 @@ async function svOS(){
       ce.os=os;ce.cliente=cliente;ce.telefone=telefone;ce.tipo=tipo;ce.saldo=saldo;ce.saldoValor=saldo?saldoValor:null;ce.valorVenda=valorVenda;ce.valorRecebido=_recebido;ce.valorRecebido2=_recebido2||null;ce.formaPag=_formaPag;ce.formaPag2=_formaPag2;
       ce.pagamentos=_pagamentos.length?_pagamentos:null;
       ce.credParcelado=_credParc||null;ce.aReceber=aReceber;ce.dtVenda=dtVenda;ce.prazo=prazo;ce.urgente=urgente;
-      ce.obs=obs;ce.respGar=respGar;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
+      ce.obs=obs;ce.respGar=respGar;ce.vendedor=vendedor;ce.receita=receita;ce.obsTxt=obsTxt;ce.osCompra=osCompra;
       ce.pedidos=oculos;
       ce.ped=p0.ped;ce.esfOD=p0.esfOD;ce.cilOD=p0.cilOD;ce.esfOE=p0.esfOE;ce.cilOE=p0.cilOE;
       ce.ts=Date.now();
@@ -7813,7 +7878,7 @@ async function svOS(){
   const c={id:'os_'+now,os,cliente,telefone,ped:p0.ped,pedidos:oculos,tipo,dtVenda,prazo,urgente,saldo,saldoValor:saldo?saldoValor:null,valorVenda,valorRecebido:_recebido,valorRecebido2:_recebido2||null,
     formaPag:_formaPag,formaPag2:_formaPag2,
     pagamentos:_pagamentos.length?_pagamentos:null,
-    credParcelado:_credParc||null,aReceber,obs,respGar,receita,obsTxt,osCompra,
+    credParcelado:_credParc||null,aReceber,obs,respGar,vendedor,receita,obsTxt,osCompra,
     esfOD:p0.esfOD,esfOE:p0.esfOE,cilOD:p0.cilOD,cilOE:p0.cilOE,
     col:colInicial,ts:now,tsCreated:now,history:[],unidade:U.un||'saovicente',
     credId:credOrigem?credOrigem.id:null,
@@ -7917,7 +7982,7 @@ function rnKan(){
         ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${formasDaOS(c).map(p=>p.forma).join(' + ')||c.formaPag}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?(faltaDoSaldo(c)>0.01
         ? `<div class="cg" style="color:#B45309;font-weight:800;font-size:11px;background:#FFFBEB;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">PAGO PARCIAL · ${rs(c.saldoPagoValor)} em ${dtBR(c.saldoPagoData)}</div>`
-        : `<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`):''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">${faltaDoSaldo(c)>0.01&&c.saldoPago?'FALTAM':'SALDO'}${(faltaDoSaldo(c)>0.01&&c.saldoPago)?' · R$ '+faltaDoSaldo(c).toFixed(2):(c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):'')}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="${String(c.tipo||'').startsWith('gar')?'color:var(--wa);background:var(--wabg);border-left:3px solid #FCD34D;border-radius:0 6px 6px 0;padding:5px 8px;font-style:normal;white-space:normal':'color:var(--mu);font-style:italic'}">${hl(c.obsTxt,srch)}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
+        : `<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`):''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">${faltaDoSaldo(c)>0.01&&c.saldoPago?'FALTAM':'SALDO'}${(faltaDoSaldo(c)>0.01&&c.saldoPago)?' · R$ '+faltaDoSaldo(c).toFixed(2):(c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):'')}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${hl(c.respGar,srch)}</div>`:''}${c.vendedor?`<div class="cg" style="color:var(--mu)">Vendedor: ${hl(c.vendedor,srch)}</div>`:''}${c.obsTxt?`<div class="cg" style="${String(c.tipo||'').startsWith('gar')?'color:var(--wa);background:var(--wabg);border-left:3px solid #FCD34D;border-radius:0 6px 6px 0;padding:5px 8px;font-style:normal;white-space:normal':'color:var(--mu);font-style:italic'}">${hl(c.obsTxt,srch)}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
       frag.appendChild(div);
     });
     col.appendChild(frag);
@@ -7958,7 +8023,7 @@ function rnGar(){
     if(c.tipo&&c.tipo.startsWith('gar')){
       if(motivo!=='todos'&&UP(c.obs||'')!==UP(motivo))return;
       const h0=c.history&&c.history[0];
-      if(h0){const d=new Date(h0.at);if(d>=ini&&d<=fim)garR.push({os:c.os,ped:c.ped||'—',tipo:c.tipo,obs:c.obs||'—',respGar:c.respGar||'—',receita:c.receita||'—',obsTxt:c.obsTxt||'—',osCompra:c.osCompra||'—',u:h0.u,at:h0.at,col:c.col});}
+      if(h0){const d=new Date(h0.at);if(d>=ini&&d<=fim)garR.push({os:c.os,cliente:c.cliente||'—',ped:c.ped||'—',tipo:c.tipo,obs:c.obs||'—',respGar:c.respGar||'—',vendedor:c.vendedor||'—',receita:c.receita||'—',obsTxt:c.obsTxt||'—',osCompra:c.osCompra||'—',u:h0.u,at:h0.at,col:c.col});}
     }
   });
   garR.sort((a,b)=>b.at-a.at);
@@ -7980,12 +8045,16 @@ function rnGar(){
     b.innerHTML='<div class="er">Nenhuma garantia'+(m!=='todos'?(' por '+m):'')+' neste período.</div>';return;
   }
   const status=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue'];
-  b.innerHTML=`<table><thead><tr><th>#</th><th>OS</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp. Garantia</th><th>Receita</th><th>Observação</th><th>Lançado por</th><th>Status</th><th>Data</th></tr></thead><tbody>${garR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td style="font-weight:600">${r.os}</td><td>${r.ped}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="bgr">${tGL(r.tipo)}</span></td><td style="color:var(--mu);font-size:12px">${r.obs}</td><td style="color:var(--mu)">${r.respGar}</td><td style="color:var(--mu)">${r.receita}</td><td style="color:var(--mu);font-size:12px">${r.obsTxt}</td><td style="color:var(--mu)">${r.u}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg);border:1px solid var(--bo)">${status[r.col]||'—'}</span></td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
+  b.innerHTML=`<table><thead><tr><th>#</th><th>OS</th><th>Cliente</th><th>Pedido</th><th>Tipo</th><th>Motivo</th><th>Resp. Garantia</th><th>Vendedor</th><th>Receita</th><th>O que aconteceu</th><th>Lançado por</th><th>Status</th><th>Data</th></tr></thead><tbody>${garR.map((r,i)=>{return`<tr><td style="color:var(--mu);font-size:11px">${i+1}</td><td style="font-weight:600">${r.os}</td><td style="color:var(--tx)">${r.cliente}</td><td>${r.ped}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500" class="bgr">${tGL(r.tipo)}</span></td><td style="color:var(--mu);font-size:12px">${r.obs}</td><td style="color:var(--mu)">${r.respGar}</td><td style="color:var(--tx);font-weight:600">${r.vendedor}</td><td style="color:var(--mu)">${r.receita}</td><td style="color:var(--mu);font-size:12px">${r.obsTxt}</td><td style="color:var(--mu)">${r.u}</td><td><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg);border:1px solid var(--bo)">${status[r.col]||'—'}</span></td><td style="color:var(--mu);white-space:nowrap">${fd(r.at)}</td></tr>`;}).join('')}</tbody></table>`;
 }
 
 function expGarCSV(){
   if(!garR.length){alert('Nenhum dado.');return;}
-  const csv=['OS,Pedido,Tipo,Motivo,Responsavel,Data',...garR.map(r=>[r.os,r.ped,tGL(r.tipo),r.obs,r.u,fd(r.at)].join(','))].join('\n');
+  // O cabecalho dizia "Responsavel" e trazia quem lancou. Agora leva os dois,
+  // mais o vendedor e o cliente, entre aspas por causa das virgulas no texto.
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const csv=['OS,Cliente,Pedido,Tipo,Motivo,Resp. Garantia,Vendedor,Receita,O que aconteceu,Lancado por,Data',
+    ...garR.map(r=>[r.os,r.cliente,r.ped,tGL(r.tipo),r.obs,r.respGar,r.vendedor,r.receita,r.obsTxt,r.u,fd(r.at)].map(q).join(','))].join('\n');
   const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='garantias.csv';a.click();URL.revokeObjectURL(u);
 }
 
@@ -8566,7 +8635,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-20';
+const VERSAO_SISTEMA='2026-10-20b';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
