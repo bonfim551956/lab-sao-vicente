@@ -8015,9 +8015,10 @@ function rnKan(){
         // o texto inteiro fica no histórico; no card vai o começo, para um
         // texto longo não empurrar o resto do card para fora da tela
         const _curto=_t.length>170?(_t.slice(0,170).trim()+'…'):_t;
-        return `<div class="cg" style="color:#7F1D1D;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;padding:5px 8px;margin-top:3px;font-weight:600;white-space:normal;line-height:1.45">`
+        // o vermelho forte da tarja antiga, agora com o texto dentro
+        return `<div class="cg" style="color:#B91C1C;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:5px;padding:4px 8px;margin-top:3px;font-weight:700;font-size:11px;white-space:normal;line-height:1.45">`
           +`<span style="font-weight:800;letter-spacing:.04em">OBSERVAÇÃO</span>`
-          +(_obs.length>1?`<span style="font-weight:700;opacity:.75"> · ${_obs.length} no histórico</span>`:'')
+          +(_obs.length>1?`<span style="font-weight:700;opacity:.8"> · ${_obs.length} no histórico</span>`:'')
           +`<br>${hl(_curto,srch)}</div>`;
       })()}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
@@ -8678,7 +8679,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-20c';
+const VERSAO_SISTEMA='2026-10-20d';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
