@@ -1135,6 +1135,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
 <option value="cortesia-pedido">Cortesia — óculos pedido</option>
 <option value="cortesia-sol">Cortesia — óculos de sol</option>
 <option value="passagem">Passagem — com lapidação</option>
+        <option value="manutencao">Manutenção — laboratório parceiro</option>
           </select>
         </div>
         <label class="os-chk">
@@ -1265,9 +1266,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="mf"><label style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em">Nova Observação</label>
         <textarea id="obs-txt" placeholder="Digite a observação..." style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:70px"></textarea>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mu);cursor:pointer;margin-bottom:8px">
-        <input type="checkbox" id="obs-alert-chk"/> Marcar como alerta no card
-      </label>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px;line-height:1.5">
+        A observação aparece como alerta no card, para quem pegar esta OS depois.
+      </div>
       <button onclick="svObs()" class="bsv" style="width:100%">Salvar Observação</button>
     </div>
     <div class="mft">
@@ -1698,7 +1699,6 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           <select id="av-tipo" onchange="tgAvulsaTipo()">
             <option value="avulsa">Venda avulsa — óculos de sol, armação</option>
             <option value="passagem-sem">Passagem sem lapidação</option>
-            <option value="manutencao">Manutenção — ajuste, limpeza, troca de peça</option>
           </select></div>
         <div class="mf"><label id="av-desc-lb">Produto <span style="color:var(--re)">*</span></label>
           <input id="av-desc" placeholder="Ex: Óculos de sol Ray-Ban"/></div>
@@ -2349,7 +2349,7 @@ function tgG(v){
   if(obsWrap)obsWrap.style.display=v&&v.startsWith('gar')?'block':'none';
   const a=lerOculosForm();
   // limpa o pedido automatico quando volta para um tipo que exige numero
-  if(!SEM_PEDIDO.includes(v))a.forEach(o=>{if(['PASSAGEM','GAR-HORA','GAR-ARMACAO','HORA'].includes(o.ped))o.ped='';});
+  if(!SEM_PEDIDO.includes(v))a.forEach(o=>{if(['PASSAGEM','GAR-HORA','GAR-ARMACAO','HORA','MANUTENCAO'].includes(o.ped))o.ped='';});
   rnOculos(ocQtd,a);
 }
 
@@ -2916,7 +2916,7 @@ function entregasDoDia(dia){
   const out=[];
   ST.cards.forEach(c=>{
     // registradas pela venda avulsa já entram como venda do dia
-    if(c.tipo==='avulsa'||c.tipo==='passagem-sem'||c.tipo==='manutencao')return;
+    if(c.tipo==='avulsa'||c.tipo==='passagem-sem')return;
     if(c.col===COL_CANC)return;            // cancelada não entra no caixa
     const h=(c.history||[]).filter(x=>x.to===5).pop();
     if(!h||h.at<ini||h.at>fim)return;
@@ -4852,7 +4852,9 @@ async function avisarWhats(id){
 
 // -- MULTIPLOS OCULOS NA MESMA OS -------------------------------------------
 let ocQtd=1;
-const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','gar-armacao-sem','hora','cortesia-hora','cortesia-sol'];
+// Manutencao vai ao laboratorio parceiro, mas nao leva lente a pedir: e
+// ajuste, limpeza, troca de peca na armacao que o cliente ja tem.
+const SEM_PEDIDO=['passagem','gar-hora','gar-armacao','gar-armacao-sem','hora','cortesia-hora','cortesia-sol','manutencao'];
 
 // Lista de oculos de um card (cards antigos, sem "pedidos", viram 1 oculos)
 function ocDoCard(c){
@@ -4868,10 +4870,12 @@ function lerOculosForm(){
     if(!document.getElementById('fp_'+i))break;
     const g=id=>{const e=document.getElementById(id+'_'+i);return e?e.value:'';};
     const chk=document.getElementById('oh_'+i);
+    const ct=document.getElementById('oc_'+i);
     const mp=document.getElementById('omp_'+i);
     const ol=document.getElementById('omplado_'+i);
     out.push({ped:g('fp'),esfOD:g('fod'),cilOD:g('fcd'),esfOE:g('foe'),cilOE:g('fce'),
               hora:chk?chk.checked:undefined,
+              contato:ct?ct.checked:undefined,
               meioPar:(mp&&mp.checked)?((ol&&ol.value)||'OD'):null});
   }
   return out;
@@ -4892,6 +4896,7 @@ function rnOculos(n,dados){
     const d=atuais[i]||{};
     const v=x=>(d[x]===0||d[x])?d[x]:'';
     const ehHora=(d.hora===true)||(d.hora===undefined&&COM_BAIXA.includes(tipo));
+    const ehContato=(d.contato===true)||(d.contato===undefined&&tipo==='contato');
     // grau aparece quando o tipo pede, ou quando este óculos sai do estoque
     const grauAqui=comGrau||ehHora;
     const pedVal=semPed?tipo.toUpperCase():v('ped');
@@ -4902,6 +4907,10 @@ function rnOculos(n,dados){
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#0D7A75;cursor:pointer" title="Lente do estoque: sai na hora e não entra no pedido ao fornecedor">
             <input type="checkbox" id="oh_${i}" ${ehHora?'checked':''} onchange="edOculosHora(${i},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#0D7A75"/>
             HORA
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#0369A1;cursor:pointer" title="Lente de contato: entra no pedido ao fornecedor, mas não vai para a montagem">
+            <input type="checkbox" id="oc_${i}" ${ehContato?'checked':''} onchange="edOculosContato(${i},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#0369A1"/>
+            LENTE DE CONTATO
           </label>
           ${i>0?`<button type="button" onclick="removerOculos(${i})" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">Remover</button>`:''}
         </div>
@@ -4939,7 +4948,13 @@ function rnOculos(n,dados){
 function addOculos(){if(ocQtd<4)rnOculos(ocQtd+1);}
 function edOculosHora(i,marcado){
   const a=lerOculosForm();
-  if(a[i])a[i].hora=marcado;
+  // Uma coisa ou outra: lente do estoque nao e lente de contato.
+  if(a[i]){a[i].hora=marcado; if(marcado)a[i].contato=false;}
+  rnOculos(ocQtd,a);
+}
+function edOculosContato(i,marcado){
+  const a=lerOculosForm();
+  if(a[i]){a[i].contato=marcado; if(marcado)a[i].hora=false;}
   rnOculos(ocQtd,a);
 }
 function edMeioPar(i,marcado){
@@ -4950,17 +4965,26 @@ function edMeioPar(i,marcado){
 function removerOculos(i){const a=lerOculosForm();a.splice(i,1);rnOculos(ocQtd-1,a);}
 
 // Monta o card resumido de cada oculos no kanban
+// Observacoes lancadas no card, da mais antiga para a mais nova. Toda
+// observacao e alerta: foi alguem escrevendo algo que o proximo precisa ler.
+function obsDoCard(c){
+  return (c.history||[]).filter(h=>h&&h.obs&&h.obsTxt);
+}
+
 function blocoOculos(c,s){
   const ocs=ocDoCard(c);
   return ocs.map((o,i)=>{
     const grau=(o.esfOD!=null)?`<div class="cg">OD ${fG(o.esfOD,o.cilOD)} · OE ${fG(o.esfOE,o.cilOE)}</div>`:'';
     const tit=ocs.length>1?`<div class="cg" style="font-weight:800;color:var(--v);text-transform:uppercase;letter-spacing:.06em;margin-top:${i?7:4}px">Óculos ${i+1}</div>`:'';
     const hora=ocs.length>1&&ocEhHora(c,o);
+    const contato=ocs.length>1&&!hora&&ocEhContato(c,o);
     const semNum=!o.ped&&c.col===0&&ocPrecisaPedido(c,o);
     const linha=semNum
       ? `<div class="cp" style="color:#B45309;font-weight:700">pedido a fazer</div>`
       : `<div class="cp">${hl(o.ped||'—',s||'')}</div>`;
-    const selo=hora?`<span style="font-size:8px;font-weight:800;padding:1px 5px;border-radius:4px;background:var(--vl);color:#0D7A75;margin-left:4px">HORA</span>`:'';
+    const selo=hora
+      ? `<span style="font-size:8px;font-weight:800;padding:1px 5px;border-radius:4px;background:var(--vl);color:#0D7A75;margin-left:4px">HORA</span>`
+      : (contato?`<span style="font-size:8px;font-weight:800;padding:1px 5px;border-radius:4px;background:#E0F2FE;color:#0369A1;margin-left:4px">LENTE DE CONTATO</span>`:'');
     return tit.replace('</div>',selo+'</div>')+linha+grau;
   }).join('');
 }
@@ -6456,8 +6480,10 @@ function tgForma2(){
 // Nos demais tipos o valor é obrigatório: é ele que forma o faturamento do dia.
 function vendaOpcional(){
   const t=document.getElementById('ft').value||'';
-  // Garantia e cortesia não têm valor a cobrar do cliente.
-  return t.startsWith('gar')||t.startsWith('cortesia');
+  // Garantia e cortesia não têm valor a cobrar do cliente. A manutenção
+  // pode ter: boa parte é cortesia para cliente da casa, mas troca de peça
+  // costuma ser cobrada. Por isso o valor fica opcional, não proibido.
+  return t.startsWith('gar')||t.startsWith('cortesia')||t==='manutencao';
 }
 function pintarValorVenda(){
   const lb=document.getElementById('fvenda-lb');
@@ -7071,26 +7097,14 @@ function tgAvulsaTipo(){
   const t=document.getElementById('av-tipo').value;
   const lb=document.getElementById('av-desc-lb');
   const inp=document.getElementById('av-desc');
-  const vlb=document.getElementById('av-valor-lb');
   const obr=' <span style="color:var(--re)">*</span>';
-  if(t==='manutencao'){
-    lb.innerHTML='Serviço realizado'+obr;
-    inp.placeholder='Ex: troca de plaquetas e ajuste da armação';
-  }else if(t==='passagem-sem'){
+  if(t==='passagem-sem'){
     lb.innerHTML='Descrição do serviço'+obr;
     inp.placeholder='Ex: passagem em armação do cliente';
   }else{
     lb.innerHTML='Produto'+obr;
     inp.placeholder='Ex: Óculos de sol Ray-Ban';
   }
-  // Na manutencao o valor e opcional: boa parte e cortesia para cliente da
-  // casa. Sem valor, nao se cobra forma de pagamento nenhuma.
-  if(vlb)vlb.innerHTML='Valor da venda'+(t==='manutencao'?'':obr);
-  const ehManut=t==='manutencao';
-  const dica=document.getElementById('av-dica');
-  if(dica)dica.textContent=ehManut
-    ? 'Ajuste, limpeza, troca de peça. Não passa pelo laboratório. O valor é opcional: sem valor, entra como cortesia e não mexe no caixa.'
-    : 'Óculos de sol, armação, acessório. Não passa pelo laboratório: entra já como entregue, conta no faturamento do dia e fica no Histórico.';
   calcAvulsa();
 }
 function tgAvulsa2(){
@@ -7132,11 +7146,9 @@ async function svAvulsa(){
 
   if(!desc){alert('Informe o produto.');document.getElementById('av-desc').focus();return;}
   if(!cliente){alert('Informe o cliente.');document.getElementById('av-cli').focus();return;}
-  // Manutencao pode ser cortesia: sem valor, nao se exige valor nem forma.
-  const ehManut=document.getElementById('av-tipo').value==='manutencao';
-  if(!ehManut&&valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
+  if(valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
   if(!os){alert('Informe o número da OS.');document.getElementById('av-os').focus();return;}
-  if(!forma&&(valor>0||rec>0)){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
+  if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
   if(rec2&&!forma2){alert('Selecione a 2ª forma de pagamento.');return;}
 
   const repetida=ST.cards.find(x=>UP(String(x.os||'').trim())===os);
@@ -7183,6 +7195,16 @@ function ocEhHora(c,o){
   if(o&&o.hora===false)return false;
   return COM_BAIXA.includes(c.tipo);
 }
+
+// Lente de contato num pedido que tambem tem oculos. Ela ENTRA no pedido ao
+// fornecedor como qualquer lente, mas nao vai para a montagem: nao ha o que
+// montar. Marcada no item, vale so para aquele item; sem marca, vale o tipo
+// da OS.
+function ocEhContato(c,o){
+  if(o&&o.contato===true)return true;
+  if(o&&o.contato===false)return false;
+  return c.tipo==='contato';
+}
 // precisa de número de pedido: leva lente e não é do estoque
 // OS mista: tem óculos que sai do estoque e óculos que depende do fornecedor.
 // Só nesses casos faz sentido avisar o cliente antes do card chegar em Pronto.
@@ -7209,8 +7231,13 @@ function opPedNum(id){
       return '<div class="mf"><label>'+(ocs.length>1?('Óculos '+(i+1)):'Este óculos')+'</label>'
         +'<div style="font-size:12px;font-weight:700;color:#0D7A75;background:var(--vl);border-radius:8px;padding:8px 11px">'
         +'HORA — lente do estoque, sem pedido</div></div>';
+    // A lente de contato entra no pedido como qualquer lente. O rotulo diz
+    // qual item e qual, para quem digita o numero nao se perder.
+    const ct=ocEhContato(c,o)
+      ? ' <span style="font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;background:#E0F2FE;color:#0369A1">LENTE DE CONTATO</span>'
+      : '';
     return '<div class="mf">'
-      +'<label>'+(ocs.length>1?('Óculos '+(i+1)):'Número do pedido')+' <span style="color:var(--re)">*</span></label>'
+      +'<label>'+(ocs.length>1?('Óculos '+(i+1)):'Número do pedido')+' <span style="color:var(--re)">*</span>'+ct+'</label>'
       +'<input id="pn_'+i+'" value="'+(o.ped||'')+'" placeholder="Ex: 115438859"/></div>';}).join('');
   document.getElementById('pedm').style.display='flex';
   setTimeout(()=>{const e=document.getElementById('pn_0');if(e)e.focus();},90);
@@ -7268,7 +7295,12 @@ function mvCard(id){
 
   // Lente de contato não passa pelo laboratório: não há o que montar.
   // Do Pedido ela vai direto para Pronto, assim que chega do fornecedor.
-  if(c.col===1&&c.tipo==='contato'){ mvCardExec(id,null,null,3); return; }
+  // Vale para a OS inteira de lentes e também para a OS em que TODOS os
+  // itens foram marcados como lente de contato. Tendo um óculos junto, o
+  // card segue para a montagem normalmente — por causa do óculos.
+  if(c.col===1&&(c.tipo==='contato'||ocDoCard(c).every(o=>ocEhContato(c,o)))){
+    mvCardExec(id,null,null,3); return;
+  }
 
   // Pedido -> Montagem: escolhe o laboratório e dá baixa no estoque
   if(c.col===1){
@@ -7377,20 +7409,19 @@ function opObs(id){
   if(obsArea)obsArea.style.display='block';
   const obsTxt=document.getElementById('obs-txt');
   if(obsTxt){obsTxt.value='';setTimeout(()=>obsTxt.focus(),100);}
-  const chk=document.getElementById('obs-alert-chk');
-  if(chk)chk.checked=false;
 }
 async function svObs(){
   const id=window._editHmId;
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   const txt=document.getElementById('obs-txt').value.trim();
   if(!txt){alert('Digite a observação.');return;}
-  const alerta=document.getElementById('obs-alert-chk').checked;
+  // Toda observacao e alerta. Era opcional, e a que ficava sem a marca nao
+  // aparecia em lugar nenhum do card -- so dentro do historico, onde
+  // ninguem olha antes de mexer na OS.
   if(!c.history)c.history=[];
-  c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,obs:true,obsTxt:txt,obsAlert:alerta});
-  c.obsAlert=alerta;
+  c.history.push({u:U.n,r:U.r,from:c.col,to:c.col,at:Date.now(),mc:false,obs:true,obsTxt:txt,obsAlert:true});
+  c.obsAlert=true;
   document.getElementById('obs-txt').value='';
-  if(document.getElementById('obs-alert-chk'))document.getElementById('obs-alert-chk').checked=false;
   opH(id);atualizarTelas();
   try{
     await saveCard(c);
@@ -7406,8 +7437,6 @@ function opH(id){
   const obsTxt=document.getElementById('obs-txt');
   if(obsTxt&&!window._mantemObs)obsTxt.value='';
   window._mantemObs=false;
-  const chk=document.getElementById('obs-alert-chk');
-  if(chk)chk.checked=false;
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   // O cliente ao lado do numero: quem abre o historico nao precisa voltar
   // ao card para saber de quem e a OS.
@@ -7705,6 +7734,8 @@ async function svOS(){
     oculos.push({
       meioPar:b.meioPar||null,
       hora:(b.hora===undefined)?undefined:!!b.hora,
+      // marcado no item: lente de contato dentro de um pedido que tem oculos
+      contato:(b.contato===undefined)?undefined:!!b.contato,
       ped,
       esfOD:b.esfOD!==''&&b.esfOD!=null?parseFloat(b.esfOD):null,
       cilOD:b.cilOD!==''&&b.cilOD!=null?normCil(parseFloat(b.cilOD)):0,
@@ -7976,7 +8007,19 @@ function rnKan(){
       let ex='';if(srch){if(!mi.has(c.id)){return;}ex=' hi';}
       const div=document.createElement('div');div.className='ca'+(ccl?' '+ccl:'')+(c.urgente?' urg':'')+ex;
       const editBtn=R.ed?'<button style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-weight:700;font-family:inherit" onclick="opEdit(\''+c.id+'\')">Editar</button>':'';
-      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:''}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
+      div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px"><div class="cos">${hl(c.os,srch)}${ocDoCard(c).length>1?` <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#EDE9FE;color:#5B21B6;font-weight:800;vertical-align:middle">${ocDoCard(c).length} ÓCULOS</span>`:''}</div>${editBtn}</div>${U&&U.un==='central'&&c.unidade?`<div class="cg" style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">${c.unidade}</div>`:''}${c.refeito?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px">SERVIÇO REFEITO</div>`:''}${(()=>{
+        const _obs=obsDoCard(c);
+        if(!_obs.length)return c.obsAlert?`<div class="cg" style="color:#B91C1C;font-weight:700;font-size:11px;background:#FEE2E2;border:1px solid #FCA5A5;padding:2px 7px;border-radius:5px;display:inline-block">OBSERVAÇÃO</div>`:'';
+        const _u=_obs[_obs.length-1];
+        const _t=String(_u.obsTxt||'');
+        // o texto inteiro fica no histórico; no card vai o começo, para um
+        // texto longo não empurrar o resto do card para fora da tela
+        const _curto=_t.length>170?(_t.slice(0,170).trim()+'…'):_t;
+        return `<div class="cg" style="color:#7F1D1D;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;padding:5px 8px;margin-top:3px;font-weight:600;white-space:normal;line-height:1.45">`
+          +`<span style="font-weight:800;letter-spacing:.04em">OBSERVAÇÃO</span>`
+          +(_obs.length>1?`<span style="font-weight:700;opacity:.75"> · ${_obs.length} no histórico</span>`:'')
+          +`<br>${hl(_curto,srch)}</div>`;
+      })()}${(c.valorVenda||c.valorRecebido)?`<div class="cg" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:3px">
         ${c.valorVenda?`<span style="font-weight:700;color:var(--tx)">Venda <b style="color:#1D4ED8">R$ ${Number(c.valorVenda).toFixed(2)}</b></span>`:''}
         ${somaRecebido(c)?`<span style="font-weight:700;color:var(--tx)">Recebido <b style="color:#16A34A">R$ ${somaRecebido(c).toFixed(2)}</b></span>`:''}
         ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${formasDaOS(c).map(p=>p.forma).join(' + ')||c.formaPag}</span>`:''}
@@ -8635,7 +8678,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-20b';
+const VERSAO_SISTEMA='2026-10-20c';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
