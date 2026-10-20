@@ -1211,8 +1211,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           <option value="Receita Fora">Receita Fora</option>
         </select>
       </div>
-      <div class="mf"><label>Observação <span style="color:var(--re)">*</span></label>
-        <textarea id="fobs-txt" placeholder="Observações adicionais..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:60px;transition:border-color .2s"></textarea>
+      <div class="mf"><label>O que aconteceu nesta garantia <span style="color:var(--re)">*</span></label>
+        <textarea id="fobs-txt" placeholder="Descreva o caso: o que o cliente relatou e o que foi feito." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--bo);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;resize:vertical;min-height:60px;transition:border-color .2s"></textarea>
       </div>
     </div>
     <div class="mft"><button class="bc" onclick="clsOs()">Cancelar</button><button class="bsv" onclick="svOS()">Salvar</button></div>
@@ -7420,9 +7420,14 @@ function opOs(){
   document.getElementById('fsaldo-box').style.display='none';
   document.getElementById('fretirada-wrap').style.display='none';
   limparFormasExtras();
-  aplicarTiposPermitidos();
   rnOculos(1,[{}]);
-  tgG('venda');
+  // O tipo selecionado manda no formulario. Perfis que so podem lancar
+  // garantia -- o pos-vendas -- ja abrem a tela numa garantia, e os campos
+  // dela precisam aparecer. Havia aqui um tgG('venda') fixo que rodava
+  // DEPOIS de aplicarTiposPermitidos() e escondia motivo, responsavel e
+  // observacao justamente para quem mais lanca garantia.
+  aplicarTiposPermitidos();
+  tgG(document.getElementById('ft').value);
   document.getElementById('om').style.display='flex';
 }
 function clsOs(){document.getElementById('om').style.display='none';editId=null;}
@@ -7649,13 +7654,31 @@ async function svOS(){
   }
   if(!oculos.length){alert('Adicione ao menos um óculos.');return;}
 
-  const obsVisivel=document.getElementById('obs-wrap').style.display==='block';
+  // Garantia sem explicacao nao entra. A exigencia olha o TIPO da OS, e nao
+  // o que esta visivel na tela: se o bloco nao tiver aparecido por qualquer
+  // motivo, a OS continua barrada em vez de ser gravada vazia -- era assim
+  // que garantias do pos-vendas chegavam sem motivo nenhum.
+  const ehGarantia=String(document.getElementById('ft').value||'').startsWith('gar');
   const obs=document.getElementById('fobs').value;
   const respGar=document.getElementById('fresp-gar').value.trim();
   const receita=document.getElementById('freceita').value;
-  if(obsVisivel&&!obs){alert('Selecione o motivo da garantia.');return;}
-  if(obsVisivel&&!respGar){alert('Preencha o responsável pela garantia.');return;}
-  if(obsVisivel&&!document.getElementById('fobs-txt').value.trim()){alert('Preencha o campo de observação.');return;}
+  if(ehGarantia){
+    const _w=document.getElementById('obs-wrap');
+    if(_w&&_w.style.display!=='block')_w.style.display='block';   // mostra o que falta
+    if(!obs){
+      alert('Selecione o motivo da garantia.');
+      document.getElementById('fobs').focus();return;
+    }
+    if(!respGar){
+      alert('Preencha o responsável pela garantia.');
+      document.getElementById('fresp-gar').focus();return;
+    }
+    if(!document.getElementById('fobs-txt').value.trim()){
+      alert('Escreva o que aconteceu nesta garantia.\n\n'
+        +'Esse texto é o que a loja lê depois para entender o caso.');
+      document.getElementById('fobs-txt').focus();return;
+    }
+  }
 
   const now=Date.now();
   const prazo=document.getElementById('fprazo').value;
@@ -7894,7 +7917,7 @@ function rnKan(){
         ${c.credId?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:#F5F3FF;color:#5B21B6">CREDIÁRIO${c.credParcelado?' R$ '+Number(c.credParcelado).toFixed(2):''}</span>`:''}${c.formaPag?`<span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--mu)">${formasDaOS(c).map(p=>p.forma).join(' + ')||c.formaPag}</span>`:''}
       </div>`:''}${c.horaPronto&&ci<3?`<div class="cg" style="color:#0D7A75;font-weight:800;font-size:11px;background:var(--vl);border:1px solid #99DDD8;padding:2px 7px;border-radius:5px;display:inline-block">HORA PRONTO</div>`:''}${(c.saldoPago&&ci<5)?(faltaDoSaldo(c)>0.01
         ? `<div class="cg" style="color:#B45309;font-weight:800;font-size:11px;background:#FFFBEB;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">PAGO PARCIAL · ${rs(c.saldoPagoValor)} em ${dtBR(c.saldoPagoData)}</div>`
-        : `<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`):''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">${faltaDoSaldo(c)>0.01&&c.saldoPago?'FALTAM':'SALDO'}${(faltaDoSaldo(c)>0.01&&c.saldoPago)?' · R$ '+faltaDoSaldo(c).toFixed(2):(c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):'')}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsTxt}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
+        : `<div class="cg" style="color:#16A34A;font-weight:800;font-size:11px;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 7px;border-radius:5px;display:inline-block">SALDO QUITADO · ${dtBR(c.saldoPagoData)}</div>`):''}${c.saldo?`<div class="cg" style="color:#92400E;font-weight:800;font-size:11px;background:#FEF3C7;border:1px solid #FCD34D;padding:2px 7px;border-radius:5px;display:inline-block">${faltaDoSaldo(c)>0.01&&c.saldoPago?'FALTAM':'SALDO'}${(faltaDoSaldo(c)>0.01&&c.saldoPago)?' · R$ '+faltaDoSaldo(c).toFixed(2):(c.saldoValor?' · R$ '+Number(c.saldoValor).toFixed(2):'')}</div>`:''}${c.cliente?`<div class="cg" style="color:var(--tx);font-weight:700;font-size:11px">${hl(c.cliente,srch)}</div>`:''}${c.telefone?`<div class="cg" style="color:var(--mu)">${c.telefone}</div>`:''}${c.dtVenda?`<div class="cg" style="color:var(--v);font-weight:500">Venda: ${c.dtVenda.split('-').reverse().join('/')}</div>`:''}${c.prazo?`<div class="cg" style="color:${c.urgente?'#DC2626':'var(--mu)'};font-weight:${c.urgente?'700':'500'}">${c.urgente?' URGENTE':''} Entrega: ${c.prazo.split('-').reverse().join('/')}</div>`:''}${c.obs?`<div class="cg" style="color:var(--wa);font-style:italic">${c.obs}${c.receita?' · '+c.receita:''}</div>`:''}${c.lab?`<div class="cg" style="color:var(--mu)">Lab: ${c.lab}</div>`:''}${c.obsmv?`<div class="cg" style="color:var(--mu);font-style:italic">${c.obsmv}</div>`:''}${c.osCompra?`<div class="cg" style="color:var(--mu)">OS Compra: ${c.osCompra}</div>`:''}${c.respGar?`<div class="cg" style="color:var(--mu)">Resp: ${c.respGar}</div>`:''}${c.obsTxt?`<div class="cg" style="${String(c.tipo||'').startsWith('gar')?'color:var(--wa);background:var(--wabg);border-left:3px solid #FCD34D;border-radius:0 6px 6px 0;padding:5px 8px;font-style:normal;white-space:normal':'color:var(--mu);font-style:italic'}">${hl(c.obsTxt,srch)}</div>`:''}${blocoOculos(c,srch)}<div class="cm"><span class="bg2 ${tGC(c.tipo)}">${tGL(c.tipo)}</span><span class="tm ${tc}">${ft(h)}</span></div><div class="cu">por ${lu}</div><div class="cac">${cm?`<button class="bn" style="${ci===4?'background:linear-gradient(135deg,#16A34A,#15803D);':''}" onclick="mvCard('${c.id}')">${nl}</button>`:''}${((ci>=3||c.horaPronto)&&c.telefone&&R.wa)?`<button id="wa-${c.id}" class="bwa${jaAvisado(c)?' avisado':''}" onclick="avisarWhats('${c.id}')">${jaAvisado(c)?'✓ Avisado':'WhatsApp'}</button>`:''}${(osMista(c)&&!c.horaPronto&&ci<3&&R.mv&&R.mv.length)?`<button class="bde" style="background:#0D7A75;color:#fff;border:1px solid #0D7A75;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="marcarHoraPronto('${c.id}')">Hora pronto</button>`:''}${(c.saldo&&ci<5&&R.ed)?`<button class="bde" style="background:#16A34A;color:#fff;border:1px solid #16A34A;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:800" onclick="opSaldoPago('${c.id}')">Receber saldo</button>`:''}<button class="bh" onclick="opH('${c.id}')" title="Histórico e mais ações">&#9776;</button></div>`;
       frag.appendChild(div);
     });
     col.appendChild(frag);
@@ -8543,7 +8566,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-17';
+const VERSAO_SISTEMA='2026-10-20';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
