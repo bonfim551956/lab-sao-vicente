@@ -4675,16 +4675,20 @@ function opEntrega(id){
     +'padding:10px 12px;margin-bottom:12px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E';
   const AV_QUITADO='display:block;font-size:12px;font-weight:700;border-radius:10px;'
     +'padding:10px 12px;margin-bottom:12px;background:#F0FDF4;border:1px solid #BBF7D0;color:#166534';
+  // O que manda aqui e o que FALTA receber, nao a marca c.saldo. A marca
+  // pode ficar ligada num saldo ja quitado -- foi o estado da OS 2331659 de
+  // Campinas -- e entao a tela pedia o saldo cheio pela segunda vez.
+  const _falta=faltaDoSaldo(c);
+  const _jaRecebido=recebidoDoSaldo(c);
   let _jaQuitado=false;
-  if(temSaldoAberto(c)){
+  if(_falta>0.001){
     av.style.cssText=AV_COBRAR;
-    const falta=faltaDoSaldo(c);
-    av.textContent=(c.saldoPago&&falta>0.01)
+    av.textContent=(_jaRecebido>0.001)
       ? ('Saldo de R$ '+Number(c.saldoValor||0).toFixed(2)+'. Já recebido R$ '
-         +recebidoDoSaldo(c).toFixed(2)+' — faltam R$ '+falta.toFixed(2)+'.')
+         +_jaRecebido.toFixed(2)+' — faltam R$ '+_falta.toFixed(2)+'.')
       : ('Esta OS tem SALDO de R$ '+Number(c.saldoValor||0).toFixed(2)+' a receber.');
-    document.getElementById('ent-valor').value=((c.saldoPago&&falta>0.01)?falta:(c.saldoValor||''));
-  }else if(c.saldoPago&&recebidoDoSaldo(c)>0.001){
+    document.getElementById('ent-valor').value=_falta;
+  }else if(_jaRecebido>0.001){
     // O saldo foi recebido antes da retirada. Sem dizer isso aqui, quem
     // entrega ve um campo de valor em branco, uma forma de pagamento a
     // escolher, e lanca o saldo de novo -- foi o que aconteceu na OS
@@ -4744,8 +4748,9 @@ async function svEntrega(){
   // compara com o que ainda falta, nao com o saldo cheio: num saldo pago
   // pela metade o cliente deve so o resto
   // Saldo ja quitado antes da retirada: cobrar de novo seria o mesmo
-  // dinheiro em dois dias. Pergunta antes de deixar passar.
-  if(!temSaldoAberto(c)&&c.saldoPago&&recebidoDoSaldo(c)>0.001&&total>0.001){
+  // dinheiro em dois dias. Pergunta antes de deixar passar. A conta e pelo
+  // que falta, nao pela marca c.saldo, que pode estar ligada por engano.
+  if(faltaDoSaldo(c)<=0.001&&recebidoDoSaldo(c)>0.001&&total>0.001){
     if(!confirm('O saldo desta OS (R$ '+Number(c.saldoValor||0).toFixed(2)+') já foi recebido'
       +(c.saldoPagoData?(' em '+dtBR(c.saldoPagoData)):'')+'.\n\n'
       +'Lançar R$ '+total.toFixed(2)+' agora coloca esse dinheiro no caixa uma segunda vez.\n\n'
@@ -8704,7 +8709,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-21';
+const VERSAO_SISTEMA='2026-10-21b';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
