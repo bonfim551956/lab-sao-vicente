@@ -4671,19 +4671,36 @@ function opEntrega(id){
   opcoesFormasRecebimento(document.getElementById('ent-forma'));
   opcoesFormasRecebimento(document.getElementById('ent-forma2'));
   const av=document.getElementById('ent-saldo');
+  const AV_COBRAR='display:block;font-size:12px;font-weight:700;border-radius:10px;'
+    +'padding:10px 12px;margin-bottom:12px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E';
+  const AV_QUITADO='display:block;font-size:12px;font-weight:700;border-radius:10px;'
+    +'padding:10px 12px;margin-bottom:12px;background:#F0FDF4;border:1px solid #BBF7D0;color:#166534';
+  let _jaQuitado=false;
   if(temSaldoAberto(c)){
-    av.style.display='block';
+    av.style.cssText=AV_COBRAR;
     const falta=faltaDoSaldo(c);
     av.textContent=(c.saldoPago&&falta>0.01)
       ? ('Saldo de R$ '+Number(c.saldoValor||0).toFixed(2)+'. Já recebido R$ '
          +recebidoDoSaldo(c).toFixed(2)+' — faltam R$ '+falta.toFixed(2)+'.')
       : ('Esta OS tem SALDO de R$ '+Number(c.saldoValor||0).toFixed(2)+' a receber.');
     document.getElementById('ent-valor').value=((c.saldoPago&&falta>0.01)?falta:(c.saldoValor||''));
+  }else if(c.saldoPago&&recebidoDoSaldo(c)>0.001){
+    // O saldo foi recebido antes da retirada. Sem dizer isso aqui, quem
+    // entrega ve um campo de valor em branco, uma forma de pagamento a
+    // escolher, e lanca o saldo de novo -- foi o que aconteceu na OS
+    // 2331659 de Campinas: R$ 350 no caixa em dois dias diferentes.
+    _jaQuitado=true;
+    av.style.cssText=AV_QUITADO;
+    av.textContent='Saldo de R$ '+Number(c.saldoValor||0).toFixed(2)+' já recebido'
+      +(c.saldoPagoData?(' em '+dtBR(c.saldoPagoData)):'')
+      +(c.saldoPagoForma?(' · '+c.saldoPagoForma):'')
+      +'. Não cobre de novo — deixe em "Sem saldo".';
+    document.getElementById('ent-valor').value='0';
   }else{
-    av.style.display='none';
+    av.style.cssText='display:none';
     document.getElementById('ent-valor').value='';
   }
-  document.getElementById('ent-forma').value='';
+  document.getElementById('ent-forma').value=_jaQuitado?'Sem saldo':'';
   document.getElementById('ent-dois').checked=false;
   tgEntDois(false);
   document.getElementById('entm').style.display='flex';
@@ -4726,6 +4743,14 @@ async function svEntrega(){
   }
   // compara com o que ainda falta, nao com o saldo cheio: num saldo pago
   // pela metade o cliente deve so o resto
+  // Saldo ja quitado antes da retirada: cobrar de novo seria o mesmo
+  // dinheiro em dois dias. Pergunta antes de deixar passar.
+  if(!temSaldoAberto(c)&&c.saldoPago&&recebidoDoSaldo(c)>0.001&&total>0.001){
+    if(!confirm('O saldo desta OS (R$ '+Number(c.saldoValor||0).toFixed(2)+') já foi recebido'
+      +(c.saldoPagoData?(' em '+dtBR(c.saldoPagoData)):'')+'.\n\n'
+      +'Lançar R$ '+total.toFixed(2)+' agora coloca esse dinheiro no caixa uma segunda vez.\n\n'
+      +'Se não há nada a receber, cancele e deixe em "Sem saldo". Confirma mesmo assim?'))return;
+  }
   const _faltaEnt=faltaDoSaldo(c);
   if(temSaldoAberto(c)&&total<_faltaEnt){
     if(!confirm('O recebido (R$ '+total.toFixed(2)+') é menor que o que falta do saldo: R$ '
@@ -8679,7 +8704,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-20d';
+const VERSAO_SISTEMA='2026-10-21';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
