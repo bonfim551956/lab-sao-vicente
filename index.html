@@ -7014,12 +7014,15 @@ const CHECKLISTS={
   ]
 };
 
-// Dois perfis, e mais nenhum: supervisor usa a lista de 24 tarefas,
-// administrador a de 20. Diretor, gerente, pos-vendas e montagem nao tem
-// check list.
+// A lista de 24 tarefas e de UMA pessoa, nao de um perfil: so a Thayna.
+// Os outros supervisores (Lori, Jaqueline, Eric) nao tem check list.
+// Mudando a pessoa responsavel, troque o login na linha abaixo.
+// A lista de 20 continua por perfil: todo administrador tem a dele.
+const CHECK_LIDER_LOGIN='thayna';
+
 function listaDoPerfil(){
   if(!U)return null;
-  if(U.r==='supervisor')return 'lider';
+  if(U.u===CHECK_LIDER_LOGIN)return 'lider';
   if(U.r==='adm')return 'auxiliar';
   return null;
 }
@@ -9130,7 +9133,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23b';
+const VERSAO_SISTEMA='2026-10-23c';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
