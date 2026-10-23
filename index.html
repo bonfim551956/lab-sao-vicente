@@ -474,6 +474,59 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   .mb{padding:8px;}
   .mo,.md{max-height:94vh;}
 }
+
+/* ── MANUAL DO SISTEMA ── */
+.mn-wrap{display:grid;grid-template-columns:232px 1fr;gap:28px;align-items:start}
+@media(max-width:900px){.mn-wrap{grid-template-columns:1fr;gap:16px}}
+.mn-idx{position:sticky;top:calc(var(--nb-h) + 14px);display:flex;flex-direction:column;gap:14px}
+@media(max-width:900px){.mn-idx{position:static;max-height:210px;overflow:auto;
+  background:var(--w);border:1px solid var(--bo);border-radius:14px;padding:12px}}
+.mn-ig{display:flex;flex-direction:column}
+.mn-igt{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--mu);padding:0 8px 5px}
+.mn-ig a{font-size:12.5px;font-weight:600;color:var(--mu);text-decoration:none;
+  padding:5px 8px;border-radius:8px;line-height:1.35}
+.mn-ig a:hover{background:var(--vl);color:#0D7A75}
+.mn-body{min-width:0;display:flex;flex-direction:column;gap:12px}
+.mn-gt{font-size:12px;font-weight:800;color:var(--v);text-transform:uppercase;
+  letter-spacing:.9px;margin-top:16px}
+.mn-gt:first-child{margin-top:0}
+.mn-sec{background:var(--w);border:1px solid var(--bo);border-radius:18px;
+  padding:22px 24px;box-shadow:var(--card-shadow);
+  scroll-margin-top:calc(var(--nb-h) + 18px)}
+.mn-st{font-size:16px;font-weight:800;color:var(--tx);letter-spacing:-.3px;margin:0 0 14px}
+.mn-h{font-size:13px;font-weight:800;color:var(--tx);margin:20px 0 8px}
+.mn-p{font-size:13.5px;line-height:1.65;color:#334155;margin:0 0 10px}
+.mn-ol,.mn-ul{margin:0 0 12px;padding-left:20px;font-size:13.5px;line-height:1.65;color:#334155}
+.mn-ol li,.mn-ul li{margin-bottom:6px}
+.mn-sim{list-style:none;margin:0 0 12px;padding:0;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:7px}
+.mn-sim li{font-size:13px;font-weight:600;color:#334155;padding-left:21px;position:relative}
+.mn-sim li:before{content:'\2713';position:absolute;left:0;color:var(--v);font-weight:800}
+.mn-av{font-size:13px;line-height:1.6;border-radius:12px;padding:12px 15px;margin:0 0 12px}
+.mn-dica{background:var(--vl);color:#0B5F5B;border:1px solid rgba(27,168,160,.25)}
+.mn-at{background:var(--vcl);color:#8A4B00;border:1px solid rgba(245,154,42,.35)}
+.mn-msg{font-size:12.5px;line-height:1.55;background:var(--bg);
+  border-left:3px solid var(--bo2);border-radius:8px;padding:10px 14px;margin:0 0 12px;
+  color:#475569;font-style:italic}
+.mn-k{display:inline-block;background:var(--bg);border:1px solid var(--bo);border-radius:6px;
+  padding:1px 7px;font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap}
+.mn-tw{overflow-x:auto;border:1px solid var(--bo);border-radius:12px;margin:0 0 14px}
+.mn-tb{width:100%;border-collapse:collapse;font-size:12.5px;min-width:420px}
+.mn-tb th{background:var(--v);color:#fff;text-align:left;padding:9px 12px;font-weight:700;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+.mn-tb td{padding:9px 12px;border-top:1px solid var(--bo);color:#334155;
+  line-height:1.5;vertical-align:top}
+.mn-tb tbody tr:nth-child(even) td{background:#F7FCFC}
+#mn-busca{font-size:12px;padding:7px 12px;border:1.5px solid var(--bo);border-radius:9px;
+  background:var(--w);color:var(--tx);font-family:inherit;font-weight:600;outline:none;width:186px}
+#mn-busca:focus{border-color:var(--v)}
+@media print{
+  nav,.tabs,.mn-idx,#mn-busca,.bex{display:none!important}
+  .mn-wrap{display:block}
+  .mn-sec{break-inside:avoid;border:0;box-shadow:none;padding:0 0 20px;border-radius:0}
+  .mn-tb th{background:#eee!important;color:#000!important}
+}
 </style>
 </head>
 <body>
@@ -524,6 +577,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
       <button class="tab" id="t-cf" onclick="sw('cf')" style="display:none">Conferência</button>
         <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
+      <button class="tab" id="t-mn" onclick="sw('mn')" style="display:none">Manual</button>
     </div>
   </nav>
 
@@ -770,6 +824,21 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   </div>
   <div id="ck-barra" style="margin-bottom:12px"></div>
   <div id="ck-body"><div class="er">Carregando...</div></div>
+</div>
+
+<div id="mns" class="rm" style="display:none">
+  <div class="rh">
+    <span class="rt">Manual do sistema</span>
+    <span style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px">montado para o seu acesso</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <input id="mn-busca" type="text" placeholder="Buscar no manual..." oninput="rnManual()"/>
+      <button class="bex" onclick="mnImprimir()">Imprimir / PDF</button>
+    </div>
+  </div>
+  <div class="mn-wrap">
+    <nav class="mn-idx" id="mn-idx" aria-label="Índice do manual"></nav>
+    <div class="mn-body" id="mn-body"><div class="er">Carregando...</div></div>
+  </div>
 </div>
 
 <div id="ags" class="rm" style="display:none">
@@ -2278,7 +2347,7 @@ function ehDiretor(){return !!(U&&U.r==='diretor');}
 function aplicarAbas(){
   const mostra=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?'block':'none';};
   if(!U||!R){
-    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us'].forEach(id=>mostra(id,false));
+    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us','t-mn'].forEach(id=>mostra(id,false));
     return;
   }
   const fin=!!(R.ed||R.r==='posvendas');
@@ -2291,6 +2360,8 @@ function aplicarAbas(){
   mostra('t-us', U.r==='supervisor'||U.r==='diretor');
   mostra('t-cf', !!R.cf);
   mostra('t-ck', !!listaDoPerfil());
+  // O manual e de todo mundo -- o que muda e o conteudo, nao o acesso.
+  mostra('t-mn', true);
   mostra('t-ag', true);
   mostra('t-nr', true);
   mostra('t-cc', true);
@@ -2309,14 +2380,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks',mn:'mns'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck','mn'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -2343,6 +2414,7 @@ function sw(tab){
   }
   if(tab==='ag')rnAgPag();
   if(tab==='ck')rnCheck();
+  if(tab==='mn')rnManual();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
@@ -7144,6 +7216,824 @@ async function expCheckMes(){
   a.href=u;a.download='checklist_'+mes+'.csv';a.click();URL.revokeObjectURL(u);
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+   MANUAL DO SISTEMA
+   O conteudo e montado de acordo com a permissao de quem esta logado:
+   cada secao declara em 'v' quando aparece. Criando funcionalidade
+   nova, acrescente a secao aqui -- este e o unico lugar do manual.
+   ═════════════════════════════════════════════════════════════════════ */
+
+// Blocos de texto, para o conteudo nao virar uma sopa de <div>.
+const _mT   = t => '<div class="mn-h">'+t+'</div>';
+const _mP   = t => '<p class="mn-p">'+t+'</p>';
+const _mOl  = a => '<ol class="mn-ol">'+a.map(x=>'<li>'+x+'</li>').join('')+'</ol>';
+const _mUl  = a => '<ul class="mn-ul">'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+const _mDica= t => '<div class="mn-av mn-dica">'+t+'</div>';
+const _mAt  = t => '<div class="mn-av mn-at">'+t+'</div>';
+const _mMsg = t => '<div class="mn-msg">'+t+'</div>';
+const _mK   = t => '<span class="mn-k">'+t+'</span>';
+const _mTab = (cab,lin) =>
+  '<div class="mn-tw"><table class="mn-tb"><thead><tr>'
+  + cab.map(c=>'<th>'+c+'</th>').join('')
+  + '</tr></thead><tbody>'
+  + lin.map(l=>'<tr>'+l.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')
+  + '</tbody></table></div>';
+
+// O contexto de permissao que cada secao recebe. Tudo que decide se uma
+// secao aparece passa por aqui -- nenhuma secao le R direto.
+function ctxManual(){
+  const r = R || {}, perfil = (U&&U.r) || '';
+  const tp = r.tp || null;
+  const temTipo = t => !tp || tp.indexOf(t) >= 0;
+  return {
+    perfil, rotulo:(RS[perfil]&&RS[perfil].l) || perfil,
+    pode: k => !!r[k],
+    fin: !!r.ed,                                   // abas de dinheiro
+    temTipo,
+    vendeNormal: temTipo('venda') || temTipo('hora'),
+    temGarantia: temTipo('gar-hora') || temTipo('gar-pedido'),
+    move: c => Array.isArray(r.mv) && r.mv.indexOf(c) >= 0,
+    moveAlgo: (Array.isArray(r.mv) && r.mv.length>0)
+           || (Array.isArray(r.mvp) && r.mvp.length>0),
+    usuarios: perfil==='supervisor' || perfil==='diretor',
+    check: !!listaDoPerfil(),
+    colunas: (r.se||[]).map(i=>nomeCol(i)),
+    colsMove: (r.mv||[]).map(i=>nomeCol(i)),
+  };
+}
+
+const MANUAL = [
+
+/* ─────────────── Começando ─────────────── */
+{
+  id:'mn-sistema', g:'Começando', t:'O que é este sistema',
+  p:'sistema loja endereco versao rodape atualizar f5 recarregar',
+  v:()=>true,
+  h:()=>
+    _mP('Este é o controle de ordens de serviço das Óticas Idealize. Cada venda vira uma OS, que caminha por um quadro até ser entregue ao cliente. O sistema também cuida do crediário, do estoque de lentes, do fechamento do caixa e dos relatórios da loja.')
+  + _mT('Cada loja tem o seu sistema')
+  + _mP('São quatro endereços e os dados não se misturam. A loja é definida pelo <b>endereço que você acessa</b>, não pelo seu cadastro: quem entra pelo endereço de Campinas está trabalhando em Campinas.')
+  + _mTab(['Loja','Endereço'],[
+      ['São Vicente','saovicente.oticasidealize.online'],
+      ['Sorocaba','sorocaba.oticasidealize.online'],
+      ['Piracicaba','piracicaba.oticasidealize.online'],
+      ['Campinas','campinas.oticasidealize.online']])
+  + _mT('A versão, no rodapé')
+  + _mP('Se a tela se comportar de um jeito que não bate com este manual, confira a versão no rodapé. Uma página aberta desde antes de uma atualização continua com o código antigo — <b>recarregar com F5 resolve</b>. O sistema recusa gravar com código velho de propósito, para não aplicar regra vencida.')
+},
+{
+  id:'mn-acesso', g:'Começando', t:'Entrar, trocar a senha e o que fazer se esquecer',
+  p:'login entrar senha trocar esqueci usuario inativo sair',
+  v:()=>true,
+  h:()=>
+    _mOl([
+      'Abra o endereço da sua loja.',
+      'Digite <b>usuário</b> e <b>senha</b>.',
+      'Clique em '+_mK('Entrar')+'.'])
+  + _mP('O usuário não diferencia maiúscula de minúscula.')
+  + _mT('Trocar a sua senha')
+  + _mP('Botão '+_mK('Senha')+', no topo da tela, ao lado de Sair. A senha nova precisa de no mínimo 6 caracteres.')
+  + _mT('Esqueci a senha')
+  + _mP('Não há recuperação por e-mail. Quem redefine é o supervisor, pela aba Usuários.')
+  + _mTab(['Mensagem','O que significa'],[
+      ['Preencha usuário e senha','Um dos dois está em branco'],
+      ['Usuário inativo. Fale com o supervisor.','O cadastro existe mas foi desativado'],
+      ['Usuário ou senha incorretos','Não achou o cadastro, ou a senha não confere']])
+},
+{
+  id:'mn-seuacesso', g:'Começando', t:'Seu acesso',
+  p:'perfil permissao o que eu posso fazer colunas abas',
+  v:()=>true,
+  h:c=>{
+    const itens=[
+      [c.pode('ca'),'Lançar OS'],
+      [c.pode('ce'),'Editar OS'],
+      [c.moveAlgo,'Mover o card entre colunas'],
+      [c.pode('wa'),'Avisar o cliente pelo WhatsApp'],
+      [c.pode('ed'),'Entregar e receber saldo'],
+      [c.pode('rf'),'Refazer um serviço'],
+      [c.pode('cn'),'Cancelar OS'],
+      [c.pode('cd'),'Excluir OS'],
+      [c.pode('es'),'Mexer no estoque de lentes'],
+      [c.pode('ed'),'Fechar o caixa do dia'],
+      [c.pode('cf'),'Conferir o caixa com o extrato'],
+      [c.pode('cfe'),'Corrigir OS de um dia já encerrado'],
+      [c.pode('aj'),'Mexer nos ajustes do sistema'],
+      [c.usuarios,'Cadastrar e desativar usuários'],
+      [c.check,'Ver e marcar o check list do dia'],
+    ].filter(x=>x[0]);
+    let s = _mP('Este manual foi montado para o <b>seu</b> acesso: só aparece aqui o que você pode fazer. Você está como <b>'+c.rotulo+'</b>.');
+    s += itens.length
+       ? '<ul class="mn-sim">'+itens.map(x=>'<li>'+x[1]+'</li>').join('')+'</ul>'
+       : _mAt('Seu usuário ainda não tem permissão para nada. Fale com o supervisor.');
+    if(c.colunas.length) s += _mP('<b>Colunas que você vê no quadro:</b> '+c.colunas.join(' · '));
+    if(c.colsMove.length) s += _mP('<b>Colunas de onde você move o card:</b> '+c.colsMove.join(' · '));
+    if(R && Array.isArray(R.mvp) && R.mvp.length)
+      s += _mP('Da coluna <b>Montagem</b> você move só quando a OS está no <b>laboratório parceiro</b>. No laboratório próprio, quem move é a montagem.');
+    if(R && R.tp)
+      s += _mP('<b>Tipos de OS que você lança:</b> garantias, passagem, cortesia, venda avulsa e manutenção. Venda normal não aparece na sua lista.');
+    s += _mP('Precisa de algo que não está aqui? Fale com o supervisor — o sistema libera só o necessário para cada função.');
+    return s;
+  }
+},
+{
+  id:'mn-quadro', g:'Começando', t:'Como o quadro funciona',
+  p:'quadro colunas venda pedido montagem pronto avisado entregue card mover',
+  v:()=>true,
+  h:c=>
+    _mP('Toda OS caminha por colunas, da esquerda para a direita. São seis no caminho normal, e três de saída que não são o "próximo passo" de ninguém.')
+  + _mTab(['Coluna','O que significa'],[
+      ['<b>Venda</b>','A OS acabou de ser lançada'],
+      ['<b>Pedido</b>','A lente foi pedida ao fornecedor'],
+      ['<b>Montagem</b>','Está no laboratório, montando'],
+      ['<b>Pronto</b>','Pronto para o cliente buscar'],
+      ['<b>Avisado</b>','O cliente já foi avisado'],
+      ['<b>Entregue</b>','O cliente levou'],
+      ['Não retirados','Ficou pronto e o cliente não buscou em 15 dias'],
+      ['Aguardando pagamento','Pagou pouco: o pedido não vai ser feito ainda'],
+      ['Canceladas','A venda foi desfeita']])
+  + (c.moveAlgo
+     ? _mT('Mover o card')
+     + _mP('Cada card tem um botão com o nome do próximo passo. <b>O card anda uma coluna por vez</b> e para em Entregue.')
+     + _mP('As três colunas de saída só recebem OS por botão próprio. Tentando empurrar um card delas pelo botão comum:')
+     + _mMsg('Esta OS está em Não retirados. Use os botões próprios dessa aba para movimentá-la.')
+     + _mP('Essa trava existe porque, antes dela, uma OS de Não retirados empurrada adiante caía em Canceladas e tirava o dinheiro do caixa sem ninguém perceber.')
+     : '')
+  + _mT('O que o sistema pede em cada passagem')
+  + _mUl([
+      '<b>Venda → Pedido:</b> o número do pedido de cada óculos que vai ao fornecedor. Óculos de HORA não tem pedido. Se todos saem do estoque, a OS passa direto.',
+      '<b>Pedido → Montagem:</b> o laboratório (Próprio ou Parceiro), e aqui as lentes <b>baixam do estoque</b> — 2 por óculos, ou 1 se estiver MEIO PAR. Falta o grau de um óculos de HORA e o sistema recusa.',
+      '<b>Montagem → Pronto:</b> quem move é a montagem. É esse passo que conta como montagem feita nos relatórios.',
+      '<b>Pronto → Avisado:</b> depois de avisar o cliente.',
+      '<b>Avisado → Entregue:</b> abre a tela de entrega.'])
+  + _mT('OS que pula etapa')
+  + _mUl([
+      '<b>Cortesia — óculos de sol:</b> de Venda vai direto para Pronto.',
+      '<b>Venda — Lentes de contato</b>, e qualquer OS em que todos os óculos estão marcados como LENTE DE CONTATO: de Pedido vai direto para Pronto.',
+      '<b>Garantia — Armação sem lapidação:</b> nasce já em Pronto.'])
+  + (c.moveAlgo
+     ? _mTab(['Quando o sistema recusa mover','O que significa'],[
+         ['Sem permissão para mover desta coluna.','Essa coluna não é do seu perfil'],
+         ['Esta OS está no laboratório próprio — quem move daqui é a montagem.','Lab. próprio só a montagem move'],
+         ['Seu perfil só movimenta garantias e passagens.','O tipo da OS não é do seu perfil'],
+         ['Preencha o grau (OD e OE)…','Falta grau num óculos que sai do estoque']])
+     : '')
+},
+
+/* ─────────────── Lançar e mover ─────────────── */
+{
+  id:'mn-tipos', g:'Lançar e mover', t:'Qual tipo de serviço escolher',
+  p:'tipo servico venda pedido hora contato garantia cortesia passagem manutencao',
+  v:c=>c.pode('ca'),
+  h:c=>
+    _mP('O tipo é a decisão mais importante do lançamento: ele define o caminho da OS, se exige grau, se exige número de pedido e se o valor é obrigatório.')
+  + (c.vendeNormal
+     ? _mT('Vendas')
+     + _mTab(['Tipo','Quando usar'],[
+        ['<b>Venda — Pedido</b>','A lente é pedida ao fornecedor. É o caso mais comum'],
+        ['<b>Venda — Hora</b>','A lente sai da prateleira, na hora. Exige o grau e baixa o estoque'],
+        ['<b>Venda — Lentes de contato</b>','Pede ao fornecedor, mas não passa pela montagem']])
+     : '')
+  + _mT('Garantias')
+  + _mTab(['Tipo','Quando usar'],[
+      ['<b>Garantia — Pedido</b>','Refazer a lente com pedido ao fornecedor'],
+      ['<b>Garantia — Hora</b>','Refazer com lente do estoque'],
+      ['<b>Garantia — Armação c/ lapidação</b>','Troca de armação que precisa lapidar a lente'],
+      ['<b>Garantia — Armação s/ lapidação</b>','Aproveita a lente como está. Nasce em Pronto']])
+  + _mT('Cortesias e serviços')
+  + _mTab(['Tipo','Quando usar'],[
+      ['<b>Cortesia — óculos hora / pedido</b>','Cortesia com lente do estoque ou pedida'],
+      ['<b>Cortesia — óculos de sol</b>','Vai direto para Pronto'],
+      ['<b>Passagem — com lapidação</b>','Passar a lente do cliente para outra armação'],
+      ['<b>Manutenção — laboratório parceiro</b>','Ajuste, limpeza, troca de peça']])
+  + _mT('O que cada tipo exige')
+  + _mTab(['Tipo','Valor','Grau','Nº pedido','Baixa estoque'],
+     (c.vendeNormal?[
+      ['Venda — Pedido','obrigatório','—','<b>sim</b>','—'],
+      ['Venda — Hora','obrigatório','<b>sim</b>','—','<b>sim</b>'],
+      ['Venda — Lentes de contato','obrigatório','—','<b>sim</b>','—']]:[]).concat([
+      ['Garantia — Pedido','opcional','—','<b>sim</b>','—'],
+      ['Garantia — Hora','opcional','<b>sim</b>','—','<b>sim</b>'],
+      ['Garantia — Armação (c/ ou s/ lap.)','opcional','—','—','—'],
+      ['Cortesia — hora','opcional','<b>sim</b>','—','<b>sim</b>'],
+      ['Cortesia — pedido','opcional','—','<b>sim</b>','—'],
+      ['Cortesia — óculos de sol','opcional','—','—','—'],
+      ['Passagem c/ lapidação','obrigatório','—','—','—'],
+      ['Manutenção','<b>opcional</b>','—','—','—']]))
+  + _mP('"Valor opcional" quer dizer que o rótulo do campo muda para <i>Valor da venda (opcional)</i> e a OS salva sem valor. Nos outros, falta o valor e o sistema recusa.')
+},
+{
+  id:'mn-novaos', g:'Lançar e mover', t:'Lançar uma OS — passo a passo',
+  p:'nova os lancar venda cliente whatsapp prazo urgente vendedor forma pagamento oculos grau',
+  v:c=>c.pode('ca'),
+  h:()=>
+    _mP('Botão '+_mK('+ Nova OS')+', na aba Serviços.')
+  + _mT('Dados da venda')
+  + _mOl([
+      '<b>Número da OS</b> — obrigatório. É o número do sistema de vendas.',
+      '<b>Cliente</b> — sem ele ninguém sabe de quem é a OS, e o aviso de WhatsApp sai sem nome.',
+      '<b>WhatsApp</b> — a máscara se forma sozinha. Sem telefone, o botão de avisar não aparece.',
+      '<b>Data da venda</b> — já vem com hoje. <b>É ela que define em qual fechamento de caixa a venda entra.</b>',
+      '<b>Prazo de entrega</b> — já vem com 10 dias. Marcando '+_mK('Urgente')+', vira 3.',
+      '<b>Vendedor</b> — obrigatório em toda OS. Escolha da lista de nomes já usados em vez de digitar.',
+      '<b>Tipo de serviço</b> — veja a seção dos tipos.'])
+  + _mT('Pagamento')
+  + _mOl([
+      '<b>Valor da venda</b> — o valor cheio da compra. É ele que conta no ranking do dia.',
+      '<b>Valor recebido</b> — quanto o cliente pagou agora.',
+      '<b>Forma de pagamento</b> — obrigatória se houve valor recebido.',
+      'Dividiu? '+_mK('+ 2ª forma de pagamento')+', e quantas mais precisar.'])
+  + _mP('O sistema mostra sozinho o que sobrou: faixa <b>amarela</b> com o saldo a receber, <b>verde</b> quando está quitado, ou <b>vermelha</b> dizendo que o recebido passou do valor da venda — aí alguém digitou errado.')
+  + _mT('Óculos')
+  + _mOl([
+      '<b>Quantidade</b> — de 1 a 4 óculos na mesma OS.',
+      'Com mais de um óculos, cada bloco ganha duas caixinhas: <b>HORA</b> (a lente sai do estoque) e <b>LENTE DE CONTATO</b> (entra no pedido, mas não vai para a montagem). Marcar uma desmarca a outra.',
+      '<b>Grau</b> — aparece quando o tipo pede, ou quando o óculos é de HORA.',
+      '<b>MEIO PAR</b> — nos óculos de HORA, quando o cliente levou só uma lente. O estoque baixa 1 em vez de 2.'])
+  + _mDica('Uma OS pode misturar óculos e lentes de contato. Marque a caixinha LENTE DE CONTATO só nos blocos que são de contato — o resto da OS segue o caminho normal.')
+  + _mT('O que o sistema recusa')
+  + _mTab(['Mensagem','O que fazer'],[
+      ['Informe o número da OS.','Preencher o número'],
+      ['Informe o valor da venda.','O tipo escolhido exige valor'],
+      ['Informe o vendedor desta OS.','Escolher o vendedor'],
+      ['Selecione a forma de pagamento.','Houve valor recebido sem forma'],
+      ['Adicione ao menos um óculos.','Nenhum óculos no formulário'],
+      ['Já existe a OS &lt;número&gt; nesta loja.','O número já está em uso — confira'],
+      ['Seu perfil só pode registrar garantias e passagens.','O tipo não é do seu perfil']])
+  + _mDica('Se a OS com aquele número está <b>cancelada</b>, o sistema pergunta em vez de bloquear, e deixa reaproveitar o número. É para uma venda cancelada por erro poder ser relançada.')
+},
+{
+  id:'mn-garantia', g:'Lançar e mover', t:'Garantia: os quatro campos obrigatórios',
+  p:'garantia motivo responsavel vendedor relato o que aconteceu receita os de compra',
+  v:c=>c.pode('ca') && c.temGarantia,
+  h:()=>
+    _mP('Em <b>toda garantia</b> e em <b>todos os perfis</b>, quatro campos são obrigatórios:')
+  + _mOl([
+      '<b>Motivo da garantia</b> — da lista: Montagem, Erro Oftalmologista, Erro Optometrista, Erro Medida, Laboratório, Preenchimento OS, Armação, Adaptação, Outros, Com Valor, Armação + Lentes.',
+      '<b>Responsável pela garantia</b> — quem responde por ela.',
+      '<b>Vendedor da venda</b> — quem fez a venda original. <b>Não é a mesma pessoa do responsável.</b>',
+      '<b>O que aconteceu nesta garantia</b> — o relato: o que o cliente disse e o que foi feito.'])
+  + _mDica('Os campos de nome sugerem os nomes que a loja já usou. <b>Escolha da lista em vez de digitar</b> — foi digitando que "NATHAN" e "NATAN" viraram duas pessoas diferentes no relatório.')
+  + _mP('Há também dois campos opcionais: <b>OS de Compra</b> (o número da venda original) e <b>Receita</b> (Interna ou Fora).')
+  + _mT('O que o sistema recusa')
+  + _mUl([
+      'Selecione o motivo da garantia.',
+      'Preencha o responsável pela garantia.',
+      'Informe o vendedor que realizou a venda.',
+      'Escreva o que aconteceu nesta garantia. Esse texto é o que a loja lê depois para entender o caso.'])
+  + _mP('Se por algum motivo os campos não aparecerem na tela, o sistema <b>não deixa salvar</b> e faz os campos reaparecerem. Era assim que garantia chegava sem informação nenhuma.')
+  + _mP('No card, o motivo, o responsável, o vendedor e o relato aparecem em destaque. O relatório da aba Garantias traz todas essas colunas.')
+},
+{
+  id:'mn-manut', g:'Lançar e mover', t:'Manutenção e venda avulsa',
+  p:'manutencao ajuste limpeza plaqueta parafuso haste venda avulsa oculos de sol armacao acessorio',
+  v:c=>c.pode('ca'),
+  h:()=>
+    _mT('Manutenção')
+  + _mP('Para ajuste, limpeza, troca de plaquetas, parafuso ou haste — serviço na armação que o cliente já tem.')
+  + _mUl([
+      'É um tipo de '+_mK('+ Nova OS')+': "Manutenção — laboratório parceiro".',
+      '<b>O valor da venda é opcional:</b> boa parte é cortesia para cliente da casa, e troca de peça costuma ser cobrada.',
+      'Não gera pedido ao fornecedor — não há lente a pedir.',
+      'Caminho: de Venda vai para Pedido e, na Montagem, escolhe o laboratório.'])
+  + _mT('Venda avulsa')
+  + _mP('Para produto pronto que não passa pelo laboratório — óculos de sol, armação, acessório. Botão '+_mK('Venda avulsa')+'.')
+  + _mP('A OS entra já como entregue (ou em Pronto, se o cliente ainda vai buscar), conta no faturamento do dia e fica no histórico. Campos: tipo, produto, para onde encaminhar, cliente, nº da OS, vendedor, valor da venda, valor recebido e forma de pagamento. <b>Aqui valor e forma são sempre obrigatórios</b> — diferente da manutenção.')
+},
+{
+  id:'mn-editar', g:'Lançar e mover', t:'Editar uma OS',
+  p:'editar alterar corrigir os historico dia fechado garantia antiga',
+  v:c=>c.pode('ce'),
+  h:c=>
+    _mP('O botão fica dentro do histórico do card: ícone '+_mK('☰')+' → '+_mK('Editar OS')+'.')
+  + _mP('Três coisas importantes:')
+  + _mOl([
+      '<b>Toda edição fica registrada</b> no histórico, campo por campo: o que era e o que passou a ser.',
+      '<b>Editar uma OS de um dia cujo fechamento já foi salvo</b> faz o sistema avisar e corrigir a linha daquele dia. Não ignore esse aviso: ele existe para o caixa não ficar diferente da OS.',
+      '<b>Editando uma garantia antiga</b>, o sistema vai exigir os quatro campos obrigatórios antes de salvar. Não é travamento: é a regra nova valendo. Preencha e salve.'])
+  + (c.pode('cfe')
+     ? _mDica('Você pode corrigir OS de um dia já conferido ou fechado. O sistema confirma antes e avisa que a conferência daquela forma de pagamento volta a ficar pendente.')
+     : _mAt('Dia já conferido ou fechado você não altera: <i>"O caixa de &lt;data&gt; já está fechado. Só o supervisor pode alterar valores de um dia fechado."</i> Mudar cliente, prazo ou telefone pode — isso não mexe no caixa.'))
+},
+{
+  id:'mn-obs', g:'Lançar e mover', t:'Observações e histórico do card',
+  p:'observacao alerta card vermelho historico quem moveu o que aconteceu',
+  v:()=>true,
+  h:()=>
+    _mT('Observações')
+  + _mP('Toda observação lançada <b>vira alerta no card</b>, com o texto à vista, em vermelho. Não existe mais a opção de não marcar como alerta: se valeu a pena escrever, a próxima pessoa que pegar a OS precisa ler.')
+  + _mP('Para lançar: no card, ícone '+_mK('☰')+' → campo <b>Nova Observação</b> → '+_mK('Salvar Observação')+'.')
+  + _mP('O card mostra o texto da observação mais recente. Havendo mais de uma, ele diz quantas existem. Texto comprido é cortado com "…" no card e fica inteiro no histórico.')
+  + _mT('Histórico')
+  + _mP('Ícone '+_mK('☰')+' no card. O título traz o número da OS e o nome do cliente.')
+  + _mP('Mostra, do mais recente para o mais antigo: cada movimento de coluna com quem moveu e quando, as edições campo por campo, os recebimentos de saldo, os avisos de WhatsApp, as observações e o cancelamento com o motivo.')
+  + _mDica('É o primeiro lugar a olhar quando alguém pergunta "o que aconteceu com essa OS".')
+},
+
+/* ─────────────── Dinheiro ─────────────── */
+{
+  id:'mn-formas', g:'Dinheiro', t:'As formas de pagamento',
+  p:'forma pagamento dinheiro pix debito credito asaas multicrediario brasilcard link sem saldo garantia',
+  v:c=>c.pode('ca') || c.fin,
+  h:()=>
+    _mP('Dinheiro, Pix, Débito, Crédito, Multicrediário, Brasilcard, Link Asaas, Asaas, Sem saldo, Garantia e Outro.')
+  + _mP('Três se comportam diferente, e é onde mora a maior parte dos erros de caixa:')
+  + _mTab(['Forma','O que é','Entra no caixa do dia?'],[
+      ['<b>Asaas</b>','Crediário parcelado no boleto','<b>Não.</b> Entra a cada parcela baixada, no dia da baixa'],
+      ['<b>Multicrediário</b>','Financeira que garante o pagamento','<b>Sim</b>, integral, no dia da venda'],
+      ['<b>Link Asaas</b>','Link de cartão. Apesar do nome, <b>não é crediário</b>','<b>Sim</b>, é dinheiro de verdade']])
+  + _mP('<b>Sem saldo</b> e <b>Garantia</b> são marcações, não dinheiro: ficam de fora da soma do caixa.')
+  + _mT('A regra de ouro do crediário')
+  + _mP('<b>Venda parcelada começa pelo contrato, não pela OS.</b> Tentando lançar uma OS com forma Asaas ou Multicrediário sem ter vindo de um contrato, o sistema recusa:')
+  + _mMsg('Venda no crediário precisa começar pelo contrato. Vá na aba Crediário, crie o contrato com a entrada e as parcelas, e use o botão "Criar OS" no detalhe dele. Assim o caixa e as parcelas ficam certos.')
+  + _mT('E quando a OS já vem do contrato')
+  + _mP('O valor parcelado <b>já vem junto</b>. Não preencha a financeira outra vez como forma de pagamento — o valor entraria duas vezes. Nessa situação a opção nem aparece na lista.')
+  + _mAt('<b>Nas formas de pagamento vai só o que o cliente pagou hoje.</b> O que faltar para fechar a venda vira saldo, e é cobrado na retirada. Foi ignorando isso que uma OS ficou com R$ 1.680 de parcelado quando o contrato era de R$ 840.')
+},
+{
+  id:'mn-saldo', g:'Dinheiro', t:'Saldo: o que falta o cliente pagar',
+  p:'saldo receber antes retirada parcial aberto quitado aba saldos',
+  v:c=>c.fin,
+  h:()=>
+    _mP('Saldo não é marcado à mão: o sistema calcula sozinho, pela conta <i>valor da venda − tudo que foi recebido − o que está parcelado no crediário</i>. Se sobrar, vira saldo.')
+  + _mT('Os três jeitos de receber um saldo')
+  + _mOl([
+      '<b>Na retirada</b> — o caminho normal. Ao mover de Avisado para Entregue, abre a tela de entrega pedindo o valor.',
+      '<b>Antes da retirada</b> — o cliente passa na loja e paga sem levar o óculos. Botão '+_mK('Receber saldo')+' no card. Pede valor, forma e <b>data do recebimento</b>. Esse dinheiro entra no caixa <b>do dia em que foi pago</b>, não no dia da retirada.',
+      '<b>Em várias vezes</b> — cada recebimento soma ao anterior, e o card mostra quanto falta.'])
+  + _mT('Onde acompanhar')
+  + _mP('Aba <b>Saldos</b>, com filtro por período, por vendedor e por situação: <b>Aberto</b> (nada recebido), <b>Parcial</b> (recebeu parte) e <b>Recebido</b> (quitado). Saldo quitado continua na lista de propósito, para a loja saber quando e como foi recebido.')
+},
+{
+  id:'mn-entregar', g:'Dinheiro', t:'Entregar a OS',
+  p:'entregar entrega retirada saldo faixa amarela verde sem saldo cobrar de novo',
+  v:c=>c.pode('ed'),
+  h:()=>
+    _mP('Botão do card em Avisado, ou pela aba Não retirados.')
+  + _mT('Quando não há nada a receber')
+  + _mP('O sistema entrega direto, registrando "Sem saldo". Não pede nada.')
+  + _mT('Quando há saldo a receber')
+  + _mP('Abre a tela de entrega com uma faixa <b>amarela</b>, e o valor já vem preenchido:')
+  + _mMsg('Esta OS tem SALDO de R$ 350,00 a receber.')
+  + _mP('Pago pela metade, a faixa diz o que falta e já traz esse valor.')
+  + _mT('Quando o saldo já foi recebido antes')
+  + _mP('A faixa é <b>verde</b>, e a tela já abre zerada em "Sem saldo":')
+  + _mMsg('Saldo de R$ 350,00 já recebido em 19/10/2026 · Pix. Não cobre de novo — deixe em "Sem saldo".')
+  + _mAt('<b>Não lance valor nenhum aí.</b> Esse dinheiro já entrou no caixa no dia em que foi pago; lançar de novo coloca o mesmo valor em dois dias diferentes. Lançando mesmo assim o sistema pergunta de novo — <b>a resposta certa é cancelar</b>, salvo se o cliente realmente pagou um valor novo.')
+  + _mT('O que a tela de entrega recusa')
+  + _mTab(['Mensagem','Motivo'],[
+      ['Informe o valor recebido.','Campo em branco'],
+      ['Selecione a forma de pagamento.','Falta a forma'],
+      ['Informe o valor da 2ª forma.','Marcou 2ª forma e não preencheu'],
+      ['"Asaas" é financiamento, não entra como recebido na retirada…','Tentou lançar financeira na retirada'],
+      ['Valor recebido está zerado…','Valor zero com forma diferente de "Sem saldo"'],
+      ['O recebido (R$ X) é menor que o que falta do saldo…','Recebeu menos que o saldo']])
+},
+{
+  id:'mn-agpag', g:'Dinheiro', t:'Aguardando pagamento',
+  p:'aguardando pagamento abaixo do minimo pedido nao sera feito volta para vendas',
+  v:c=>c.pode('ed'),
+  h:()=>
+    _mP('Para a venda em que o cliente pagou pouco e o pedido não vai ser feito até ele pagar mais.')
+  + _mOl([
+      'No card em <b>Venda</b>, abra o histórico ('+_mK('☰')+') e clique em '+_mK('Saldo abaixo do mín.')+'.',
+      'O card sai do quadro e vai para a aba <b>Aguardando pagamento</b>. Ele não entra em Pedido enquanto estiver lá.',
+      'Quando o cliente pagar, botão '+_mK('Voltar para Vendas')+'. O card volta para a coluna Venda e segue o caminho normal.'])
+  + _mP('A aba mostra desde quando cada OS está parada e quem a mandou para lá, com exportação em CSV.')
+  + _mDica('Não há percentual automático: quem decide é o administrativo, caso a caso.')
+},
+
+/* ─────────────── Crediário ─────────────── */
+{
+  id:'mn-cred-financeiras', g:'Crediário', t:'Asaas e Multicrediário: a diferença que mais importa',
+  p:'crediario asaas multicrediario financeira parcela entrada caixa cep contrato',
+  v:c=>c.fin,
+  h:()=>
+    _mP('O crediário é a venda parcelada. O contrato vem <b>antes</b> da OS: é dele que nasce a venda, e é por ele que o dinheiro entra no caixa na data certa.')
+  + _mTab(['','ASAAS','MULTICREDIÁRIO'],[
+      ['O que é','Crediário parcelado no boleto','Financeira que garante o pagamento'],
+      ['A loja recebe no ato','<b>só a entrada</b>','<b>a venda inteira</b>'],
+      ['O parcelado entra no caixa','a cada parcela baixada, no dia da baixa','no dia da venda, de uma vez'],
+      ['CEP do cliente','<b>obrigatório</b>','não é pedido'],
+      ['Contrato impresso','botão Gerar Contrato','não tem'],
+      ['Acatar parcela','não existe','existe']])
+  + _mAt('No Asaas, o dinheiro das parcelas <b>ainda não é da loja</b>: ele entra conforme o cliente paga. No Multicrediário, a financeira assume a dívida e a loja recebe tudo.')
+  + _mP('A aba Crediário abre mostrando só os contratos do Asaas. Para ver os do Multicrediário, troque de aba dentro da tela — <b>os totais são sempre de uma financeira por vez</b>.')
+  + _mDica('<b>"Link Asaas" não é crediário.</b> Apesar do nome, é link de cartão: dinheiro de verdade, entra integral no caixa do dia.')
+},
+{
+  id:'mn-cred-contrato', g:'Crediário', t:'Cadastrar um contrato',
+  p:'novo crediario contrato cpf cep os provisoria valor da compra parcelas gerar',
+  v:c=>c.fin,
+  h:()=>
+    _mP('Aba <b>Crediário</b> → '+_mK('+ Novo Crediário')+'.')
+  + _mTab(['Campo','Obrigatório','Observação'],[
+      ['Nome Completo','<b>sim</b>','Fica em maiúsculas'],
+      ['CPF','não','Texto livre, sem máscara'],
+      ['Telefone','não','Sem ele, o contrato aparece como "sem telefone"'],
+      ['CEP','<b>só no Asaas</b>','Exatamente 8 dígitos'],
+      ['Data da Compra','<b>sim</b>',''],
+      ['Financeira','<b>sim</b>','Nasce em Multicrédito'],
+      ['Vendedor','<b>sim</b>','Vai junto para a OS criada depois'],
+      ['Valor da Compra','<b>confira sempre</b>','Veja o aviso abaixo'],
+      ['Valor Crediário','<b>sim</b>','É o valor parcelado'],
+      ['Valor / Data da Entrada','não','Sem a data, a entrada em aberto nunca aparece como atrasada']])
+  + _mAt('<b>Valor da Compra.</b> O campo tem asterisco de obrigatório, mas o sistema salva com ele em branco, gravando zero, sem avisar. Isso estraga a OS depois: o valor da venda sai errado. <b>Confira esse campo antes de salvar.</b>')
+  + _mT('OS provisória')
+  + _mP('Cliente fechou o crediário mas ainda não escolheu o óculos? Marque <b>OS provisória</b>: o sistema gera um número temporário, que é substituído quando a OS de verdade for criada pelo contrato.')
+  + _mT('As parcelas')
+  + _mOl([
+      'Digite <b>Nº de parcelas</b> e <b>Data da 1ª parcela</b>.',
+      'Clique '+_mK('Gerar')+'. O sistema cria as parcelas com valores iguais, mês a mês.',
+      'Ajuste valor e data de cada linha à mão se precisar, remova pelo "x" e acrescente com '+_mK('+ Adicionar parcela manualmente')+'.',
+      'Salvar.'])
+  + _mP('Clicar '+_mK('Gerar')+' de novo <b>apaga e refaz</b> a lista inteira.')
+  + _mAt('<b>1ª parcela no fim do mês.</b> Com a 1ª em 31/01, a 2ª cai em <b>31/03</b>: fevereiro é pulado. Contrato com 1ª parcela em 29, 30 ou 31 precisa ter os vencimentos conferidos um por um.')
+},
+{
+  id:'mn-cred-parcelas', g:'Crediário', t:'Entrada, parcelas e acatamento',
+  p:'baixar entrada parcial baixar parcela acatar atrasado editar parcela renegociar',
+  v:c=>c.fin,
+  h:()=>
+    _mT('Baixar a entrada')
+  + _mP('No detalhe do contrato, botão '+_mK('Baixar Entrada')+'. O sistema pergunta quanto o cliente pagou (aceita valor menor) e como pagou.')
+  + _mAt('<b>Entrada parcial.</b> Recebendo parte, o contrato passa a mostrar a entrada como "PAGA" na lista, pelo valor acordado, e ela <b>sai do controle de atraso</b>. Só o detalhe do contrato mostra "Parcial · faltam R$ X". Para saber se ainda falta entrada, <b>abra o contrato</b>. E não existe segunda baixa parcial: um novo Baixar Entrada <b>substitui</b> o valor, não soma.')
+  + _mP('O que falta da entrada é lançado na OS como "A receber na retirada", e é cobrado quando o cliente busca o óculos.')
+  + _mT('Baixar uma parcela')
+  + _mP('Botão '+_mK('Baixar')+' na linha da parcela. Pede a data do pagamento e uma observação opcional. No <b>Asaas</b>, essa baixa é o que faz o dinheiro entrar no caixa, no dia do pagamento. No <b>Multicrediário</b> a baixa não mexe no caixa — o dinheiro já entrou na venda.')
+  + _mAt('O sistema <b>não exige ordem</b>: dá para baixar a parcela 5 antes da 1, e dá para marcar como paga uma parcela que vence ano que vem. Confira o número antes de baixar.')
+  + _mT('Acatar (só Multicrediário)')
+  + _mP('Registra que a financeira aceitou assumir a parcela atrasada: o dinheiro está garantido, falta o repasse cair, que é a baixa. A parcela acatada continua como em aberto.')
+  + _mT('Editar uma parcela')
+  + _mP('Só valor e vencimento, e o <b>motivo é obrigatório</b> — fica no histórico do contrato. Parcela paga não pode ser editada: <i>"Esta parcela já foi paga. Para corrigir, fale com o supervisor."</i>')
+  + _mT('Renegociar')
+  + _mP('As parcelas em aberto viram "renegociado" (não são apagadas), as pagas não são tocadas, e parcelas novas são criadas na sequência. O motivo é obrigatório e o sistema mostra a prévia antes de confirmar.')
+  + _mAt('<b>Entrada em aberto na renegociação.</b> O valor dela entra na conta do que está sendo renegociado, mas a entrada continua marcada como pendente — a dívida pode aparecer duas vezes. Nesses casos, <b>fale com o supervisor antes de renegociar</b>.')
+},
+{
+  id:'mn-cred-os', g:'Crediário', t:'Criar a OS a partir do contrato',
+  p:'criar os do contrato crediario ja preenchido valor recebido entrada',
+  v:c=>c.fin && c.pode('ca'),
+  h:()=>
+    _mP('É assim que uma venda de crediário entra no quadro.')
+  + _mOl([
+      'Aba <b>Crediário</b> → ache o contrato → '+_mK('Ver')+'.',
+      'Botão '+_mK('Criar OS')+'.',
+      'O formulário abre <b>já preenchido</b>: cliente, telefone, vendedor, data da venda, valor da venda, valor recebido (só a entrada que foi paga de fato), forma de pagamento, o que falta receber na retirada e, no Multicrediário, a 2ª forma já com o valor que a financeira cobre. Uma faixa verde no topo explica a conta.',
+      'Você ainda preenche: número da OS, tipo de serviço, prazo, quantidade de óculos, números de pedido, graus e os campos de garantia se for o caso.',
+      'Salvar. O contrato passa a apontar para a OS de verdade.'])
+  + _mAt('<b>A regra que mais gera erro:</b> não lance a financeira como forma de pagamento. O parcelado já veio do contrato; lançando de novo, o mesmo dinheiro conta duas vezes. Nas formas vai só o que o cliente pagou hoje.')
+  + _mT('Cancelar o contrato é diferente de cancelar a OS')
+  + _mP('<b>Cancelar a OS não mexe no crediário</b>, e vice-versa: a dívida existe independentemente do óculos. Precisando desfazer os dois, faça os dois.')
+},
+
+/* ─────────────── Depois da venda ─────────────── */
+{
+  id:'mn-whats', g:'Depois da venda', t:'Avisar o cliente pelo WhatsApp',
+  p:'whatsapp avisar aviso pronto reenviar hora pronto mensagem',
+  v:c=>c.pode('wa'),
+  h:()=>
+    _mP('No card, a partir de <b>Pronto</b>, desde que a OS tenha telefone cadastrado. Também aparece na aba Não retirados.')
+  + _mP('Clicar <b>envia sozinho</b>, pelo WhatsApp da loja. O botão vira "Enviando…" e depois o card mostra ✓ Avisado.')
+  + _mP('Se o envio automático falhar, o sistema avisa. <b>Clicando de novo, abre o WhatsApp com o texto pronto</b> — aí é só apertar enviar.')
+  + _mT('Óculos de hora pronto, na OS mista')
+  + _mP('Numa OS com dois óculos, um de estoque e outro de pedido, o de hora fica pronto antes. Botão '+_mK('Hora pronto')+' no card: ele ganha a tarja HORA PRONTO, <b>não muda de coluna</b>, e o botão de WhatsApp fica liberado.')
+  + _mAt('O texto que avisa que <b>só um</b> dos óculos está pronto sai apenas no envio automático. Se o envio falhar e você enviar pela mão, o cliente recebe o texto normal, dizendo que o óculos está pronto — e pode vir buscar os dois. Numa OS mista enviada na mão, <b>avise na conversa</b> que só um está pronto.')
+  + _mP('Quando a OS inteira chegar em Pronto, o botão volta a aparecer, de propósito: o primeiro aviso era de um óculos só.')
+  + _mT('Reenviar')
+  + _mP('O botão continua clicável depois de avisado, mas o sistema bloqueia reenvio por <b>10 minutos</b>.')
+},
+{
+  id:'mn-naoret', g:'Depois da venda', t:'Não retirados',
+  p:'nao retirados 15 dias avisado espera anotar contato cobranca',
+  v:()=>true,
+  h:c=>
+    _mP('OS que ficou pronta, o cliente foi avisado e não veio buscar. Elas saem do quadro para não poluir o dia a dia e ficam na aba <b>Não retirados</b>, com o tempo de espera e o histórico de contatos.')
+  + _mT('Como uma OS vai para lá')
+  + _mP('<b>Sozinha.</b> O sistema move as OS paradas em Avisado há mais de 15 dias, anota o motivo e marca o card como AUTOMÁTICO. São 15 dias <b>sem nenhuma movimentação</b>: qualquer ação que toque o card — anotar uma cobrança, receber saldo, editar — reinicia a contagem.')
+  + _mP('Não existe botão para mandar uma OS para lá na mão.')
+  + _mT('O que dá para fazer na aba')
+  + _mUl([
+      _mK('Anotar')+' — registra o contato com o cliente. Todos podem.',
+      (c.pode('wa')?_mK('WhatsApp')+' — manda o aviso de novo.':''),
+      (c.pode('ed')?_mK('Entregar')+' ou '+_mK('Receber e entregar')+' — a OS vai direto para Entregue e a marca de não retirado é limpa.':''),
+      (c.pode('ed')?_mK('Só receber saldo')+' — recebe sem entregar.':''),
+      (c.pode('cn')?_mK('Cancelar')+' — com motivo.':''),
+    ].filter(x=>x))
+  + _mP('Filtros: com ou sem saldo, tempo de espera (15, 30, 60 ou 90 dias) e contato (sem anotação, já contatado, sem telefone). A coluna <b>Espera</b> fica laranja acima de 30 dias e vermelha acima de 60.')
+  + (c.pode('ed')?_mAt('Não tente mover o card dessa aba pelo botão comum do quadro. O sistema bloqueia, e com razão: antes dessa trava, uma OS de Não retirados empurrada adiante caía em Canceladas e o dinheiro sumia do caixa.'):'')
+},
+{
+  id:'mn-refazer', g:'Depois da venda', t:'Refazer um serviço',
+  p:'refazer refeito erro montagem lente quebrada grau errado baixa de lente',
+  v:c=>c.pode('rf'),
+  h:()=>
+    _mP('Para erro de montagem, lente quebrada, grau errado — quando o serviço vai ser feito de novo.')
+  + _mOl([
+      'No card, ícone '+_mK('☰')+' → '+_mK('Refazer')+'. Não há botão de refazer no corpo do card.',
+      '<b>Motivo do refazer</b> — texto livre, obrigatório.',
+      '<b>Baixa de lente</b> — aparece só se a OS tiver óculos de HORA. Marque OD, OE ou os dois. Se a lente foi reaproveitada ou o problema foi na armação, <b>não marque nada</b>.',
+      'Botão '+_mK('Refazer')+'. Não há confirmação: executa na hora.'])
+  + _mP('A OS <b>volta para a coluna Venda</b> e refaz todo o caminho, o card ganha a tarja SERVIÇO REFEITO, o motivo fica no histórico e as lentes marcadas baixam do estoque.')
+  + _mAt('<b>Risco de baixa dobrada.</b> A lente marcada no refazer baixa agora. Como a OS volta para Venda, ao passar de Pedido para Montagem de novo <b>o estoque baixa outra vez</b>. Vale conferir a prateleira depois de um refazer.')
+  + _mP('No relatório, aba <b>Refeitos</b>: uma OS refeita duas vezes aparece duas vezes, cada uma com o seu motivo.')
+},
+{
+  id:'mn-cancelar', g:'Depois da venda', t:'Cancelar e excluir',
+  p:'cancelar cancelamento motivo desistencia duplicada devolucao reabrir excluir apagar',
+  v:c=>c.pode('cn') || c.pode('cd'),
+  h:c=>
+    _mP('A OS cancelada <b>não é apagada</b>: sai do quadro, vai para a aba Cancelados e continua pesquisável, com o motivo e quem cancelou.')
+  + _mOl([
+      'No card, ícone '+_mK('☰')+' → '+_mK('Cancelar OS')+'. Também há o botão na aba Não retirados.',
+      '<b>Motivo</b> — obrigatório, da lista: desistência do cliente, erro de lançamento, OS duplicada, devolução, troca por outra OS, outro.',
+      '<b>Detalhe</b> — opcional, texto livre.',
+      'Confirmar.'])
+  + _mT('O que acontece com o dinheiro')
+  + _mP('A OS sai do caixa: sai do fechamento do dia da venda, as formas de pagamento voltam a ficar pendentes de conferência, e se o dia estava conferido ou fechado, volta para aberto.')
+  + _mP('Se a correção do caixa falhar, o sistema avisa que a linha continua no caixa daquele dia e pede para removê-la no Fechamento. <b>Faça isso</b> — senão o caixa fica com dinheiro que não existe.')
+  + _mAt('O sistema tira do caixa <b>só a linha do dia da venda</b>. Se aquela OS já tinha entrega ou saldo recebido lançados no caixa de <b>outro</b> dia, e esse dia já estava salvo, essas linhas continuam lá. Numa OS com saldo recebido antes, confira também o fechamento do dia do recebimento.')
+  + _mP('Uma OS cancelada <b>não ocupa mais o número</b>: lançando de novo com o mesmo número, o sistema pergunta e deixa.')
+  + (c.pode('cd')
+     ? _mT('Reabrir e excluir')
+     + _mP('Na aba Cancelados, botão '+_mK('Reabrir')+': a OS volta para a coluna <b>Avisado</b> (sempre Avisado) e a venda volta para o caixa do dia dela.')
+     + _mAt('<b>Excluir apaga a OS do banco, sem rastro.</b> Evite: cancelar preserva a história, excluir não.')
+     : _mDica('Reabrir uma OS cancelada é do supervisor. Precisando, chame ele.'))
+},
+
+/* ─────────────── Caixa e estoque ─────────────── */
+{
+  id:'mn-ranking', g:'Caixa e estoque', t:'Ranking e caixa: as duas palavras que mais confundem',
+  p:'ranking caixa faturamento vendido dinheiro que entrou ticket medio',
+  v:c=>c.fin,
+  h:()=>
+    _mTab(['','Ranking','Caixa'],[
+      ['O que é','O que foi <b>vendido</b> hoje','O <b>dinheiro que entrou</b> hoje'],
+      ['Conta','O valor cheio das vendas com data de hoje, pago ou não','Só o que tem forma de pagamento e valor'],
+      ['Inclui venda antiga?','não','<b>sim</b> — saldo recebido hoje de venda do mês passado entra aqui']])
+  + _mP('Dois exemplos resolvem quase toda dúvida:')
+  + _mUl([
+      '<b>Venda de R$ 1.000 hoje, cliente pagou R$ 300.</b> Ranking: R$ 1.000. Caixa: R$ 300.',
+      '<b>Cliente paga hoje R$ 350 de saldo de uma venda de setembro.</b> Ranking: R$ 0. Caixa: R$ 350.'])
+  + _mP('"Sem saldo" e "Garantia" não são dinheiro: ficam de fora do caixa.')
+},
+{
+  id:'mn-fechamento', g:'Caixa e estoque', t:'Fechamento do caixa',
+  p:'fechamento caixa do dia vendas recebimentos rascunho salvar buscar o que entrou depois',
+  v:c=>c.pode('ed'),
+  h:c=>
+    _mP('Aba <b>Fechamento</b>. Duas listas: <b>Vendas do dia</b> à esquerda e <b>Recebimentos do dia</b> à direita.')
+  + _mP('Os Recebimentos reúnem origens diferentes, cada uma com o seu selo:')
+  + _mTab(['Selo','O que é'],[
+      ['DO SISTEMA','Entrega feita hoje'],
+      ['SALDO PAGO ANTES DA RETIRADA','O cliente pagou sem levar o óculos'],
+      ['PARCELA n — CREDIÁRIO ASAAS','Parcela baixada hoje'],
+      ['VENDA DE dd/mm/aaaa','A venda é de outro dia']])
+  + _mP('Nenhum dos três últimos é erro: é dinheiro que entrou hoje de venda antiga.')
+  + _mT('Passo a passo')
+  + _mOl([
+      'Abra a aba. O dia de hoje já vem carregado.',
+      'Confira as duas listas. O que veio do sistema não é editável — <b>se estiver errado, corrija na OS</b>.',
+      'Faltando alguma coisa, acrescente com '+_mK('+ Venda avulsa')+' ou '+_mK('+ Linha')+'.',
+      'Preencha <b>Avaliações no dia</b> e <b>Observação</b>, se houver.',
+      _mK('Salvar fechamento')+'.'])
+  + _mT('Rascunho')
+  + _mP('O que é digitado antes de salvar fica guardado <b>naquele computador</b>, com aviso amarelo na tela. Não vai para o banco até alguém clicar em Salvar.')
+  + _mAt('O rascunho é por computador. Se duas pessoas mexem no mesmo dia em máquinas diferentes, <b>o rascunho mais recente vence o que já foi salvo</b>, sem aviso de conflito. Combinem quem fecha o caixa.')
+  + _mT('Depois de salvo, o dia trava')
+  + _mP('Isso é proposital: fechamento salvo é documento. Entrando venda depois, use '+_mK('Buscar o que entrou depois')+' — ele acrescenta só o que falta, sem duplicar.')
+  + (c.pode('cd')?_mP('<b>Remover uma linha que veio do sistema</b> é só do supervisor, e a remoção é lembrada: a linha não volta na próxima sincronização.'):'')
+  + _mDica('No topo da aba, "Fechado por Fulano" significa apenas <b>que o dia foi salvo</b> — não que o caixa está no estado fechado. O estado de verdade (<b>Aberto → Conferido → Fechado</b>) aparece na aba Conferência.')
+},
+{
+  id:'mn-conferencia', g:'Caixa e estoque', t:'Conferência do caixa',
+  p:'conferencia conferir extrato maquininha banco contar gaveta ia bateu sobra falta',
+  v:c=>c.pode('cf'),
+  h:()=>
+    _mP('Serve para bater o que o sistema registrou contra o extrato do banco, da maquininha ou do Asaas — <b>uma forma de pagamento por vez</b>.')
+  + _mOl([
+      'Aba <b>Conferência</b>. Embaixo, a lista de dias do mês.',
+      'Clique '+_mK('Conferir')+' no dia desejado.',
+      'Para cada forma com valor: <b>Dinheiro</b> → '+_mK('Contar gaveta')+', informando quanto foi contado de verdade. <b>Demais formas</b> → '+_mK('Conferir')+', colando o extrato ou anexando o arquivo (PDF, CSV, TXT, XLSX) e clicando '+_mK('Conferir com a IA')+'.',
+      'Dá para conferir o dia inteiro de uma vez, ou um período (padrão: últimos 14 dias).'])
+  + _mTab(['Resultado','O que significa'],[
+      ['<b>BATEU</b> (verde)','Extrato e sistema fecham'],
+      ['<b>SOBRA / FALTA R$ X</b> (vermelho)','Há diferença'],
+      ['<b>A CONFERIR</b> (amarelo)','Ainda não foi conferida'],
+      ['<b>NÃO ENCONTRADO</b> (cinza)','A IA não achou essa forma nos extratos; continua pendente']])
+  + _mP('O bloco <b>"Nos extratos e não no sistema"</b> lista o que apareceu no extrato e não tem correspondente no sistema. É onde se descobre dinheiro que entrou e ninguém lançou: ache a venda e lance, ou registre como venda avulsa no fechamento.')
+  + _mP('Quando todas as formas do dia forem conferidas e todas baterem, o dia vira <b>conferido</b> sozinho. Havendo diferença, você decide se aceita.')
+  + _mAt('<b>Não confie no verde de um dia conferido por período.</b> Um dia dentro de um período com diferença aparece depois como BATEU, em verde: a diferença existe e fica escrita na observação, mas o chip diz o contrário. Abra e leia a observação. Isso é um defeito conhecido, já reportado.')
+  + _mDica('PDF digitalizado (foto de papel) não serve — o sistema avisa. Nesse caso copie e cole o conteúdo no campo de texto.')
+},
+{
+  id:'mn-estoque', g:'Caixa e estoque', t:'Estoque de lentes',
+  p:'estoque lente grau esferico cilindrico adicionar corrigir contagem repor lista para pedir',
+  v:c=>c.pode('es'),
+  h:c=>
+    _mP('Aba <b>Estoque</b>. Duas grades por grau: <b>NEGATIVO</b> (esférico de −0,25 a −4,00) e <b>POSITIVO</b> (0,00 a +4,00). As colunas são o cilíndrico, de 0,00 a −2,00.')
+  + _mP('As cores das células: <b>vermelho</b> = zerado ou 1 a 3 (repor) · <b>verde</b> = quantidade ideal · <b>amarelo</b> = acima do ideal. A faixa ideal é 4 a 6 em São Vicente e Piracicaba, e 6 a 12 em Sorocaba e Campinas.')
+  + _mT('Achar um grau')
+  + _mP('<b>Um clique</b> na célula marca o grau e desenha uma faixa até os cabeçalhos, para não se perder na grade. Clicar de novo desmarca, e a marcação fica salva mesmo recarregando a página.')
+  + _mT('Dar entrada em lente')
+  + _mP('<b>Dois cliques</b> na célula, ou botão '+_mK('+ Adicionar lente')+'. O esférico é obrigatório; o cilíndrico é opcional e, digitando positivo, o sistema converte para negativo sozinho.')
+  + (c.pode('cd')?_mP(_mK('Corrigir contagem')+' (só supervisor): em vez de somar, informa quanto <b>tem de verdade na prateleira</b>. O sistema mostra a diferença e pede confirmação.'):_mDica('Corrigir contagem é do supervisor. Achou diferença na prateleira? Chame ele.'))
+  + _mT('A baixa automática')
+  + _mP('A lente sai do estoque quando a OS passa de <b>Pedido para Montagem</b>: 2 lentes por óculos, ou 1 se estiver MEIO PAR.')
+  + _mAt('Dois cuidados conhecidos: se o grau estiver <b>zerado</b>, a baixa não acontece e <b>nenhum aviso aparece</b>; e <b>nada devolve a lente ao estoque</b> se a OS for cancelada ou excluída. Quem cuida do estoque precisa saber dos dois.')
+  + _mT('Reposição')
+  + _mUl([
+      _mK('Lista p/ Pedir')+' — PDF com as lentes abaixo de 4 unidades, com coluna em branco para anotar à mão.',
+      _mK('Arquivo de Pedido')+' — CSV no formato que o laboratório importa. O laboratório pede em <b>pares</b>: 1 lente = 0,5.',
+      _mK('CSV')+' e '+_mK('PDF')+' — o estoque completo.'])
+  + _mDica('O estoque <b>não guarda histórico</b>: não há registro de quem deu entrada nem de quem corrigiu uma contagem. E lente fora da grade (−5,00, por exemplo) é gravada e conta nos totais, mas não aparece em nenhuma célula. Se os números não baterem com a prateleira, é uma das causas possíveis.')
+},
+{
+  id:'mn-projecao', g:'Caixa e estoque', t:'Projeção e metas do ciclo',
+  p:'projecao meta ciclo ticket medio dias trabalhados avaliacoes google',
+  v:c=>c.pode('ed'),
+  h:()=>
+    _mP('Aba <b>Projeção</b>. Monta o acompanhamento do mês a partir <b>dos fechamentos já salvos</b> — dia que não foi fechado não entra.')
+  + _mP('Botão '+_mK('Metas do ciclo')+': dias do ciclo (padrão 26), Meta 1, Meta 2, Meta 3 e meta de avaliações no Google. É <b>uma meta por loja por mês</b>: não há meta anual nem herança do mês anterior.')
+  + _mTab(['Conta','Como é calculada'],[
+      ['dias trabalhados','dias fechados com ranking ou caixa maior que zero'],
+      ['ticket médio diário','caixa ÷ dias trabalhados'],
+      ['projeção do mês','ticket médio diário × dias do ciclo'],
+      ['falta para a meta','meta − caixa'],
+      ['meta diária','falta ÷ dias restantes']])
+  + _mAt('<b>As metas são medidas contra o CAIXA, não contra o ranking.</b> A loja pode vender R$ 200 mil num mês, receber R$ 120 mil (crediário, Asaas) e o sistema dizer que não bateu a Meta 1. É assim por desenho.')
+  + _mDica('Três telas diferentes mostram um número chamado "ticket médio", com bases diferentes. Falando de ticket médio, diga de qual tela está falando. E meta em branco aparece como atingida, em verde — meta não definida não é meta batida.')
+},
+
+/* ─────────────── Gestão ─────────────── */
+{
+  id:'mn-relatorios', g:'Gestão', t:'Os relatórios',
+  p:'relatorio montagem garantias refeitos prazos historico exportar csv pdf semana',
+  v:()=>true,
+  h:()=>
+    _mP('Todos têm o mesmo desenho: período no topo (Hoje / Esta semana / Este mês / Personalizado), indicadores, tabela e exportação. <b>A semana começa no domingo</b> em todos eles.')
+  + _mDica('"Status" é sempre a coluna atual do card, não o estado na data do evento. Uma garantia de março já entregue aparece como "Entregue" no relatório de março.')
+  + _mTab(['Relatório','O que mostra'],[
+      ['<b>Montagem</b>','Cada passagem de Montagem para Pronto. Um card com 2 óculos são 2 montagens. O "Responsável" é quem moveu para Pronto — o montador, não o vendedor'],
+      ['<b>Garantias</b>','Todas as garantias do período, com motivo, responsável, vendedor, receita e o relato. Exporta CSV e PDF'],
+      ['<b>Refeitos</b>','Cada refazer é uma linha, com o motivo e quem refez'],
+      ['<b>Prazos</b>','OS com prazo vencendo ou vencido, das que ainda não foram avisadas. ATRASADA, VENCE HOJE, VENCE AMANHÃ ou Em N dias'],
+      ['<b>Histórico</b>','As OS já entregues, com busca. Diferente dos outros, busca direto no banco']])
+  + _mAt('Dois cuidados nas exportações: nos filtros <b>Passagem</b> e <b>Garantia</b> do relatório de Montagens, só o "Total montagens" acompanha o filtro — use só o Total. E dos quatro arquivos CSV, só o de Garantias trata vírgulas corretamente: nos outros, um texto com vírgula embaralha as colunas da planilha.')
+},
+{
+  id:'mn-ig', g:'Gestão', t:'Indique e Ganhe',
+  p:'indique e ganhe indicacao premio pix oculos de sol',
+  v:c=>c.fin,
+  h:()=>
+    _mP('Registra que um cliente trouxe outro e qual prêmio foi dado. Campos: nome de quem indicou (obrigatório), OS e valor de compra dele; nome da indicação (obrigatório), OS e valor de compra dela; data e prêmio.')
+  + _mP('<b>Prêmio:</b> só duas opções — PIX de R$ 50,00 ou Óculos de Sol.')
+  + _mP('Dá para editar um lançamento, e cada edição fica registrada. <b>Não há como excluir.</b>')
+  + _mDica('Os números de OS e os valores de compra são digitados à mão, sem ligação com a venda real. E não há campo de "prêmio pago": o lançamento não diz se o prêmio já foi entregue.')
+},
+{
+  id:'mn-usuarios', g:'Gestão', t:'Usuários e perfis',
+  p:'usuario cadastrar novo perfil senha desativar inativo ultimo acesso diretor global',
+  v:c=>c.usuarios,
+  h:c=>
+    _mP('Aba <b>Usuários</b> → '+_mK('+ Novo usuário')+'.')
+  + _mOl([
+      '<b>Nome</b> — como aparece no histórico das OS. Fica em maiúsculas.',
+      '<b>Usuário</b> — o login. Mínimo 3 caracteres, só letras minúsculas, números, ponto, hífen e sublinhado. <b>Sem espaço e sem acento.</b>',
+      '<b>Perfil</b> — decide o que a pessoa vê e faz.',
+      '<b>Senha</b> — mínimo 6 caracteres.'])
+  + _mP('Para <b>trocar a senha de alguém</b>, abra o usuário, digite a senha nova e salve. Deixando o campo em branco, a senha atual é mantida.')
+  + _mAt('Para tirar o acesso de quem saiu, <b>desative em vez de excluir</b>: o nome continua no histórico das OS que a pessoa lançou. A caixinha "ver inativos" mostra os desativados.')
+  + _mT('Os perfis')
+  + _mTab(['Perfil','O que tem'],[
+      ['<b>Diretor</b>','Tudo. É o único que confere e fecha o caixa, e nenhum outro perfil pode criá-lo, alterá-lo ou desativá-lo'],
+      ['<b>Supervisor</b>','Tudo, menos a Conferência. Continua excluindo OS, corrigindo estoque e cadastrando usuários'],
+      ['<b>Gerente</b>','Igual ao administrador. Existe só em Piracicaba e Campinas'],
+      ['<b>Administrador</b>','Lança, edita, entrega, cancela, mexe no estoque e fecha o caixa. Não exclui nem reabre'],
+      ['<b>Pós-vendas</b>','Lança garantia, passagem, cortesia, venda avulsa e manutenção. Move só da coluna Avisado'],
+      ['<b>Montagem</b>','Move só da coluna Montagem. Nada mais']])
+  + (c.perfil==='diretor'
+     ? _mDica('Supervisor e diretor podem ser marcados como <b>globais</b>: entram em qualquer loja com uma senha só.')
+     : _mDica('O perfil Diretor não aparece na sua lista: só um diretor cria, altera ou desativa outro diretor.'))
+  + _mP('A coluna <b>Último acesso</b> mostra quando a pessoa entrou pela última vez — serve para achar cadastro esquecido e gente que não usa.')
+},
+{
+  id:'mn-check', g:'Gestão', t:'Check list do dia',
+  p:'check list tarefa do dia marcar pendente vermelho csv do mes',
+  v:c=>c.check,
+  h:()=>
+    _mP('Aba <b>Check list</b>. As tarefas do seu dia, na ordem em que devem ser feitas.')
+  + _mOl([
+      'A aba abre no dia de hoje. O cabeçalho mostra quantas de quantas já foram feitas.',
+      'Clique na tarefa para marcar. Ela fica <b>verde</b>. Clicando de novo, desmarca.',
+      'Tarefa que ainda não foi feita fica <b>vermelha</b> — e continua vermelha naquela data até ser marcada.',
+      'Para ver outro dia, troque a data. Botão '+_mK('Hoje')+' volta para hoje.',
+      _mK('CSV do mês')+' exporta o mês inteiro.'])
+  + _mP('Fica registrado quem marcou cada tarefa e quando.')
+},
+
+/* ─────────────── Referência ─────────────── */
+{
+  id:'mn-regras', g:'Referência', t:'As cinco regras que evitam quase todo erro de caixa',
+  p:'regras erro caixa resumo decorar',
+  v:c=>c.fin || c.pode('ca'),
+  h:()=>
+    _mOl([
+      '<b>Venda parcelada começa pelo contrato</b>, nunca pela OS.',
+      '<b>Nas formas de pagamento vai só o que o cliente pagou hoje.</b> O resto o sistema calcula como saldo.',
+      '<b>Saldo já pago não se cobra de novo na retirada.</b> Faixa verde = deixe em "Sem saldo".',
+      '<b>Erro em OS de dia já fechado se corrige na OS</b>, não removendo a linha do caixa. O sistema avisa e acerta o fechamento sozinho.',
+      '<b>Cancelar é melhor que excluir.</b> Cancelar preserva a história; excluir apaga.'])
+},
+{
+  id:'mn-situacoes', g:'Referência', t:'Situações do dia a dia',
+  p:'duvida problema nao acho a os estoque nao bate valor dobrado tela diferente',
+  v:()=>true,
+  h:c=>
+    _mT('"O quadro não mostra uma OS que eu sei que existe"')
+  + _mP('Três causas, nesta ordem: ela foi <b>entregue</b> (procure no Histórico); está em <b>Não retirados</b>, <b>Aguardando pagamento</b> ou <b>Cancelados</b>; ou a tela ainda está carregando — aguarde alguns segundos ou recarregue com F5.')
+  + _mT('"O número da OS já existe"')
+  + _mP('Se a OS existente está viva, o número está em uso: confira o número. Se está <b>cancelada</b>, o sistema pergunta e deixa reaproveitar.')
+  + (c.fin
+     ? _mT('"O cliente pagou o saldo antes e agora, na retirada, apareceu de novo"')
+     + _mP('A tela de entrega mostra uma faixa <b>verde</b> dizendo que o saldo já foi recebido, e já vem zerada em "Sem saldo". <b>Deixe assim e entregue.</b> Lançar valor ali coloca o mesmo dinheiro no caixa duas vezes. Se o valor já entrou duas vezes, não tente resolver removendo a linha do fechamento: <b>chame o supervisor</b>.')
+     + _mT('"O valor parcelado do card está dobrado"')
+     + _mP('Alguém lançou a financeira <b>também</b> como forma de pagamento numa OS que já veio do contrato. Nas formas vai só o que o cliente pagou hoje. O card precisa ser corrigido — <b>chame o supervisor</b>.')
+     + _mT('"O caixa de hoje está com um valor que eu não reconheço"')
+     + _mP('Procure o selo da linha nos Recebimentos: SALDO PAGO ANTES DA RETIRADA, PARCELA n — CREDIÁRIO ASAAS ou VENDA DE dd/mm/aaaa. Nenhum dos três é erro: é dinheiro que entrou hoje de venda antiga.')
+     : '')
+  + (c.pode('es')
+     ? _mT('"O estoque não bate com a prateleira"')
+     + _mP('Causas conhecidas, em ordem de probabilidade: <b>refazer</b> com baixa de lente marcada (pode ter baixado duas vezes); OS <b>cancelada ou excluída</b> depois de ter ido para Montagem (a lente não volta); baixa que não aconteceu porque o grau <b>estava zerado</b>; ou lente com grau <b>fora da grade</b>, que não aparece na tela. Corrija pela contagem real e avise, para a causa ser investigada.')
+     : '')
+  + _mT('"A tela está diferente do que eu conheço"')
+  + _mP('Confira a versão no rodapé. Página aberta desde antes de uma atualização continua com o código antigo — <b>F5 resolve</b>.')
+},
+{
+  id:'mn-ajuda', g:'Referência', t:'Quando não ensinar e sim encaminhar',
+  p:'ajuda suporte encaminhar duvida aberta pendencia diego',
+  v:()=>true,
+  h:()=>
+    _mP('Algumas coisas do sistema estão em aberto e ainda vão ser decididas. Caindo em uma delas, não invente caminho: <b>fale com o supervisor ou com a diretoria</b>.')
+  + _mUl([
+      'Dinheiro que entrou duas vezes no caixa, ou que você não consegue explicar.',
+      'Conferência que diz que bateu mas você sabe que tem diferença.',
+      'Estoque que não bate depois de um refazer ou de um cancelamento.',
+      'Parcela ou entrada de crediário que parece contada duas vezes.',
+      'Número de relatório que não fecha com o que você viu na tela.'])
+  + _mDica('<b>Em dúvida sobre dinheiro, prefira conferir a lançar.</b> É mais fácil lançar depois do que desfazer.')
+},
+];
+
+const MN_GRUPOS=['Começando','Lançar e mover','Dinheiro','Crediário','Depois da venda','Caixa e estoque','Gestão','Referência'];
+
+// Busca sem acento, para "garantia" achar "garantía" e vice-versa.
+function _mnNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+
+function mnSecoesVisiveis(){
+  const c=ctxManual();
+  const termo=_mnNorm((document.getElementById('mn-busca')||{}).value).trim();
+  return MANUAL.filter(s=>s.v(c))
+              .filter(s=>!termo || _mnNorm(s.t+' '+s.p+' '+s.g).includes(termo));
+}
+
+function rnManual(){
+  const c=ctxManual();
+  const vis=mnSecoesVisiveis();
+  const idx=document.getElementById('mn-idx');
+  const corpo=document.getElementById('mn-body');
+  if(!idx||!corpo)return;
+
+  idx.innerHTML=MN_GRUPOS.map(g=>{
+    const ss=vis.filter(s=>s.g===g);
+    if(!ss.length)return '';
+    return '<div class="mn-ig"><div class="mn-igt">'+g+'</div>'
+      + ss.map(s=>'<a href="#'+s.id+'" onclick="mnIr(\''+s.id+'\');return false;">'+s.t+'</a>').join('')
+      + '</div>';
+  }).join('');
+
+  if(!vis.length){
+    corpo.innerHTML='<div class="er">Nada encontrado. Tente outra palavra.</div>';
+    return;
+  }
+  corpo.innerHTML=MN_GRUPOS.map(g=>{
+    const ss=vis.filter(s=>s.g===g);
+    if(!ss.length)return '';
+    return '<div class="mn-gt">'+g+'</div>'
+      + ss.map(s=>'<section class="mn-sec" id="'+s.id+'">'
+          +'<h3 class="mn-st">'+s.t+'</h3>'+s.h(c)+'</section>').join('');
+  }).join('');
+}
+
+function mnIr(id){
+  const e=document.getElementById(id);
+  if(e)e.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function mnImprimir(){window.print();}
+
 // ── AGUARDANDO PAGAMENTO ────────────────────────────────────────────────────
 // A venda entrou, mas o cliente pagou pouco e a loja nao vai pedir a lente
 // ainda. Quem decide e o administrativo: o sistema nao calcula percentual
@@ -9133,7 +10023,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23c';
+const VERSAO_SISTEMA='2026-10-23d';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
