@@ -85,6 +85,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .av{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--v),var(--vc));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;}
 .nn{font-size:12px;color:rgba(255,255,255,.75);font-weight:600;}
 .rb{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:700;letter-spacing:.04em;}
+.rb-d{background:#1E1B4B;color:#fff;}
 .rb-s{background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.25);}
 .rb-a{background:rgba(245,154,42,.3);color:#FEF3E2;border:1px solid rgba(245,154,42,.4);}
 .rb-m{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.2);}
@@ -513,7 +514,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-sd" onclick="sw('sd')" style="display:none">Saldos</button>
       <button class="tab" id="t-cr" onclick="sw('cr')" style="display:none">Crediário</button>
       <button class="tab" id="t-ig" onclick="sw('ig')" style="display:none">Indique e Ganhe</button>
-      <button class="tab" id="t-nr" onclick="sw('nr')" style="display:none">Não retirados</button>
+      <button class="tab" id="t-ck" onclick="sw('ck')" style="display:none">Check list</button>
+<button class="tab" id="t-ag" onclick="sw('ag')" style="display:none">Aguardando pagamento</button>
+<button class="tab" id="t-nr" onclick="sw('nr')" style="display:none">Não retirados</button>
       <button class="tab" id="t-cc" onclick="sw('cc')" style="display:none">Cancelados</button>
       <button class="tab" id="t-hs" onclick="sw('hs')">Histórico</button>
       <button class="tab" id="t-e" onclick="sw('e')" style="display:none">Estoque</button>
@@ -755,7 +758,41 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     </div>
   </div>
 
-  <div id="nrs" class="rm" style="display:none">
+  <div id="cks" class="rm" style="display:none">
+  <div class="rh">
+    <span class="rt">Check list do dia</span>
+    <span id="ck-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <input type="date" id="ck-dia" onchange="rnCheck()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600"/>
+      <button class="bex" onclick="ckHoje()">Hoje</button>
+      <button class="bex" onclick="expCheckMes()">CSV do mês</button>
+    </div>
+  </div>
+  <div id="ck-barra" style="margin-bottom:12px"></div>
+  <div id="ck-body"><div class="er">Carregando...</div></div>
+</div>
+
+<div id="ags" class="rm" style="display:none">
+  <div class="rh">
+    <span class="rt">Aguardando pagamento</span>
+    <span id="ag-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <div class="sw" style="position:relative">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="ag-busca" placeholder="OS, cliente ou vendedor" oninput="rnAgPag()"/>
+      </div>
+      <button class="bex" onclick="expAg()">CSV</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--mu);background:var(--bg);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-weight:500">
+    Vendas que saíram do quadro porque o pagamento ainda não chegou ao mínimo.
+    O pedido não é feito enquanto a OS estiver aqui. Quando o cliente pagar,
+    use <b>Voltar para Vendas</b> e siga o caminho normal até Pedido.
+  </div>
+  <div class="tw"><div id="ag-body"><div class="er">Carregando...</div></div></div>
+</div>
+
+<div id="nrs" class="rm" style="display:none">
     <div class="rh">
       <span class="rt">Pedidos não retirados</span>
       <span id="nr-cont" style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px"></span>
@@ -923,6 +960,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
         <button class="pb" id="sd-ps" onclick="setPerSd('s')">Esta semana</button>
         <button class="pb" id="sd-pm" onclick="setPerSd('m')">Este mês</button>
         <button class="pb active" id="sd-ptd" onclick="setPerSd('td')">Todos</button>
+        <select id="sd-vend" onchange="rnSaldos()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
+          <option value="todos">Todos os vendedores</option>
+        </select>
         <select id="sd-sit" onchange="rnSaldos()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
           <option value="todos">Todas as situações</option>
           <option value="aberto">Em aberto</option>
@@ -973,6 +1013,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           <option value="3">Vence em até 3 dias</option>
           <option value="5">Vence em até 5 dias</option>
           <option value="10">Vence em até 10 dias</option>
+        </select>
+        <select id="cr-vend" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600">
+          <option value="todos">Todos os vendedores</option>
         </select>
         <select id="cr-status" onchange="rnCr()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;background:var(--w);color:var(--tx);font-family:inherit;outline:none">
           <option value="todos">Todos os status</option>
@@ -1116,6 +1159,9 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
         <div class="os-sec">Dados da venda</div>
         <div class="mf"><label>Número da OS <span style="color:var(--re)">*</span></label><input id="fo" placeholder="Ex: 2254429"/></div>
         <div class="mf"><label>Cliente</label><input id="fcli" placeholder="Nome do cliente"/></div>
+        <div class="mf"><label>Vendedor <span style="color:var(--re)">*</span></label>
+          <input id="fvendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda"/>
+        </div>
         <div class="mf"><label>WhatsApp <span style="color:var(--mu);font-weight:400">(para o aviso de pronto)</span></label>
           <input id="ftel" placeholder="(13) 99999-9999" maxlength="16" inputmode="numeric" oninput="mascTel(this)"/></div>
         <div class="os-2">
@@ -1205,9 +1251,6 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <div class="mf"><label>OS de Compra</label><input id="foscompra" placeholder="Número da OS de compra"/></div>
       <div class="mf"><label>Responsável pela garantia <span style="color:var(--re)">*</span></label>
         <input id="fresp-gar" list="nomes-garantia" autocomplete="off" placeholder="Quem responde por esta garantia"/>
-      </div>
-      <div class="mf"><label>Vendedor da venda <span style="color:var(--re)">*</span></label>
-        <input id="fvendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda original"/>
       </div>
       <datalist id="nomes-garantia"></datalist>
       <div class="mf"><label>Receita</label>
@@ -1305,6 +1348,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="mf"><label>Nome Completo <span style="color:var(--re)">*</span></label><input id="cr-nome" placeholder="Nome completo do cliente"/></div>
       <div class="mf"><label>CPF</label><input id="cr-cpf" placeholder="000.000.000-00" maxlength="14"/></div>
+      <div class="mf"><label>Vendedor <span style="color:var(--re)">*</span></label>
+        <input id="cr-vendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda"/></div>
       <div class="mf"><label>Telefone <span style="color:var(--mu);font-weight:400">(para cobrança)</span></label><input id="cr-tel" placeholder="(13) 99999-9999" maxlength="16" inputmode="numeric" oninput="mascTel(this)"/></div>
       <div class="mf" id="cr-cep-wrap" style="display:none"><label>CEP do cliente <span style="color:var(--re)">*</span></label><input id="cr-cep" placeholder="00000-000" maxlength="9" oninput="mascCEP(this)"/></div>
       <div class="mf"><label>Ordem de Serviço</label>
@@ -1491,6 +1536,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           Se o número atual for FAKE ou estiver vazio, o sistema gera um provisório de 8 dígitos.
         </div>
       </div>
+      <div class="mf"><label>Vendedor</label>
+        <input id="cr-edit-vendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda"/></div>
       <div class="mf"><label>Data da Compra</label><input id="cr-edit-dtcompra" type="date"/></div>
       <div class="mf"><label>Financeira</label>
         <select id="cr-edit-fin" onchange="tgCepEdit()">
@@ -1709,6 +1756,8 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
           </select></div>
         <div class="mf"><label>Cliente <span style="color:var(--re)">*</span></label>
           <input id="av-cli" placeholder="Nome do cliente"/></div>
+        <div class="mf"><label>Vendedor <span style="color:var(--re)">*</span></label>
+          <input id="av-vendedor" list="nomes-garantia" autocomplete="off" placeholder="Quem fez a venda"/></div>
         <div class="mf"><label>Nº da OS <span style="color:var(--re)">*</span></label>
           <input id="av-os" placeholder="Ex: 2254429"/></div>
       </div>
@@ -1871,7 +1920,13 @@ const US=[
   {u:'posvendas',p:'pos321',n:'Pós-vendas',r:'posvendas',un:'saovicente'},
 ];
 const RS={
-  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,cn:true,cf:true,ce:true,es:true,ed:true,rf:true,aj:true,wa:true},
+  // Diretor fica acima do supervisor: e o unico que confere e fecha o caixa,
+  // e nenhum outro perfil pode desativa-lo, edita-lo ou cria-lo.
+  diretor:{l:'Diretor',c:'rb-d',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,cn:true,cf:true,cfe:true,ce:true,es:true,ed:true,rf:true,aj:true,wa:true},
+  // Supervisor continua com tudo, menos conferir e fechar o caixa. Corrigir
+  // uma OS de dia ja encerrado ele continua podendo: e rotina, e mandar isso
+  // para o diretor travaria a loja.
+  supervisor:{l:'Supervisor',c:'rb-s',se:[0,1,2,3,4],mv:[0,1,2,3,4,5],ca:true,cd:true,cn:true,cf:false,cfe:true,ce:true,es:true,ed:true,rf:true,aj:true,wa:true},
   adm:{l:'Administrador',c:'rb-a',se:[0,1,2,3,4],mv:[0,1,3,4],mvp:[2],ca:true,cd:false,cn:true,cf:false,ce:true,es:true,ed:true,rf:true,aj:false,wa:true},
   // 'tp' limita os tipos de OS que o perfil pode criar e movimentar.
   // Sem 'tp', o perfil trabalha com todos os tipos.
@@ -1882,7 +1937,11 @@ const RS={
         'cortesia-hora','cortesia-pedido','cortesia-sol','avulsa','manutencao']},
   montagem:{l:'Montagem',c:'rb-m',se:[0,1,2,3,4],mv:[2],ca:false,cd:false,cn:false,cf:false,ce:false,es:false,ed:false,rf:false,aj:false,wa:false},
 };
-const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // mantido para histórico
+const CF=['Venda','Pedido','Montagem','Pronto','Avisado','Entregue']; // o quadro desenha estas
+// As colunas fora do quadro. Sem elas o historico escrevia "-> undefined"
+// no cancelamento e no nao retirado.
+const CF_FORA={6:'Não retirados',7:'Canceladas',8:'Aguardando pagamento'};
+function nomeCol(i){return CF[i]||CF_FORA[i]||'—';}
 const CS=['Venda','Pedido','Montagem','Pronto','Avisado'];
 const COM_GRAU=['hora','gar-hora','gar-estoque','cortesia-hora'];
 const COM_BAIXA=['hora','gar-hora','gar-estoque','cortesia-hora'];
@@ -1998,6 +2057,7 @@ function mapCard(r){return upCard({
   saldo:r.saldo,saldoValor:r.saldo_valor,saldoObs:r.saldo_obs||[],
   canceladoEm:r.cancelado_em,canceladoPor:r.cancelado_por,canceladoMotivo:r.cancelado_motivo,
   naoRetEm:r.nao_ret_em,naoRetPor:r.nao_ret_por,
+  agPagEm:r.ag_pag_em,agPagPor:r.ag_pag_por,
   saldoPago:r.saldo_pago,saldoPagoEm:r.saldo_pago_em,saldoPagoPor:r.saldo_pago_por,
   saldoPagoValor:r.saldo_pago_valor,saldoPagoForma:r.saldo_pago_forma,saldoPagoData:r.saldo_pago_data,
   horaPronto:r.hora_pronto,horaProntoEm:r.hora_pronto_em,horaProntoPor:r.hora_pronto_por,
@@ -2117,6 +2177,7 @@ async function saveCard(c){
       cancelado_em:c.canceladoEm||null,cancelado_por:c.canceladoPor||null,
       cancelado_motivo:c.canceladoMotivo||null,
       nao_ret_em:c.naoRetEm||null,nao_ret_por:c.naoRetPor||null,
+      ag_pag_em:c.agPagEm||null,ag_pag_por:c.agPagPor||null,
       saldo_pago:!!c.saldoPago,saldo_pago_em:c.saldoPagoEm||null,saldo_pago_por:c.saldoPagoPor||null,
       saldo_pago_valor:(c.saldoPagoValor===0||c.saldoPagoValor)?c.saldoPagoValor:null,
       saldo_pago_forma:c.saldoPagoForma||null,saldo_pago_data:c.saldoPagoData||null,
@@ -2168,7 +2229,7 @@ async function doLogin(){
     // marcado como global, que entra em qualquer loja com uma senha só
     const linhas=await sbGet('usuarios','usuario=eq.'+encodeURIComponent(u));
     const reg=(linhas||[]).find(x=>x.unidade===UNIDADE)
-           || (linhas||[]).find(x=>x.global&&x.perfil==='supervisor');
+           || (linhas||[]).find(x=>x.global&&podeSerGlobal(x.perfil));
     if(reg){
       if(!reg.ativo){erroLogin('Usuário inativo. Fale com o supervisor.');return;}
       if(await conferirSenha(p,reg.salt,reg.senha_hash)){
@@ -2194,7 +2255,7 @@ async function doLogin(){
   document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
   document.getElementById('nn').textContent=UP(U.n);
   const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-  const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
+  const msgs={diretor:'Diretor — acesso total, com a conferência do caixa.',supervisor:'Supervisor — acesso total, menos a conferência do caixa.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
   const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
   aplicarAbas();
   // Abre direto na aba salva, ANTES de sincronizar -- acaba com o "pisca" em Servicos
@@ -2207,6 +2268,13 @@ async function doLogin(){
 }
 // Mostra e esconde as abas conforme o perfil. Chamada no login, na sessão
 // restaurada e no logout -- assim nunca sobra aba do usuário anterior.
+// Perfis que podem ser marcados como globais e entrar em qualquer loja com
+// uma senha so. Faltando o diretor aqui, promover alguem a diretor tiraria o
+// acesso dele as outras tres lojas na hora.
+function podeSerGlobal(perfil){return perfil==='supervisor'||perfil==='diretor';}
+// Quem manda no cadastro de usuarios e na conferencia do caixa.
+function ehDiretor(){return !!(U&&U.r==='diretor');}
+
 function aplicarAbas(){
   const mostra=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?'block':'none';};
   if(!U||!R){
@@ -2220,8 +2288,10 @@ function aplicarAbas(){
   mostra('t-sd', fin);
   mostra('t-cr', fin);
   mostra('t-ig', fin);
-  mostra('t-us', U.r==='supervisor');
+  mostra('t-us', U.r==='supervisor'||U.r==='diretor');
   mostra('t-cf', !!R.cf);
+  mostra('t-ck', !!listaDoPerfil());
+  mostra('t-ag', true);
   mostra('t-nr', true);
   mostra('t-cc', true);
 }
@@ -2239,14 +2309,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -2271,6 +2341,8 @@ function sw(tab){
     else rnConferencia();
     rnConfLista();
   }
+  if(tab==='ag')rnAgPag();
+  if(tab==='ck')rnCheck();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
@@ -2305,6 +2377,22 @@ function eK(e,c){return`${Number(e).toFixed(2)}_${Number(c).toFixed(2)}`;}
 // Sugere os nomes que a loja ja usou nestes dois campos. Sao de digitacao
 // livre, e por isso "NATHAN" e "NATAN" conviviam no mesmo relatorio: a
 // sugestao faz a segunda vez escolher a grafia da primeira.
+// Preenche um seletor de vendedor com os nomes que aparecem de verdade na
+// lista, mantendo o que ja estava escolhido. Nome que nao existe mais na
+// tela sairia da lista e zeraria o filtro sem querer -- por isso o atual
+// e sempre mantido.
+function encherFiltroVendedor(id,nomes,rotulo){
+  const sel=document.getElementById(id);
+  if(!sel)return;
+  const atual=sel.value||'todos';
+  const lista=[...new Set((nomes||[]).map(n=>UP(String(n||'').trim())).filter(n=>n.length>1))]
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(atual!=='todos'&&!lista.includes(atual))lista.push(atual);
+  sel.innerHTML='<option value="todos">'+(rotulo||'Todos os vendedores')+'</option>'
+    +lista.map(n=>'<option value="'+n.replace(/"/g,'&quot;')+'">'+n+'</option>').join('');
+  sel.value=atual;
+}
+
 async function sugerirNomesGarantia(){
   const d=document.getElementById('nomes-garantia');
   if(!d)return;
@@ -2315,10 +2403,16 @@ async function sugerirNomesGarantia(){
     window._nomesGar=[];
     try{
       const un=(U&&U.un)||UNIDADE;
-      const rs=await sbGet('os_cards','select=resp_gar,vendedor'
-        +'&unidade=eq.'+encodeURIComponent(un)
-        +'&resp_gar=not.is.null&limit=2000');
-      window._nomesGar=(rs||[]).reduce((a,r)=>a.concat([r.resp_gar,r.vendedor]),[]);
+      const [rs,cr]=await Promise.all([
+        sbGet('os_cards','select=resp_gar,vendedor'
+          +'&unidade=eq.'+encodeURIComponent(un)
+          +'&or=(resp_gar.not.is.null,vendedor.not.is.null)&limit=3000'),
+        sbGet('crediario','select=vendedor'
+          +'&unidade=eq.'+encodeURIComponent(un)
+          +'&vendedor=not.is.null&limit=2000')
+      ]);
+      window._nomesGar=(rs||[]).reduce((a,r)=>a.concat([r.resp_gar,r.vendedor]),[])
+        .concat((cr||[]).map(r=>r.vendedor));
     }catch(e){
       // sem rede a sugestao fica vazia; o campo continua de digitacao livre
       window._nomesGar=[];
@@ -2505,6 +2599,8 @@ function criarOsDoCrediario(){
   opcoesFormas(document.getElementById('fforma2'));
 
   document.getElementById('fcli').value=UP(c.nome||'');
+  // o vendedor vem do contrato; quem lanca so confere
+  if(c.vendedor)document.getElementById('fvendedor').value=UP(c.vendedor);
   if(c.telefone)document.getElementById('ftel').value=c.telefone;
   document.getElementById('fdt').value=dataPagamentoCred(c,d.parcs);
   document.getElementById('fvenda').value=total.toFixed(2);
@@ -2691,7 +2787,8 @@ async function svReneg(){
 let usLista=[];
 
 const PERFIS_DESC={
-  supervisor:'Acesso total, inclusive esta tela.',
+  diretor:'Acesso total. Único que confere e fecha o caixa. Não pode ser desativado.',
+  supervisor:'Acesso total, menos conferir e fechar o caixa.',
   gerente:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
   adm:'Cria OS e movimenta tudo, menos Montagem para Pronto. Vê os financeiros.',
   montagem:'Move apenas de Montagem para Pronto. Não vê financeiro.',
@@ -2707,7 +2804,10 @@ async function tgGlobal(id, ligar){
     const r=await sbGet('usuarios','id=eq.'+id);
     const reg=r&&r[0];
     if(!reg){alert('Usuário não encontrado.');return;}
-    if(reg.perfil!=='supervisor'){alert('Só o perfil supervisor pode ser global.');return;}
+    if(!podeSerGlobal(reg.perfil)){alert('Só supervisor e diretor podem ser globais.');return;}
+    if(reg.perfil==='diretor'&&!ehDiretor()){
+      alert('Só um diretor pode alterar outro diretor.');return;
+    }
 
     if(!ligar){
       if(!confirm('Prender '+reg.nome+' à loja '+reg.unidade+'?\n\n'
@@ -2760,21 +2860,23 @@ async function rnUsuarios(){
       <td style="font-weight:700">${u.nome}${u.usuario===(U&&U.u)?' <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:var(--vl);color:var(--v);font-weight:800">VOCÊ</span>':''}</td>
       <td style="color:var(--mu)">${u.usuario}</td>
       <td style="color:var(--tx);font-weight:600">${(RS[u.perfil]||{}).l||u.perfil}
-        ${u.global&&u.perfil==='supervisor'?'<div style="font-size:9px;font-weight:800;color:#5B21B6;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:5px;padding:1px 6px;display:inline-block;margin-top:3px">TODAS AS LOJAS</div>':''}</td>
+        ${u.global&&podeSerGlobal(u.perfil)?'<div style="font-size:9px;font-weight:800;color:#5B21B6;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:5px;padding:1px 6px;display:inline-block;margin-top:3px">TODAS AS LOJAS</div>':''}</td>
       <td style="color:var(--mu);font-size:11px;white-space:nowrap">${fmt(u.ultimo_acesso)}</td>
       <td>${u.ativo
         ?'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;background:#F0FDF4;color:#16A34A">ATIVO</span>'
         :'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:800;background:#FEF2F2;color:#B91C1C">INATIVO</span>'
          +'<div style="font-size:9px;color:var(--mu);margin-top:2px">'+fmt(u.desativado_em)+'</div>'}</td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="bex" onclick="opUsuario('${u.id}')">Editar</button>
-        ${u.perfil==='supervisor'&&u.ativo
+        ${(u.perfil==='diretor'&&!ehDiretor())
+          ? '<span style="font-size:10px;font-weight:700;color:var(--mu)">só o diretor altera</span>'
+          : '<button class="bex" onclick="opUsuario(\''+u.id+'\')">Editar</button>'}
+        ${podeSerGlobal(u.perfil)&&u.ativo&&!(u.perfil==='diretor'&&!ehDiretor())
           ? (u.global
              ? '<button class="bex" onclick="tgGlobal(\''+u.id+'\',false)">Prender à loja</button>'
              : '<button class="bex" style="background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE" onclick="tgGlobal(\''+u.id+'\',true)">Liberar todas as lojas</button>')
           : ''}
         ${u.ativo
-          ? (u.usuario===(U&&U.u) ? '' : '<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="tgAtivo(\''+u.id+'\',false)">Desativar</button>')
+          ? ((u.usuario===(U&&U.u)||(u.perfil==='diretor'&&!ehDiretor())) ? '' : '<button class="bex" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA" onclick="tgAtivo(\''+u.id+'\',false)">Desativar</button>')
           : '<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0" onclick="tgAtivo(\''+u.id+'\',true)">Reativar</button>'}
       </div></td></tr>`).join('')}</tbody></table>`;
 }
@@ -2786,7 +2888,12 @@ function opUsuario(id){
   document.getElementById('us-nome').value=u?u.nome:'';
   document.getElementById('us-login').value=u?u.usuario:'';
   const sel=document.getElementById('us-perfil');
-  sel.innerHTML=Object.keys(RS).map(p=>'<option value="'+p+'">'+RS[p].l+'</option>').join('');
+  // So um diretor cria ou promove outro diretor. Sem isso, qualquer
+  // supervisor se promoveria -- e "diretor nao pode ser excluido" nao valeria
+  // nada, porque bastaria trocar a senha dele.
+  sel.innerHTML=Object.keys(RS)
+    .filter(p=>p!=='diretor'||ehDiretor()||(u&&u.perfil==='diretor'))
+    .map(p=>'<option value="'+p+'">'+RS[p].l+'</option>').join('');
   sel.value=u?u.perfil:'montagem';
   sel.onchange=()=>{document.getElementById('us-perfil-desc').textContent=PERFIS_DESC[sel.value]||'';};
   sel.onchange();
@@ -2805,6 +2912,13 @@ async function svUsuario(){
   const login=document.getElementById('us-login').value.trim().toLowerCase();
   const perfil=document.getElementById('us-perfil').value;
   const senha=document.getElementById('us-senha').value;
+
+  // So diretor mexe em diretor -- tanto para criar/promover quanto para
+  // alterar um que ja existe (trocar a senha dele seria assumir a conta).
+  const alvo=id?usLista.find(x=>x.id===id):null;
+  if((perfil==='diretor'||(alvo&&alvo.perfil==='diretor'))&&!ehDiretor()){
+    alert('Só um diretor pode criar ou alterar um diretor.');return;
+  }
 
   if(!nome){alert('Preencha o nome.');return;}
   if(!/^[a-z0-9._-]{3,}$/.test(login)){alert('O usuário deve ter ao menos 3 caracteres, sem espaço nem acento.');return;}
@@ -2834,6 +2948,11 @@ async function svUsuario(){
 
 async function tgAtivo(id,ativar){
   const u=usLista.find(x=>x.id===id);if(!u)return;
+  // Diretor nao pode ser desativado por mais ninguem. A trava fica aqui, e
+  // nao so no botao: botao escondido nao protege nada.
+  if(u.perfil==='diretor'&&!ehDiretor()){
+    alert('Só um diretor pode desativar outro diretor.');return;
+  }
   if(!ativar&&!confirm('Desativar '+u.nome+'?\n\nEle perde o acesso na hora, mas continua no histórico '
     +'de tudo que já fez. Dá para reativar depois.'))return;
   try{
@@ -2892,7 +3011,7 @@ let fcVendas=[], fcEntregas=[], fcSalvo=null, fcDiaCarregado=null, _fcTimer=null
 // Linhas que vieram do sistema e o supervisor removeu. Sem guardar isso,
 // a linha voltaria sozinha na próxima sincronização.
 let fcRemovidos=[];
-function podeExcluirFech(){return U&&U.r==='supervisor';}
+function podeExcluirFech(){return !!(U&&(U.r==='supervisor'||U.r==='diretor'));}
 const rs=v=>'R$ '+Number(v||0).toFixed(2);
 const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
 
@@ -4524,10 +4643,12 @@ function situacaoSaldo(c){
 function rnSaldos(){
   const {ini,fim}=rangeSd();
   const sit=document.getElementById('sd-sit')?.value||'todos';
+  const vend=document.getElementById('sd-vend')?.value||'todos';
   const busca=(document.getElementById('sd-busca')?.value||'').toLowerCase();
   const lbs={h:'Saldos de hoje',s:'Saldos desta semana',m:'Saldos deste mês',td:'Todos os saldos'};
   const tt=document.getElementById('sd-tt'); if(tt)tt.textContent=lbs[perSd];
 
+  encherFiltroVendedor('sd-vend',(ST.cards||[]).map(c=>c.vendedor));
   sdDados=ST.cards.filter(c=>{
     // teve saldo é o que importa, não se ainda está pendente: quitado
     // continua na lista, para saber quando e como foi recebido
@@ -4536,6 +4657,7 @@ function rnSaldos(){
     if(ini&&(!c.dtVenda||c.dtVenda<ini||c.dtVenda>fim))return false;
     const s=situacaoSaldo(c);
     if(sit!=='todos'&&s!==sit)return false;
+    if(vend!=='todos'&&UP(c.vendedor||'')!==UP(vend))return false;
     if(busca&&!((c.os||'')+' '+(c.cliente||'')).toLowerCase().includes(busca))return false;
     return true;
   }).map(c=>({...c,_sit:situacaoSaldo(c),_ent:quandoEntregue(c)}))
@@ -5112,6 +5234,8 @@ function opNovoCr(){
   crParcelas=[];
   document.getElementById('cr-nome').value='';
   document.getElementById('cr-cpf').value='';
+  document.getElementById('cr-vendedor').value='';
+  sugerirNomesGarantia();
   document.getElementById('cr-cep').value='';
   document.getElementById('cr-os').value='';
   document.getElementById('cr-tel').value='';
@@ -5169,10 +5293,15 @@ function renderParcelas(){
 
 async function svNovoCr(){
   const nome=UP(document.getElementById('cr-nome').value.trim());
+  const vendedorCr=UP(document.getElementById('cr-vendedor').value.trim());
   const fin=document.getElementById('cr-fin-novo').value;
   const vcompra=parseFloat(document.getElementById('cr-vcompra').value)||0;
   const vcred=parseFloat(document.getElementById('cr-vcred').value)||0;
   if(!nome){alert('Preencha o nome do cliente.');return;}
+  if(!vendedorCr){
+    alert('Informe o vendedor desta venda.');
+    document.getElementById('cr-vendedor').focus();return;
+  }
   if(!vcred){alert('Preencha o valor do crediário.');return;}
   const dtCompra=document.getElementById('cr-dtcompra').value;
   if(!dtCompra){alert('Preencha a data da compra.');return;}
@@ -5209,7 +5338,7 @@ async function svNovoCr(){
     os_fake:document.getElementById('cr-os-fake').checked,
     entrada_paga:false,dt_entrada_paga:null,entrada_paga_por:null,
     num_parcelas:crParcelas.length,status:'aberto',
-    obs:null,criado_por:U.n
+    obs:null,criado_por:U.n,vendedor:vendedorCr
   };
 
   const parcelas=crParcelas.map((p,i)=>({
@@ -5221,7 +5350,7 @@ async function svNovoCr(){
   }));
 
   try{
-    upCampos(contrato,['nome','os','obs','criado_por']);
+    upCampos(contrato,['nome','os','obs','criado_por','vendedor']);
     await sbUpsert('crediario',contrato);
     for(const p of parcelas) await sbUpsert('crediario_parcelas',p);
     clsNovoCr();
@@ -5259,6 +5388,7 @@ async function rnCr(){
   const busca=(document.getElementById('cr-busca')?.value||'').toLowerCase();
   const vencFiltro=document.getElementById('cr-venc')?.value||'todos';
   const acatFiltro=document.getElementById('cr-acat')?.value||'todos';
+  const vendFiltro=document.getElementById('cr-vend')?.value||'todos';
   // janela de vencimento: de hoje ate hoje + N dias
   const hojeD=hojeBR();
   let limite=null;
@@ -5282,8 +5412,12 @@ async function rnCr(){
     if(finFiltro!=='todos')params+=`&financeira=eq.${finFiltro}`;
     if(crIni)params+=`&created_at=gte.${crIni}`;
     if(crFim)params+=`&created_at=lte.${crFim}T23:59:59`;
-    const contratos=await sbGet('crediario',params);
-    (contratos||[]).forEach(c=>upCampos(c,['nome','os','obs','criado_por','entrada_paga_por']));
+    let contratos=await sbGet('crediario',params);
+    (contratos||[]).forEach(c=>upCampos(c,['nome','os','obs','criado_por','entrada_paga_por','vendedor']));
+    encherFiltroVendedor('cr-vend',(contratos||[]).map(c=>c.vendedor));
+    if(vendFiltro!=='todos'){
+      contratos=(contratos||[]).filter(c=>UP(c.vendedor||'')===UP(vendFiltro));
+    }
 
     // Carrega parcelas
     const ids=contratos.map(c=>c.id);
@@ -6319,6 +6453,8 @@ function opEditCr(cid){
   document.getElementById('cr-edit-id').value=cid;
   document.getElementById('cr-edit-nome').value=c.nome||'';
   document.getElementById('cr-edit-cpf').value=c.cpf||'';
+  document.getElementById('cr-edit-vendedor').value=c.vendedor||'';
+  sugerirNomesGarantia();
   document.getElementById('cr-edit-cep').value=c.cep||'';
   document.getElementById('cr-edit-os').value=c.os||'';
   document.getElementById('cr-edit-tel').value=c.telefone||'';
@@ -6377,6 +6513,7 @@ async function svEditCr(){
     await sbPatch('crediario',{
       nome,
       cpf:document.getElementById('cr-edit-cpf').value.trim()||null,
+      vendedor:UP(document.getElementById('cr-edit-vendedor').value.trim())||null,
       telefone:document.getElementById('cr-edit-tel').value.trim()||null,
       os:UP(document.getElementById('cr-edit-os').value.trim())||null,
       os_fake:document.getElementById('cr-edit-os-fake').checked,
@@ -6744,6 +6881,7 @@ async function varrerNaoRetirados(){
 
 // ── CANCELAMENTO E PEDIDOS NÃO RETIRADOS ────────────────────────────────────
 // Colunas 6 e 7 ficam fora do quadro: cada uma tem a sua aba.
+const COL_AG_PAG=8;      // fora do quadro: venda parada esperando pagamento
 const COL_NAO_RET=6, COL_CANC=7;
 
 function opCancOs(id){
@@ -6803,7 +6941,7 @@ async function devolverAoFechamento(card){
 async function voltarDoArquivo(id,destino){
   const c=ST.cards.find(x=>x.id===id);if(!c)return;
   if(!R||!R.ed){alert('Sem permissão.');return;}
-  const nomes={4:'Avisado',3:'Pronto'};
+  const nomes={4:'Avisado',3:'Pronto',0:'Vendas'};
   if(!confirm('Trazer a OS '+(c.os||'')+' de volta para '+(nomes[destino]||destino)+'?'))return;
   const now=Date.now();
   if(!c.history)c.history=[];
@@ -6812,6 +6950,7 @@ async function voltarDoArquivo(id,destino){
   const eraCancelada=!!c.canceladoEm;
   c.canceladoEm=null;c.canceladoPor=null;c.canceladoMotivo=null;
   c.naoRetEm=null;c.naoRetPor=null;
+  c.agPagEm=null;c.agPagPor=null;
   atualizarTelas();
   try{
     await saveCard(c);
@@ -6820,12 +6959,277 @@ async function voltarDoArquivo(id,destino){
   catch(e){alert('Erro ao salvar: '+e.message);}
 }
 
+// ── CHECK LIST DE ROTINA ────────────────────────────────────────────────────
+// Duas listas: a de quem lidera o administrativo e a de quem auxilia. O perfil
+// decide qual aparece -- a tela nao diz "lider" nem "auxiliar" em lugar nenhum,
+// so "Check list do dia".
+const CHECKLISTS={
+  lider:[
+    'Encaminhar relatório de comissão detalhado todos os dias para a Lori. Primeira tarefa!',
+    'Verificar WhatsApp da loja',
+    'Verificar bateria dos celulares e abrir WhatsApp das campanhas todos os dias',
+    'Fazer controle das avaliações do Google',
+    'Acompanhar o sistema de OS de todas as unidades',
+    'Lançar vendas no sistema de OS',
+    'Dar baixa nas OS entregues no sistema',
+    'Verificar se tem novos pagamentos no ASAAS e MULTI (dar baixa no sistema de OS e venda+)',
+    'Toda quarta entrar em contato com os clientes que não fizeram a retirada',
+    'Verificar diariamente se existem parcelas a serem acatadas no multi',
+    'Inserir código de pedidos no sistema de OS',
+    'Avisar óculos prontos (sempre priorizar os para hora)',
+    'Separar os pedidos e levar ao laboratório',
+    'Conferir o caixa',
+    'Enviar lembrete de vencimento das parcelas do ASAAS',
+    'Enviar mensagem de aniversariante do dia',
+    'Emissão de NF (1x por mês, dividir o valor em média dos dias trabalhados)',
+    'Verificar uma vez ao mês parcelas acatadas e lançar no acerto (entre o dia 05 e 10)',
+    'Fechamento de caixa (enviar o fechamento no grupo; fechar envelope e entregar ao Diego; imprimir fechamento para arquivar as OS do dia)',
+    'Antes de ir embora colocar o celular para carregar',
+    'Enviar pedidos do dia',
+    'Conferir os prazos no sistema de OS diariamente',
+    'Verificar se a documentação das vendas do multi estão corretas (se houver)',
+    'Enviar mensagens do Indique e Ganhe'
+  ],
+  auxiliar:[
+    'Verificar WhatsApp da loja',
+    'Lançar vendas no sistema de OS',
+    'Dar baixa nas OS entregues no sistema',
+    'Verificar se tem novos pagamentos no ASAAS e MULTI (dar baixa no sistema de OS e venda+)',
+    'Verificar diariamente se existem parcelas a serem acatadas no multi',
+    'Toda quarta entrar em contato com os clientes que não fizeram a retirada',
+    'Inserir código de pedidos no sistema de OS',
+    'Avisar óculos prontos (sempre priorizar os para hora)',
+    'Separar os pedidos e levar ao laboratório',
+    'Conferir o caixa',
+    'Enviar lembrete de vencimento das parcelas do ASAAS',
+    'Enviar mensagem de aniversariante do dia',
+    'Emissão de NF (1x por mês, dividir o valor em média dos dias trabalhados)',
+    'Verificar uma vez ao mês parcelas acatadas e lançar no acerto (entre o dia 05 e 10)',
+    'Fechamento de caixa (enviar o fechamento no grupo; fechar envelope e entregar ao responsável; imprimir fechamento para arquivar as OS do dia)',
+    'Antes de ir embora colocar o celular e o tablet para carregar',
+    'Enviar pedidos do dia',
+    'Conferir os prazos no sistema de OS diariamente',
+    'Verificar se a documentação das vendas do multi estão corretas (se houver)',
+    'Enviar mensagens do Indique e Ganhe para clientes que fizeram a retirada'
+  ]
+};
+
+// Qual lista cada perfil enxerga. Montagem e pos-vendas nao tem check list.
+function listaDoPerfil(){
+  if(!U)return null;
+  if(U.r==='diretor'||U.r==='supervisor')return 'lider';
+  if(U.r==='adm'||U.r==='gerente')return 'auxiliar';
+  return null;
+}
+
+let ckMarcas={};        // item -> {por, em}
+let ckDiaCarregado='';
+
+function ckHoje(){
+  const e=document.getElementById('ck-dia');
+  if(e)e.value=hojeBR();
+  rnCheck();
+}
+
+function ckId(lista,dia,item){
+  return 'cl_'+(U&&U.un?U.un:'saovicente')+'_'+lista+'_'+dia+'_'+item;
+}
+
+async function rnCheck(){
+  const lista=listaDoPerfil();
+  const body=document.getElementById('ck-body');
+  if(!lista||!body)return;
+  const campo=document.getElementById('ck-dia');
+  if(campo&&!campo.value)campo.value=hojeBR();
+  const dia=campo?campo.value:hojeBR();
+  ckDiaCarregado=dia;
+  const itens=CHECKLISTS[lista];
+
+  try{
+    const rs=await sbGet('checklist_marcacoes',
+      'unidade=eq.'+encodeURIComponent(U.un||'saovicente')
+      +'&lista=eq.'+lista+'&dia=eq.'+dia);
+    ckMarcas={};
+    (rs||[]).forEach(r=>{if(r.feito)ckMarcas[r.item]={por:r.marcado_por,em:r.marcado_em};});
+  }catch(e){
+    body.innerHTML='<div class="er">Não consegui buscar o check list: '+e.message+'</div>';
+    return;
+  }
+  if(ckDiaCarregado!==dia)return;   // o usuario trocou o dia enquanto carregava
+
+  const feitas=itens.filter((_,i)=>ckMarcas[i]).length;
+  const pct=itens.length?Math.round(feitas/itens.length*100):0;
+  const cont=document.getElementById('ck-cont');
+  if(cont)cont.textContent=feitas+' de '+itens.length+' feitas';
+  const barra=document.getElementById('ck-barra');
+  if(barra)barra.innerHTML='<div style="background:var(--bo);border-radius:20px;height:8px;overflow:hidden">'
+    +'<div style="height:100%;width:'+pct+'%;background:'+(pct===100?'#16A34A':'var(--v)')+';transition:width .25s"></div></div>'
+    +'<div style="font-size:11px;color:var(--mu);font-weight:600;margin-top:5px">'
+    +(dia===hojeBR()?'Hoje':dtBR(dia))+' · '+pct+'%'+(pct===100?' — tudo feito':'')+'</div>';
+
+  body.innerHTML='<div style="display:flex;flex-direction:column;gap:7px">'
+    +itens.map((txt,i)=>{
+      const m=ckMarcas[i];
+      const hora=m&&m.em?new Date(m.em).toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}):'';
+      return '<label style="display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:12px;cursor:pointer;'
+        +'border:1.5px solid '+(m?'#BBF7D0':'var(--bo)')+';background:'+(m?'#F0FDF4':'var(--w)')+'">'
+        +'<input type="checkbox" '+(m?'checked':'')+' onchange="tgCheck('+i+',this.checked)" '
+        +'style="width:19px;height:19px;cursor:pointer;accent-color:#16A34A;flex-shrink:0;margin-top:1px"/>'
+        +'<span style="flex:1;font-size:13px;line-height:1.5;color:'+(m?'#166534':'var(--tx)')+';'
+        +(m?'font-weight:600':'font-weight:500')+'">'+txt
+        +(m?('<div style="font-size:10px;color:#16A34A;font-weight:700;margin-top:3px">'
+            +(m.por||'')+(hora?(' · '+hora):'')+'</div>'):'')
+        +'</span></label>';
+    }).join('')+'</div>';
+}
+
+async function tgCheck(item,marcado){
+  const lista=listaDoPerfil();
+  if(!lista)return;
+  const dia=document.getElementById('ck-dia').value||hojeBR();
+  const id=ckId(lista,dia,item);
+  // a tela responde na hora; se a gravacao falhar, desfaz e avisa
+  if(marcado)ckMarcas[item]={por:U.n,em:new Date().toISOString()};
+  else delete ckMarcas[item];
+  try{
+    if(marcado){
+      await sbUpsert('checklist_marcacoes',{id,unidade:U.un||'saovicente',lista,item,
+        dia,feito:true,marcado_por:U.n,marcado_em:new Date().toISOString()});
+    }else{
+      await sbDelete('checklist_marcacoes',{id});
+    }
+    rnCheck();
+  }catch(e){
+    if(marcado)delete ckMarcas[item]; else ckMarcas[item]={por:U.n};
+    alert('Não consegui salvar: '+e.message);
+    rnCheck();
+  }
+}
+
+// O mes inteiro em planilha, no formato do papel: uma linha por tarefa,
+// uma coluna por dia.
+async function expCheckMes(){
+  const lista=listaDoPerfil();
+  if(!lista){alert('Seu perfil não tem check list.');return;}
+  const dia=document.getElementById('ck-dia').value||hojeBR();
+  const mes=dia.slice(0,7);
+  const ultimo=new Date(Number(mes.slice(0,4)),Number(mes.slice(5,7)),0).getDate();
+  let rs=[];
+  try{
+    rs=await sbGet('checklist_marcacoes',
+      'unidade=eq.'+encodeURIComponent(U.un||'saovicente')
+      +'&lista=eq.'+lista+'&dia=gte.'+mes+'-01&dia=lte.'+mes+'-'+String(ultimo).padStart(2,'0'));
+  }catch(e){alert('Não consegui buscar o mês: '+e.message);return;}
+  const feito={};
+  (rs||[]).forEach(r=>{if(r.feito)feito[r.item+'_'+Number(String(r.dia).slice(8,10))]=1;});
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const dias=[];for(let d=1;d<=ultimo;d++)dias.push(d);
+  const csv=[['ATIVIDADES'].concat(dias).map(q).join(',')]
+    .concat(CHECKLISTS[lista].map((txt,i)=>
+      [txt].concat(dias.map(d=>feito[i+'_'+d]?'X':'')).map(q).join(',')))
+    .join('\n');
+  const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='checklist_'+mes+'.csv';a.click();URL.revokeObjectURL(u);
+}
+
+// ── AGUARDANDO PAGAMENTO ────────────────────────────────────────────────────
+// A venda entrou, mas o cliente pagou pouco e a loja nao vai pedir a lente
+// ainda. Quem decide e o administrativo: o sistema nao calcula percentual
+// nenhum, so guarda a OS fora do quadro ate o dinheiro chegar.
+
+async function opAgPag(id){
+  const c=ST.cards.find(x=>x.id===id);if(!c)return;
+  if(!R||!R.ed){alert('Sem permissão para tirar a OS do quadro.');return;}
+  if(c.col!==0){
+    alert('Só uma OS que ainda está em Vendas pode ir para Aguardando pagamento.\n\n'
+      +'Esta está em '+nomeCol(c.col)+'.');
+    return;
+  }
+  const venda=num(c.valorVenda), pago=somaRecebido(c);
+  if(!confirm('Tirar a OS '+(c.os||'')+' do quadro por falta de pagamento?\n\n'
+    +'Venda: R$ '+venda.toFixed(2)+'\nPago até agora: R$ '+pago.toFixed(2)+'\n\n'
+    +'Ela sai de Vendas e vai para a aba Aguardando pagamento. O pedido não é\n'
+    +'feito enquanto ela estiver lá. Quando o cliente pagar, use "Voltar para Vendas".'))return;
+  const now=Date.now();
+  if(!c.history)c.history=[];
+  c.history.push({u:U.n,r:U.r,from:c.col,to:COL_AG_PAG,at:now,mc:false,agPag:true,
+                  venda,pago});
+  c.col=COL_AG_PAG;c.ts=now;
+  c.agPagEm=now;c.agPagPor=U.n;
+  clsH();atualizarTelas();
+  try{
+    await saveCard(c);
+    setSy('ok','OS em aguardando pagamento — '+horaAgora());
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+}
+
+function rnAgPag(){
+  const b=document.getElementById('ag-body');if(!b)return;
+  const busca=(document.getElementById('ag-busca')?.value||'').toLowerCase();
+  const lista=ST.cards.filter(c=>c.col===COL_AG_PAG)
+    .filter(c=>!busca||((c.os||'')+' '+(c.cliente||'')+' '+(c.vendedor||''))
+                        .toLowerCase().includes(busca))
+    .sort((a,b2)=>(a.agPagEm||0)-(b2.agPagEm||0));
+  window._agLista=lista;
+  const cont=document.getElementById('ag-cont');
+  const todas=ST.cards.filter(c=>c.col===COL_AG_PAG);
+  const aberto=todas.reduce((s,c)=>s+Math.max(num(c.valorVenda)-somaRecebido(c),0),0);
+  if(cont)cont.textContent=todas.length+' OS · R$ '+aberto.toFixed(2)+' a receber para liberar o pedido';
+  if(!lista.length){
+    b.innerHTML=_arquivoCarregado
+      ? '<div class="er">Nenhuma OS aguardando pagamento.</div>'
+      : '<div class="er">Carregando...</div>';
+    return;
+  }
+  b.innerHTML='<table><thead><tr><th>#</th><th>OS</th><th>Cliente</th><th>Vendedor</th>'
+    +'<th>Dt. Venda</th><th>Venda</th><th>Pago</th><th>Falta</th><th>Parada há</th>'
+    +'<th>Tirada por</th><th>Ações</th></tr></thead><tbody>'
+    +lista.map((c,i)=>{
+      const venda=num(c.valorVenda), pago=somaRecebido(c);
+      const falta=Math.max(venda-pago,0);
+      const dias=c.agPagEm?Math.floor((Date.now()-c.agPagEm)/86400000):0;
+      const corD=dias>30?'#DC2626':(dias>15?'#B45309':'var(--mu)');
+      return '<tr><td style="color:var(--mu);font-size:11px">'+(i+1)+'</td>'
+        +'<td style="font-weight:700">'+hl(c.os||'—',busca)+'</td>'
+        +'<td>'+hl(c.cliente||'—',busca)+'</td>'
+        +'<td style="color:var(--mu)">'+hl(c.vendedor||'—',busca)+'</td>'
+        +'<td style="color:var(--mu);white-space:nowrap">'+(c.dtVenda?dtBR(c.dtVenda):'—')+'</td>'
+        +'<td style="font-weight:700;color:#1D4ED8">R$ '+venda.toFixed(2)+'</td>'
+        +'<td style="color:#16A34A;font-weight:700">R$ '+pago.toFixed(2)+'</td>'
+        +'<td style="color:#B45309;font-weight:800">R$ '+falta.toFixed(2)+'</td>'
+        +'<td style="color:'+corD+';font-weight:700;white-space:nowrap">'+dias+' dia'+(dias===1?'':'s')+'</td>'
+        +'<td style="color:var(--mu);font-size:11px">'+(c.agPagPor||'—')+'</td>'
+        +'<td style="white-space:nowrap">'
+        +(R&&R.ed?'<button class="bex" style="background:#F0FDF4;color:#16A34A;border-color:#BBF7D0;font-weight:700" onclick="voltarDoArquivo(\''+c.id+'\',0)">Voltar para Vendas</button>':'')
+        +'<button class="bex" style="margin-left:6px" onclick="opH(\''+c.id+'\')">Histórico</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+function expAg(){
+  const lista=window._agLista||[];
+  if(!lista.length){alert('Nada para exportar.');return;}
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const csv=['OS,Cliente,Vendedor,Dt. Venda,Venda,Pago,Falta,Dias parada,Tirada por',
+    ...lista.map(c=>{
+      const venda=num(c.valorVenda), pago=somaRecebido(c);
+      const dias=c.agPagEm?Math.floor((Date.now()-c.agPagEm)/86400000):0;
+      return [c.os,c.cliente,c.vendedor,c.dtVenda,venda.toFixed(2),pago.toFixed(2),
+              Math.max(venda-pago,0).toFixed(2),dias,c.agPagPor].map(q).join(',');
+    })].join('\n');
+  const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='aguardando_pagamento.csv';a.click();URL.revokeObjectURL(u);
+}
+
 const fmtDtH=ts=>ts?new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 
 // Quadro, Saldos e Não retirados mostram a mesma OS sob ângulos diferentes.
 // Mexeu numa, as três precisam refletir na hora.
 function atualizarTelas(){
   rnKan();
+  if(document.getElementById('ags')&&document.getElementById('ags').style.display!=='none')rnAgPag();
   const vis=id=>{const e=document.getElementById(id);return e&&e.style.display!=='none';};
   if(vis('sds'))rnSaldos();
   if(vis('nrs'))rnNaoRet();
@@ -7102,7 +7506,9 @@ async function svSaldoPago(){
 // faturamento do dia e no Histórico, e é encontrada na busca como qualquer OS.
 function opAvulsa(){
   if(!R||!R.ca){alert('Sem permissão para registrar vendas.');return;}
-  ['av-desc','av-cli','av-os','av-valor','av-rec','av-rec2'].forEach(i=>document.getElementById(i).value='');
+  ['av-desc','av-cli','av-os','av-valor','av-rec','av-rec2','av-vendedor']
+    .forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
+  sugerirNomesGarantia();
   const st=document.getElementById('av-tipo');
   [...st.options].forEach(o=>{
     const pode=!R.tp||R.tp.includes(o.value);
@@ -7167,6 +7573,7 @@ async function svAvulsa(){
   }
   const desc=UP(document.getElementById('av-desc').value.trim());
   const cliente=UP(document.getElementById('av-cli').value.trim());
+  const vendedor=UP(document.getElementById('av-vendedor').value.trim());
   let os=UP(document.getElementById('av-os').value.trim());
   const valor=num(document.getElementById('av-valor').value);
   const rec=num(document.getElementById('av-rec').value);
@@ -7176,6 +7583,7 @@ async function svAvulsa(){
 
   if(!desc){alert('Informe o produto.');document.getElementById('av-desc').focus();return;}
   if(!cliente){alert('Informe o cliente.');document.getElementById('av-cli').focus();return;}
+  if(!vendedor){alert('Informe o vendedor.');document.getElementById('av-vendedor').focus();return;}
   if(valor<=0){alert('Informe o valor da venda.');document.getElementById('av-valor').focus();return;}
   if(!os){alert('Informe o número da OS.');document.getElementById('av-os').focus();return;}
   if(!forma){alert('Selecione a forma de pagamento.');document.getElementById('av-forma').focus();return;}
@@ -7184,7 +7592,7 @@ async function svAvulsa(){
   const repetida=ST.cards.find(x=>UP(String(x.os||'').trim())===os);
   if(repetida){
     alert('Já existe a OS '+os+' nesta loja.\n\n'
-      +'Ela está em: '+(CF[repetida.col]||'?')
+      +'Ela está em: '+nomeCol(repetida.col)
       +(repetida.cliente?('\nCliente: '+repetida.cliente):'')
       +'\n\nConfira o número antes de salvar.');
     document.getElementById('av-os').focus();
@@ -7196,7 +7604,7 @@ async function svAvulsa(){
   const saldoV=Math.round((valor-rec-rec2)*100)/100;
   const tipo=document.getElementById('av-tipo').value;
   const destino=parseInt(document.getElementById('av-destino').value)||5;
-  const c={id:'os_'+now, os, cliente, descricao:desc, tipo,
+  const c={id:'os_'+now, os, cliente, vendedor, descricao:desc, tipo,
     ped:'', pedidos:[], dtVenda:hojeBR(), prazo:hojeBR(), urgente:false,
     valorVenda:valor, valorRecebido:rec, valorRecebido2:rec2||null,
     formaPag:forma, formaPag2:forma2||null,
@@ -7381,7 +7789,7 @@ async function mvCardExec(id,lab,obsmv,destino){
   // retirado (6) e Cancelada (7) exigem destino declarado -- ninguem cai
   // nelas por avancar uma coluna.
   if(destino==null&&prox>5){
-    alert('Esta OS está em '+(from===6?'Não retirados':'Canceladas')
+    alert('Esta OS está em '+nomeCol(from)
       +'.\n\nUse os botões próprios dessa aba para movimentá-la.');
     return;
   }
@@ -7481,6 +7889,8 @@ function opH(id){
     const partes=[];
     if(R&&R.rf&&c.col<5)partes.push(bt('Refazer',"clsH();opRf('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
     if(R&&R.ed&&c.saldo)partes.push(bt('Anotar cobrança',"clsH();opSaldoObs('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--bg);color:var(--mu)'));
+    if(R&&R.ed&&c.col===0)partes.push(bt('Saldo abaixo do mínimo',"opAgPag('"+c.id+"')",'border:1.5px solid #FCD34D;background:#FFFBEB;color:#92400E'));
+    if(R&&R.ed&&c.col===COL_AG_PAG)partes.push(bt('Voltar para Vendas',"clsH();voltarDoArquivo('"+c.id+"',0)",'border:1.5px solid #BBF7D0;background:#F0FDF4;color:#16A34A'));
     if(R&&R.cn&&c.col!==7)partes.push(bt('Cancelar OS',"clsH();opCancOs('"+c.id+"')",'border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C'));
     if(R&&R.cd)partes.push(bt('Excluir',"clsH();dlCard('"+c.id+"')",'border:1.5px solid var(--bo);background:var(--w);color:var(--mu)'));
     ac.innerHTML=partes.join('');
@@ -7489,7 +7899,7 @@ function opH(id){
   if(!c.history||!c.history.length){l.innerHTML='<div style="font-size:12px;color:var(--mu);padding:4px 0">Sem movimentações.</div>';}
   else{l.innerHTML=c.history.slice().reverse().map(h=>{const rl=h.r&&RS[h.r]?RS[h.r].l:h.r||'';const mt=h.mc?'<span class="mt">mont ✓</span>':'';const rf=h.refeito?`<div style="color:#DC2626;font-size:11px;margin-top:3px">Refazer: ${h.motivoRefeito||''}</div>`
   +(h.lentesBaixa?`<div style="color:#0D7A75;font-size:10px;font-weight:700;margin-top:2px">Lente nova: ${h.lentesBaixa}</div>`:''):'';
-const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">'+(h.parcial?'avisou pelo WhatsApp — óculos de hora':'avisou pelo WhatsApp')+'</span>':(h.obs?'':ed+' → <b>'+CF[h.to]+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
+const ob=h.obs?`<div style="margin-top:4px;padding:6px 8px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 6px 6px 0;font-size:11px;color:#7F1D1D">${h.obsAlert?'<b>ALERTA:</b> ':''}${h.obsTxt}</div>`:'';const ed=h.edicao?(h.diffs&&h.diffs.length?'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span><div style="margin-top:4px">'+h.diffs.map(d=>`<div style="font-size:10px;color:#374151;padding:2px 0"><span style="font-weight:600;color:#1D4ED8">${d.campo}:</span> <span style="color:#64748B">${d.de}</span> → <span style="color:#16A34A;font-weight:600">${d.para}</span></div>`).join('')+'</div>':'<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:#EFF6FF;color:#1D4ED8;margin-left:4px;font-weight:700">editado</span>'):'';;return`<div class="hi"><b>${h.u}</b> <span class="ht">${rl}</span>${mt}${h.horaPronto?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--vl);color:#0D7A75;font-weight:800;margin-left:4px">marcou o óculos de hora como pronto</span>':h.whats?'<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:#F0FDF4;color:#16A34A;font-weight:800;margin-left:4px">'+(h.parcial?'avisou pelo WhatsApp — óculos de hora':'avisou pelo WhatsApp')+'</span>':(h.obs?'':ed+' → <b>'+nomeCol(h.to)+'</b>')}<br><span style="font-size:11px">${fd(h.at)}</span>${rf}${ob}</div>`;}).join('');}
   document.getElementById('hm').style.display='flex';
 }
 function clsH(){document.getElementById('hm').style.display='none';}
@@ -7603,9 +8013,9 @@ async function liberaEdicaoDoDia(dia, diffs){
   const st=f.status||'aberto';
   if(st==='aberto')return true;
   const rot={conferido:'conferido',fechado:'fechado'}[st]||st;
-  if(!R||!R.cf){
+  if(!R||!R.cfe){
     alert('O caixa de '+dtBR(dia)+' já está '+rot+'.\n\n'
-      +'Só o supervisor pode alterar valores de um dia '+rot+'.');
+      +'Só o supervisor ou o diretor podem alterar valores de um dia '+rot+'.');
     return false;
   }
   return confirm('ATENÇÃO: o caixa de '+dtBR(dia)+' já está '+rot+'.\n\n'
@@ -7734,7 +8144,7 @@ async function svOS(){
   const repetida=ST.cards.find(x=>x.id!==editId&&UP(String(x.os||'').trim())===os);
   if(repetida&&repetida.col!==COL_CANC){
     alert('Já existe a OS '+os+' nesta loja.\n\n'
-      +'Ela está em: '+(CF[repetida.col]||'?')
+      +'Ela está em: '+nomeCol(repetida.col)
       +(repetida.cliente?('\nCliente: '+repetida.cliente):'')
       +'\n\nConfira o número antes de salvar.');
     document.getElementById('fo').focus();
@@ -7784,6 +8194,13 @@ async function svOS(){
   const respGar=document.getElementById('fresp-gar').value.trim();
   const vendedor=document.getElementById('fvendedor').value.trim();
   const receita=document.getElementById('freceita').value;
+
+  // Vendedor vale para toda OS, nao so garantia: e por ele que saem os
+  // filtros de saldo e de crediario por vendedor.
+  if(!vendedor){
+    alert('Informe o vendedor desta OS.');
+    document.getElementById('fvendedor').focus();return;
+  }
   if(ehGarantia){
     const _w=document.getElementById('obs-wrap');
     if(_w&&_w.style.display!=='block')_w.style.display='block';   // mostra o que falta
@@ -7794,10 +8211,6 @@ async function svOS(){
     if(!respGar){
       alert('Preencha o responsável pela garantia.');
       document.getElementById('fresp-gar').focus();return;
-    }
-    if(!vendedor){
-      alert('Informe o vendedor que realizou a venda.');
-      document.getElementById('fvendedor').focus();return;
     }
     if(!document.getElementById('fobs-txt').value.trim()){
       alert('Escreva o que aconteceu nesta garantia.\n\n'
@@ -8679,7 +9092,7 @@ document.addEventListener('keydown',e=>{
     if(s.tk){
       const linhas=await sbGet('usuarios','usuario=eq.'+encodeURIComponent(s.u));
       const reg=(linhas||[]).find(x=>x.unidade===UNIDADE)
-             || (linhas||[]).find(x=>x.global&&x.perfil==='supervisor');
+             || (linhas||[]).find(x=>x.global&&podeSerGlobal(x.perfil));
       if(!reg||!reg.ativo||reg.senha_hash!==s.tk){localStorage.removeItem('idealize_session');return;}
       U={u:reg.usuario,n:reg.nome,r:reg.perfil,un:UNIDADE,id:reg.id,tk:reg.senha_hash,gl:!!reg.global};
     }else{
@@ -8694,7 +9107,7 @@ document.addEventListener('keydown',e=>{
     document.getElementById('av').textContent=U.n.charAt(0).toUpperCase();
     document.getElementById('nn').textContent=UP(U.n);
     const rb=document.getElementById('nr');rb.textContent=R.l;rb.className='rb '+R.c;
-    const msgs={supervisor:'Supervisor — acesso total.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
+    const msgs={diretor:'Diretor — acesso total, com a conferência do caixa.',supervisor:'Supervisor — acesso total, menos a conferência do caixa.',adm:'Administrador — cria OS e movimenta tudo, menos Montagem para Pronto.',gerente:'Gerente — cria OS e movimenta tudo, menos Montagem para Pronto.',montagem:'Montagem — move de Montagem para Pronto.',posvendas:'Pós-vendas — cria e entrega garantias e passagens.'};
     const b=document.getElementById('ab');b.textContent=msgs[U.r];b.className='ab '+U.r;
     aplicarAbas();
     let aba=localStorage.getItem('idealize_tab')||'k';
@@ -8709,7 +9122,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-21b';
+const VERSAO_SISTEMA='2026-10-23';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
