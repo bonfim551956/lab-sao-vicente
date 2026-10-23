@@ -475,6 +475,12 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   .mo,.md{max-height:94vh;}
 }
 
+/* ── DEPÓSITO ── */
+.dp-f{font-size:12px;padding:6px 10px;border:1.5px solid var(--bo);border-radius:8px;
+  background:var(--w);color:var(--tx);font-family:inherit;outline:none;font-weight:600}
+.dp-f:focus{border-color:var(--v)}
+#dp-body table input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--v)}
+
 /* ── MANUAL DO SISTEMA ── */
 .mn-wrap{display:grid;grid-template-columns:232px 1fr;gap:28px;align-items:start}
 @media(max-width:900px){.mn-wrap{grid-template-columns:1fr;gap:16px}}
@@ -577,6 +583,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-pj" onclick="sw('pj')" style="display:none">Projeção</button>
       <button class="tab" id="t-cf" onclick="sw('cf')" style="display:none">Conferência</button>
         <button class="tab" id="t-us" onclick="sw('us')" style="display:none">Usuários</button>
+      <button class="tab" id="t-dp" onclick="sw('dp')" style="display:none">Depósito</button>
       <button class="tab" id="t-mn" onclick="sw('mn')" style="display:none">Manual</button>
     </div>
   </nav>
@@ -824,6 +831,38 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
   </div>
   <div id="ck-barra" style="margin-bottom:12px"></div>
   <div id="ck-body"><div class="er">Carregando...</div></div>
+</div>
+
+<div id="dps" class="rm" style="display:none">
+  <div class="rh">
+    <span class="rt">Depósito</span>
+    <span style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px">o dinheiro em espécie que ainda não foi ao banco</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <input type="date" id="dp-ini" onchange="rnDeposito()" class="dp-f"/>
+      <span style="font-size:11px;color:var(--mu);font-weight:700">até</span>
+      <input type="date" id="dp-fim" onchange="rnDeposito()" class="dp-f"/>
+      <select id="dp-sit" onchange="rnDeposito()" class="dp-f">
+        <option value="pendente">A depositar</option>
+        <option value="depositado">Já depositados</option>
+        <option value="todos">Todos</option>
+      </select>
+      <button class="bex" onclick="dpMes()">Este mês</button>
+      <button class="bex" onclick="expDeposito()">CSV</button>
+    </div>
+  </div>
+  <div class="rsum" id="dp-kpis"></div>
+  <div id="dp-lote" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--vl);border:1px solid rgba(27,168,160,.3);border-radius:14px;
+    padding:11px 14px;margin:12px 0">
+    <span id="dp-lote-txt" style="font-size:13px;color:#0B5F5B"></span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <label style="font-size:11px;font-weight:700;color:#0B5F5B">Depositado em</label>
+      <input type="date" id="dp-lote-data" class="dp-f"/>
+      <input type="text" id="dp-lote-obs" placeholder="Observação (opcional)" class="dp-f" style="width:180px"/>
+      <button class="bsv" style="flex:none;padding:9px 16px" onclick="dpLoteGravar()">Marcar como depositado</button>
+    </div>
+  </div>
+  <div id="dp-body"><div class="er">Carregando...</div></div>
 </div>
 
 <div id="mns" class="rm" style="display:none">
@@ -2347,7 +2386,7 @@ function ehDiretor(){return !!(U&&U.r==='diretor');}
 function aplicarAbas(){
   const mostra=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?'block':'none';};
   if(!U||!R){
-    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us','t-mn'].forEach(id=>mostra(id,false));
+    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us','t-mn','t-dp'].forEach(id=>mostra(id,false));
     return;
   }
   const fin=!!(R.ed||R.r==='posvendas');
@@ -2359,6 +2398,8 @@ function aplicarAbas(){
   mostra('t-ig', fin);
   mostra('t-us', U.r==='supervisor'||U.r==='diretor');
   mostra('t-cf', !!R.cf);
+  // O depósito do dinheiro é do diretor, e de mais ninguém.
+  mostra('t-dp', ehDiretor());
   mostra('t-ck', !!listaDoPerfil());
   // O manual e de todo mundo -- o que muda e o conteudo, nao o acesso.
   mostra('t-mn', true);
@@ -2380,14 +2421,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks',mn:'mns'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks',mn:'mns',dp:'dps'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck','mn'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck','mn','dp'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -2415,6 +2456,7 @@ function sw(tab){
   if(tab==='ag')rnAgPag();
   if(tab==='ck')rnCheck();
   if(tab==='mn')rnManual();
+  if(tab==='dp')rnDeposito();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
   if(tab==='sd')rnSaldos();
@@ -3649,6 +3691,18 @@ function lancamentosDaForma(forma){
   return out;
 }
 
+// A diferenca de uma forma conferida. Devolve null quando nao da para
+// saber -- forma nunca conferida, ou conferida por um periodo que a IA nao
+// soube separar por dia. null NAO e zero: dia sem diferenca apurada nao
+// pode se dar por conferido nem aparecer como se tivesse batido.
+function difConf(c){
+  if(!c)return null;
+  const v=c.dif;
+  if(v===null||v===undefined||v==='')return null;
+  const n=Number(v);
+  return isNaN(n)?null:n;
+}
+
 function rnConferencia(){
   const el=document.getElementById('fc-conf'); if(!el)return;
   // conferência é do supervisor
@@ -3683,8 +3737,9 @@ function rnConferencia(){
   if(!formas.length){el.innerHTML='<div class="er">Nada a conferir neste dia.</div>';return;}
 
   // explica por que o caixa ainda não está conferido
-  const pend=formas.filter(f=>!fcConferencia[f]);
-  const comDif=formas.filter(f=>fcConferencia[f]&&Math.abs(fcConferencia[f].dif)>=0.01);
+  const pend=formas.filter(f=>difConf(fcConferencia[f])===null);
+  const comDif=formas.filter(f=>{const d=difConf(fcConferencia[f]);
+                                 return d!==null&&Math.abs(d)>=0.01;});
   let aviso='';
   if(fcStatus==='aberto'){
     if(pend.length)aviso='<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;'
@@ -3701,15 +3756,17 @@ function rnConferencia(){
     const c=fcConferencia[f];
     const ehDinheiro=(f==='Dinheiro');
     let estado,cor;
-    if(!c){estado='a conferir';cor='background:#FFFBEB;color:#92400E;border:1px solid #FCD34D';}
-    else if(Math.abs(c.dif)<0.01){estado='bateu';cor='background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0';}
-    else{estado=(c.dif>0?'sobra ':'falta ')+rs(Math.abs(c.dif));cor='background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5';}
+    const dc=difConf(c);
+    if(dc===null){estado=c?'confira de novo':'a conferir';
+      cor='background:#FFFBEB;color:#92400E;border:1px solid #FCD34D';}
+    else if(Math.abs(dc)<0.01){estado='bateu';cor='background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0';}
+    else{estado=(dc>0?'sobra ':'falta ')+rs(Math.abs(dc));cor='background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5';}
 
     return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;'
       +'border-bottom:1px solid var(--bo);padding:9px 2px">'
       +'<div style="flex:1;min-width:130px"><div style="font-size:12px;font-weight:800">'+f+'</div>'
       +'<div style="font-size:10px;color:var(--mu)">sistema: <b>'+rs(sistema)+'</b>'
-      +(c?(' · '+(ehDinheiro?'gaveta':'extrato')+': <b>'+rs(c.extrato)+'</b>'):'')+'</div></div>'
+      +(c&&dc!==null?(' · '+(ehDinheiro?'gaveta':'extrato')+': <b>'+rs(c.extrato)+'</b>'):'')+'</div></div>'
       +'<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;'+cor+'">'+estado.toUpperCase()+'</span>'
       +(c&&c.obs?'<div style="flex:1 1 100%;font-size:10px;color:var(--mu)">'+c.obs+'</div>':'')
       +'<button class="bex" onclick="opConf(\''+f.replace(/'/g,"\\'")+'\')">'
@@ -3862,8 +3919,9 @@ function talvezConferirSozinho(){
   const t=totaisFech();
   const formas=Object.keys(t.porForma).filter(f=>t.porForma[f]>0.001);
   if(!formas.length||fcStatus!=='aberto')return false;
-  const todas=formas.every(f=>fcConferencia[f]);
-  const bateu=formas.every(f=>Math.abs((fcConferencia[f]||{}).dif||0)<0.01);
+  const todas=formas.every(f=>difConf(fcConferencia[f])!==null);
+  const bateu=formas.every(f=>{const d=difConf(fcConferencia[f]);
+                               return d!==null&&Math.abs(d)<0.01;});
   if(todas&&bateu){
     fcStatus='conferido';
     setSy('ok','Tudo bateu — caixa marcado como conferido');
@@ -4242,31 +4300,58 @@ async function salvarConfPer(){
       : e.message;
   }
 
-  // marca cada dia do período com o resultado por forma
-  const bateu={};
-  (c.d.formas||[]).forEach(f=>{ if(f.encontrado!==false)bateu[f.forma]=f; });
-  if(Object.keys(bateu).length){
+  // Marca cada dia do periodo com o resultado por forma.
+  //
+  // A IA devolve 'porDia' so dos dias em que houve diferenca. Entao dia
+  // listado = dia com diferenca, e dia nao listado = dia que bateu -- mas
+  // isso so vale se ela conseguiu separar por dia. Quando nao conseguiu
+  // (porDia vazio com o periodo divergindo), nao da para dizer de qual dia
+  // e a diferenca: nenhum dia pode ser dado como conferido, e nenhum pode
+  // ser gravado como se tivesse batido.
+  const porForma={};
+  (c.d.formas||[]).forEach(f=>{ if(f.encontrado!==false)porForma[f.forma]=f; });
+  const difDe={};
+  (c.d.porDia||[]).forEach(x=>{
+    if(x&&x.data)difDe[x.data]=Math.round((num(x.extrato)-num(x.sistema))*100)/100;
+  });
+  const periodoBateu=Math.abs(num(c.d.diferenca))<0.01;
+  const separouPorDia=(c.d.porDia||[]).length>0;
+  const sabeDeQuemE=periodoBateu||separouPorDia;
+  let naoAtribuidos=0;
+  if(Object.keys(porForma).length){
     for(const dia of cpDias){
       try{
         const r=await sbGet('fechamento_caixa','id=eq.'+('fc_'+U.un+'_'+dia.data));
         const atual=(r&&r[0])?r[0]:null;
         if(!atual)continue;
         const conf=(atual.conferencia&&typeof atual.conferencia==='object')?atual.conferencia:{};
+        const difDia=(difDe[dia.data]===undefined)?0:difDe[dia.data];
         let mudou=false;
         Object.keys(dia.formas||{}).forEach(f=>{
-          const res=bateu[f];
+          const res=porForma[f];
           if(!res||conf[f])return;          // sem dado, ou já conferida antes
-          conf[f]={sistema:num(dia.formas[f]),extrato:num(dia.formas[f]),
-            dif:res.bateu?0:null, por:U.n, em:Date.now(),
+          // Forma que bateu no período inteiro vale para qualquer dia dele.
+          // Forma com diferença só pode ser marcada quando dá para saber de
+          // qual dia ela é -- senão fica pendente, para ser conferida à mão.
+          if(!res.bateu&&!sabeDeQuemE){naoAtribuidos++;return;}
+          const difF=res.bateu?0:difDia;
+          conf[f]={sistema:num(dia.formas[f]),extrato:num(dia.formas[f])+difF,
+            dif:difF, por:U.n, em:Date.now(),
             obs:'Conferido no período '+dtBR(c.ini)+' a '+dtBR(c.fim)
-              +(res.bateu?'':' — período com diferença de '+rs(res.diferenca))};
+              +(Math.abs(difF)<0.01?''
+                :' — este dia ficou com diferença de '+rs(difF))};
           mudou=true;
         });
         if(!mudou)continue;
-        const formasDia=Object.keys(dia.formas||{});
-        const todas=formasDia.every(f=>conf[f]);
-        const semDif=formasDia.every(f=>!conf[f]||conf[f].dif===0);
-        const novoStatus=(todas&&semDif&&atual.status==='aberto')?'conferido':(atual.status||'aberto');
+        // As formas que contam são as do fechamento salvo, não só as que a
+        // IA enxergou: senão um dia com Dinheiro por contar se dava por
+        // conferido sozinho.
+        const formasReais=Object.keys(formasDoFechamento(atual));
+        const todas=formasReais.every(f=>difConf(conf[f])!==null);
+        const semDif=formasReais.every(f=>{const d=difConf(conf[f]);
+                                           return d!==null&&Math.abs(d)<0.01;});
+        const novoStatus=(todas&&semDif&&(atual.status||'aberto')==='aberto')
+          ?'conferido':(atual.status||'aberto');
         await sbPatch('fechamento_caixa',
           {conferencia:conf,status:novoStatus,conferido_por:U.n,conferido_em:Date.now()},
           {id:'fc_'+U.un+'_'+dia.data});
@@ -4283,8 +4368,247 @@ async function salvarConfPer(){
   if(erro){alert('A conferência do período não foi guardada na tabela própria:\n\n'+erro
     +(dias?('\n\nMas os '+dias+' dia(s) foram marcados normalmente.'):''));}
   else setSy('ok','Período guardado · '+dias+' dia(s) marcado(s) — '+horaAgora());
+  if(naoAtribuidos){
+    alert('O período tem diferença e os extratos não trazem a data de cada '
+      +'lançamento, então não dá para saber de qual dia ela é.\n\n'
+      +'As formas que bateram no período inteiro foram marcadas. As que '
+      +'ficaram com diferença continuam pendentes, para serem conferidas dia '
+      +'a dia — é o único jeito de achar o dia certo.');
+  }
 }
 
+
+// ── DEPÓSITO ────────────────────────────────────────────────────────────────
+// O dinheiro em espécie de cada dia e se ele já foi para o banco. Um dia é um
+// caixa é um depósito; o "lote" é a mesma data de depósito em vários dias de
+// uma vez. Aba só do diretor.
+
+let dpDados=[], dpSel={};
+
+function dpValorDoDia(f){
+  const formas=formasDoFechamento(f);
+  const sistema=num(formas['Dinheiro']);
+  const gaveta=(f.dinheiro_gaveta===null||f.dinheiro_gaveta===undefined||f.dinheiro_gaveta==='')
+    ? null : num(f.dinheiro_gaveta);
+  // Contou a gaveta? O que vai para o banco é o que existe de verdade.
+  return {sistema, gaveta, valor:(gaveta===null)?sistema:gaveta};
+}
+
+function dpMes(){
+  const h=new Date(hojeBR()+'T12:00:00');
+  document.getElementById('dp-ini').value=new Date(h.getFullYear(),h.getMonth(),1)
+    .toLocaleDateString('en-CA');
+  document.getElementById('dp-fim').value=hojeBR();
+  rnDeposito();
+}
+
+async function rnDeposito(){
+  const b=document.getElementById('dp-body'); if(!b)return;
+  if(!ehDiretor()){b.innerHTML='<div class="er">Só o diretor vê os depósitos.</div>';return;}
+
+  const ini=document.getElementById('dp-ini'), fim=document.getElementById('dp-fim');
+  if(!ini.value||!fim.value){
+    const h=new Date(hojeBR()+'T12:00:00');
+    ini.value=new Date(h.getFullYear(),h.getMonth(),1).toLocaleDateString('en-CA');
+    fim.value=hojeBR();
+  }
+  const sit=(document.getElementById('dp-sit')||{}).value||'pendente';
+  b.innerHTML='<div class="er">Carregando...</div>';
+
+  try{
+    const r=await sbGet('fechamento_caixa',
+      'unidade=eq.'+U.un+'&data=gte.'+ini.value+'&data=lte.'+fim.value+'&order=data.desc');
+    dpDados=(r||[]).map(f=>{
+      const v=dpValorDoDia(f);
+      return {data:f.data, sistema:v.sistema, gaveta:v.gaveta, valor:v.valor,
+              dep:f.deposito_data||null,
+              depValor:(f.deposito_valor===null||f.deposito_valor===undefined)
+                ?null:num(f.deposito_valor),
+              depPor:f.deposito_por||'', obs:f.deposito_obs||'',
+              caixa:f.status||'aberto'};
+    }).filter(d=>d.valor>0.001||d.dep)
+      .filter(d=>sit==='todos'?true:(sit==='depositado'?!!d.dep:!d.dep));
+
+    // some da seleção o que saiu da lista
+    Object.keys(dpSel).forEach(k=>{ if(!dpDados.some(d=>d.data===k&&!d.dep))delete dpSel[k]; });
+
+    rnDpTotais();
+    rnDpLote();
+
+    if(!dpDados.length){
+      b.innerHTML='<div class="er">'+(sit==='depositado'
+        ?'Nenhum depósito registrado neste período.'
+        :'Nada a depositar neste período.')+'</div>';
+      return;
+    }
+
+    b.innerHTML='<table><thead><tr>'
+      +'<th style="width:34px"><input type="checkbox" id="dp-todos" onchange="dpTodos(this.checked)"/></th>'
+      +'<th>Dia</th><th>Caixa</th><th>Dinheiro no sistema</th><th>Contado na gaveta</th>'
+      +'<th>A depositar</th><th>Depósito</th><th></th></tr></thead><tbody>'
+      +dpDados.map(d=>{
+        const dif=(d.gaveta===null)?null:Math.round((d.gaveta-d.sistema)*100)/100;
+        const selo=d.dep
+          ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;'
+            +'background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0">'+dtBR(d.dep)+'</span>'
+            +(d.depPor?'<div style="font-size:9px;color:var(--mu);margin-top:2px">'+d.depPor+'</div>':'')
+          : '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:7px;'
+            +'background:#FEF3C7;color:#92400E;border:1px solid #FCD34D">A DEPOSITAR</span>';
+        return '<tr>'
+        +'<td>'+(d.dep?'':'<input type="checkbox" class="dp-ck" data-dia="'+d.data+'" '
+          +(dpSel[d.data]?'checked ':'')+'onchange="dpMarcar(\''+d.data+'\',this.checked)"/>')+'</td>'
+        +'<td><b>'+dtBR(d.data)+'</b></td>'
+        +'<td style="font-size:10px;color:var(--mu)">'+(d.caixa==='aberto'?'aberto'
+            :(d.caixa==='conferido'?'conferido':'fechado'))+'</td>'
+        +'<td>'+rs(d.sistema)+'</td>'
+        +'<td>'+(d.gaveta===null
+            ? '<span style="color:var(--mu);font-size:11px">não contada</span>'
+            : rs(d.gaveta)+(dif&&Math.abs(dif)>=0.01
+                ? '<div style="font-size:9px;font-weight:700;color:'+(dif>0?'#16A34A':'#B91C1C')+'">'
+                  +(dif>0?'sobra ':'falta ')+rs(Math.abs(dif))+'</div>':''))+'</td>'
+        +'<td style="font-weight:800;color:var(--vc)">'+rs(d.dep&&d.depValor!==null?d.depValor:d.valor)+'</td>'
+        +'<td>'+selo+(d.obs?'<div style="font-size:9px;color:var(--mu)">'+d.obs+'</div>':'')+'</td>'
+        +'<td style="text-align:right">'+(d.dep
+            ? '<button class="bex" onclick="dpDesfazer(\''+d.data+'\')">Desfazer</button>'
+            : '<button class="bex" onclick="dpUm(\''+d.data+'\')">Depositar</button>')+'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table>';
+  }catch(e){
+    b.innerHTML='<div class="wb">Não consegui carregar: '+e.message+'</div>';
+  }
+}
+
+function rnDpTotais(){
+  const el=document.getElementById('dp-kpis'); if(!el)return;
+  const pend=dpDados.filter(d=>!d.dep);
+  const feitos=dpDados.filter(d=>d.dep);
+  const aDepositar=pend.reduce((s,d)=>s+d.valor,0);
+  const depositado=feitos.reduce((s,d)=>s+(d.depValor!==null?d.depValor:d.valor),0);
+  const semContar=pend.filter(d=>d.gaveta===null).length;
+  el.innerHTML=
+    '<div class="rs2"><div class="rl">A depositar</div>'
+    +'<div class="rv" style="color:var(--vc)">'+rs(aDepositar)+'</div></div>'
+    +'<div class="rs2"><div class="rl">Dias a depositar</div><div class="rv">'+pend.length+'</div></div>'
+    +'<div class="rs2"><div class="rl">Depositado no período</div>'
+    +'<div class="rv v">'+rs(depositado)+'</div></div>'
+    +'<div class="rs2"><div class="rl">Gaveta não contada</div>'
+    +'<div class="rv"'+(semContar?' style="color:var(--re)"':'')+'>'+semContar+'</div></div>';
+}
+
+function rnDpLote(){
+  const el=document.getElementById('dp-lote'); if(!el)return;
+  const sel=dpDados.filter(d=>!d.dep&&dpSel[d.data]);
+  if(!sel.length){el.style.display='none';return;}
+  const total=sel.reduce((s,d)=>s+d.valor,0);
+  el.style.display='flex';
+  document.getElementById('dp-lote-txt').innerHTML=
+    '<b>'+sel.length+' dia(s) selecionado(s)</b> · '+rs(total);
+  const dt=document.getElementById('dp-lote-data');
+  if(dt&&!dt.value)dt.value=hojeBR();
+}
+
+function dpMarcar(dia,marcado){
+  if(marcado)dpSel[dia]=true; else delete dpSel[dia];
+  rnDpLote();
+  const t=document.getElementById('dp-todos');
+  if(t){const livres=dpDados.filter(d=>!d.dep);
+        t.checked=livres.length>0&&livres.every(d=>dpSel[d.data]);}
+}
+
+function dpTodos(marcado){
+  dpDados.filter(d=>!d.dep).forEach(d=>{ if(marcado)dpSel[d.data]=true; else delete dpSel[d.data]; });
+  document.querySelectorAll('.dp-ck').forEach(c=>{c.checked=!!marcado;});
+  rnDpLote();
+}
+
+// Grava o depósito de um ou de vários dias. O lote é só isto: a mesma data
+// de depósito em todos os dias escolhidos.
+async function dpGravar(dias,quando,obs){
+  if(!ehDiretor()){alert('Só o diretor registra depósito.');return;}
+  if(!dias.length){alert('Escolha pelo menos um dia.');return;}
+  if(!quando){alert('Informe a data do depósito.');return;}
+  const alvos=dpDados.filter(d=>dias.indexOf(d.data)>=0&&!d.dep);
+  if(!alvos.length){alert('Esses dias já estão depositados.');return;}
+  const total=alvos.reduce((s,d)=>s+d.valor,0);
+  const semContar=alvos.filter(d=>d.gaveta===null);
+  if(!confirm('Registrar depósito de '+rs(total)+' em '+dtBR(quando)+'?\n\n'
+    +alvos.length+' dia(s): '+alvos.map(d=>dtBR(d.data)).join(', ')
+    +(semContar.length?('\n\nAtenção: em '+semContar.length+' dia(s) a gaveta não foi contada — '
+      +'o valor é o que o sistema registrou, não o que foi contado.'):'')))return;
+
+  let feitos=0, falhou=[];
+  for(const d of alvos){
+    try{
+      await sbPatch('fechamento_caixa',
+        {deposito_data:quando, deposito_valor:d.valor, deposito_por:U.n,
+         deposito_em:Date.now(), deposito_obs:obs||null},
+        {id:'fc_'+U.un+'_'+d.data});
+      feitos++;
+    }catch(e){ falhou.push(dtBR(d.data)); }
+  }
+  dpSel={};
+  const dt=document.getElementById('dp-lote-data'); if(dt)dt.value='';
+  const ob=document.getElementById('dp-lote-obs'); if(ob)ob.value='';
+  await rnDeposito();
+  if(falhou.length)alert('Não consegui gravar '+falhou.length+' dia(s): '+falhou.join(', ')
+    +'\n\nOs outros '+feitos+' foram gravados.');
+  else setSy('ok',feitos+' dia(s) depositado(s) — '+horaAgora());
+}
+
+function dpLoteGravar(){
+  dpGravar(Object.keys(dpSel),
+           document.getElementById('dp-lote-data').value,
+           document.getElementById('dp-lote-obs').value.trim());
+}
+
+function dpUm(dia){
+  const d=dpDados.find(x=>x.data===dia); if(!d)return;
+  const q=prompt('Data do depósito do caixa de '+dtBR(dia)+'\n\n'
+    +'Dinheiro a depositar: '+rs(d.valor)
+    +(d.gaveta===null?'\n(a gaveta deste dia não foi contada)':''),
+    hojeBR());
+  if(q===null)return;
+  const data=String(q).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(data)){
+    alert('A data precisa estar no formato AAAA-MM-DD.');return;
+  }
+  dpGravar([dia],data,'');
+}
+
+async function dpDesfazer(dia){
+  if(!ehDiretor()){alert('Só o diretor mexe no depósito.');return;}
+  const d=dpDados.find(x=>x.data===dia); if(!d)return;
+  if(!confirm('Desfazer o depósito de '+dtBR(dia)+'?\n\n'
+    +'Registrado em '+dtBR(d.dep)+(d.depPor?(' por '+d.depPor):'')+'.\n'
+    +'O dia volta para a lista do que falta depositar.'))return;
+  try{
+    await sbPatch('fechamento_caixa',
+      {deposito_data:null,deposito_valor:null,deposito_por:null,
+       deposito_em:null,deposito_obs:null},
+      {id:'fc_'+U.un+'_'+dia});
+    await rnDeposito();
+    setSy('ok','Depósito desfeito — '+horaAgora());
+  }catch(e){ alert('Não consegui desfazer: '+e.message); }
+}
+
+function expDeposito(){
+  if(!dpDados.length){alert('Nada para exportar.');return;}
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const csv=[['Dia','Caixa','Dinheiro no sistema','Contado na gaveta','A depositar',
+              'Data do depósito','Registrado por','Observação'].map(q).join(',')]
+    .concat(dpDados.map(d=>[
+      dtBR(d.data), d.caixa, d.sistema.toFixed(2),
+      d.gaveta===null?'':d.gaveta.toFixed(2),
+      (d.dep&&d.depValor!==null?d.depValor:d.valor).toFixed(2),
+      d.dep?dtBR(d.dep):'', d.depPor, d.obs].map(q).join(',')))
+    .join('\n');
+  const b=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='depositos_'+document.getElementById('dp-ini').value
+    +'_a_'+document.getElementById('dp-fim').value+'.csv';
+  a.click();URL.revokeObjectURL(u);
+}
 
 // ── LISTA DE CONFERÊNCIA ────────────────────────────────────────────────────
 // Um dia por linha: o valor de cada forma de pagamento e se já foi conferida.
@@ -4298,7 +4622,11 @@ function formasDoFechamento(f){
     if(!F||!V||F==='Sem saldo'||F==='Garantia')return;
     m[F]=(m[F]||0)+V;
   };
-  (f.vendas||[]).forEach(v=>{soma(v.forma1,v.pago1);soma(v.forma2,v.pago2);});
+  (f.vendas||[]).forEach(v=>{
+    soma(v.forma1,v.pago1);soma(v.forma2,v.pago2);
+    // a 3a forma em diante fica em 'extras'
+    if(Array.isArray(v.extras))v.extras.forEach(p=>soma(p.forma,p.valor));
+  });
   (f.entregas||[]).forEach(e=>{soma(e.forma,e.valor);soma(e.forma2,e.valor2);});
   return m;
 }
@@ -4322,8 +4650,9 @@ async function rnConfLista(){
     clDados=(r||[]).map(f=>{
       const formas=formasDoFechamento(f);
       const conf=(f.conferencia&&typeof f.conferencia==='object')?f.conferencia:{};
-      const dif=Object.values(conf).reduce((s,c)=>s+Math.abs(num(c.dif)),0);
-      const pend=Object.keys(formas).filter(x=>!conf[x]).length;
+      const dif=Object.values(conf).reduce((s,c)=>{const d=difConf(c);
+        return s+(d===null?0:Math.abs(d));},0);
+      const pend=Object.keys(formas).filter(x=>difConf(conf[x])===null).length;
       return {data:f.data, caixa:num(f.caixa), ranking:num(f.ranking),
               status:f.status||'aberto', formas, conf, dif, pend,
               por:f.conferido_por||f.fechado_por||''};
@@ -7823,7 +8152,9 @@ const MANUAL = [
       ['<b>NÃO ENCONTRADO</b> (cinza)','A IA não achou essa forma nos extratos; continua pendente']])
   + _mP('O bloco <b>"Nos extratos e não no sistema"</b> lista o que apareceu no extrato e não tem correspondente no sistema. É onde se descobre dinheiro que entrou e ninguém lançou: ache a venda e lance, ou registre como venda avulsa no fechamento.')
   + _mP('Quando todas as formas do dia forem conferidas e todas baterem, o dia vira <b>conferido</b> sozinho. Havendo diferença, você decide se aceita.')
-  + _mAt('<b>Não confie no verde de um dia conferido por período.</b> Um dia dentro de um período com diferença aparece depois como BATEU, em verde: a diferença existe e fica escrita na observação, mas o chip diz o contrário. Abra e leia a observação. Isso é um defeito conhecido, já reportado.')
+  + _mT('Conferir um período de uma vez')
+  + _mP('O sistema guarda a diferença de <b>cada dia</b> separadamente: o dia que bateu fica <b>conferido</b>, e o dia que não bateu continua aberto mostrando quanto sobrou ou faltou. Um dia só se dá por conferido quando <b>todas</b> as formas dele têm valor conferido — inclusive o dinheiro da gaveta.')
+  + _mDica('Quando os extratos não trazem a data de cada lançamento, não dá para saber de qual dia é a diferença. O sistema avisa e deixa essas formas <b>pendentes</b> em vez de dar o dia por conferido — aí o jeito é conferir dia a dia para achar o dia certo.')
   + _mDica('PDF digitalizado (foto de papel) não serve — o sistema avisa. Nesse caso copie e cole o conteúdo no campo de texto.')
 },
 {
@@ -7848,6 +8179,26 @@ const MANUAL = [
       _mK('CSV')+' e '+_mK('PDF')+' — o estoque completo.'])
   + _mDica('O estoque <b>não guarda histórico</b>: não há registro de quem deu entrada nem de quem corrigiu uma contagem. E lente fora da grade (−5,00, por exemplo) é gravada e conta nos totais, mas não aparece em nenhuma célula. Se os números não baterem com a prateleira, é uma das causas possíveis.')
 },
+{
+  id:'mn-deposito', g:'Caixa e estoque', t:'Depósito do dinheiro',
+  p:'deposito dinheiro especie banco gaveta depositar lote data do deposito',
+  v:c=>c.perfil==='diretor',
+  h:()=>
+    _mP('Aba <b>Depósito</b>. Mostra, dia a dia, o <b>dinheiro em espécie</b> que entrou no caixa e ainda não foi ao banco. Dia sem dinheiro nenhum não aparece.')
+  + _mT('Qual valor ele considera')
+  + _mP('Se a gaveta daquele dia foi <b>contada</b> na Conferência, vale o que foi contado — é o que existe de verdade para depositar. Se não foi contada, vale o que o sistema registrou, e a tela avisa que aquela gaveta não foi conferida.')
+  + _mT('Registrar um depósito')
+  + _mOl([
+      'Escolha o período e deixe o filtro em <b>A depositar</b>.',
+      'Para um dia só: botão '+_mK('Depositar')+' na linha, e informe a data do depósito.',
+      'Para vários: marque as caixinhas dos dias que foram no mesmo depósito, preencha <b>Depositado em</b> e, se quiser, uma observação, e clique '+_mK('Marcar como depositado')+'.',
+      'O sistema confirma mostrando o total e os dias, e avisa se alguma gaveta não foi contada.'])
+  + _mP('Cada dia guarda o <b>seu</b> valor, não o total do lote. O lote é só a mesma data de depósito em vários dias de uma vez.')
+  + _mT('Se errar')
+  + _mP('Botão '+_mK('Desfazer')+' na linha do dia, que volta para "a depositar". Fica registrado quem depositou e quando.')
+  + _mDica('O filtro <b>Já depositados</b> mostra o histórico com a data de cada depósito, e o '+_mK('CSV')+' leva tudo para a planilha.')
+},
+
 {
   id:'mn-projecao', g:'Caixa e estoque', t:'Projeção e metas do ciclo',
   p:'projecao meta ciclo ticket medio dias trabalhados avaliacoes google',
@@ -10023,7 +10374,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23d';
+const VERSAO_SISTEMA='2026-10-23e';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
