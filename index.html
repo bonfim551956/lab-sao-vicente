@@ -6983,7 +6983,7 @@ const CHECKLISTS={
     'Enviar mensagem de aniversariante do dia',
     'Emissão de NF (1x por mês, dividir o valor em média dos dias trabalhados)',
     'Verificar uma vez ao mês parcelas acatadas e lançar no acerto (entre o dia 05 e 10)',
-    'Fechamento de caixa (enviar o fechamento no grupo; fechar envelope e entregar ao Diego; imprimir fechamento para arquivar as OS do dia)',
+    'Fechamento de caixa (enviar o fechamento no grupo; fechar envelope e entregar ao responsável; imprimir fechamento para arquivar as OS do dia)',
     'Antes de ir embora colocar o celular para carregar',
     'Enviar pedidos do dia',
     'Conferir os prazos no sistema de OS diariamente',
@@ -7014,11 +7014,13 @@ const CHECKLISTS={
   ]
 };
 
-// Qual lista cada perfil enxerga. Montagem e pos-vendas nao tem check list.
+// Dois perfis, e mais nenhum: supervisor usa a lista de 24 tarefas,
+// administrador a de 20. Diretor, gerente, pos-vendas e montagem nao tem
+// check list.
 function listaDoPerfil(){
   if(!U)return null;
-  if(U.r==='diretor'||U.r==='supervisor')return 'lider';
-  if(U.r==='adm'||U.r==='gerente')return 'auxiliar';
+  if(U.r==='supervisor')return 'lider';
+  if(U.r==='adm')return 'auxiliar';
   return null;
 }
 
@@ -7060,23 +7062,29 @@ async function rnCheck(){
   const feitas=itens.filter((_,i)=>ckMarcas[i]).length;
   const pct=itens.length?Math.round(feitas/itens.length*100):0;
   const cont=document.getElementById('ck-cont');
-  if(cont)cont.textContent=feitas+' de '+itens.length+' feitas';
+  if(cont){
+    cont.textContent=feitas+' de '+itens.length+' feitas';
+    cont.style.color=(feitas===itens.length)?'#16A34A':'#B91C1C';
+  }
+  const faltam=itens.length-feitas;
   const barra=document.getElementById('ck-barra');
-  if(barra)barra.innerHTML='<div style="background:var(--bo);border-radius:20px;height:8px;overflow:hidden">'
-    +'<div style="height:100%;width:'+pct+'%;background:'+(pct===100?'#16A34A':'var(--v)')+';transition:width .25s"></div></div>'
-    +'<div style="font-size:11px;color:var(--mu);font-weight:600;margin-top:5px">'
-    +(dia===hojeBR()?'Hoje':dtBR(dia))+' · '+pct+'%'+(pct===100?' — tudo feito':'')+'</div>';
+  if(barra)barra.innerHTML='<div style="background:'+(faltam?'#FEE2E2':'var(--bo)')+';border-radius:20px;height:8px;overflow:hidden">'
+    +'<div style="height:100%;width:'+pct+'%;background:'+(faltam?'#DC2626':'#16A34A')+';transition:width .25s"></div></div>'
+    +'<div style="font-size:12px;font-weight:800;margin-top:6px;color:'+(faltam?'#B91C1C':'#16A34A')+'">'
+    +(dia===hojeBR()?'Hoje':dtBR(dia))+' · '+pct+'%'
+    +(faltam?(' — '+faltam+' pendente'+(faltam>1?'s':'')):' — tudo feito')+'</div>';
 
   body.innerHTML='<div style="display:flex;flex-direction:column;gap:7px">'
     +itens.map((txt,i)=>{
       const m=ckMarcas[i];
       const hora=m&&m.em?new Date(m.em).toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}):'';
+      // Tarefa pendente fica vermelha naquele dia, ate ser marcada.
       return '<label style="display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:12px;cursor:pointer;'
-        +'border:1.5px solid '+(m?'#BBF7D0':'var(--bo)')+';background:'+(m?'#F0FDF4':'var(--w)')+'">'
+        +'border:1.5px solid '+(m?'#BBF7D0':'#FCA5A5')+';background:'+(m?'#F0FDF4':'#FEF2F2')+'">'
         +'<input type="checkbox" '+(m?'checked':'')+' onchange="tgCheck('+i+',this.checked)" '
-        +'style="width:19px;height:19px;cursor:pointer;accent-color:#16A34A;flex-shrink:0;margin-top:1px"/>'
-        +'<span style="flex:1;font-size:13px;line-height:1.5;color:'+(m?'#166534':'var(--tx)')+';'
-        +(m?'font-weight:600':'font-weight:500')+'">'+txt
+        +'style="width:19px;height:19px;cursor:pointer;accent-color:'+(m?'#16A34A':'#DC2626')+';flex-shrink:0;margin-top:1px"/>'
+        +'<span style="flex:1;font-size:13px;line-height:1.5;color:'+(m?'#166534':'#7F1D1D')+';'
+        +(m?'font-weight:600':'font-weight:600')+'">'+txt
         +(m?('<div style="font-size:10px;color:#16A34A;font-weight:700;margin-top:3px">'
             +(m.por||'')+(hora?(' · '+hora):'')+'</div>'):'')
         +'</span></label>';
@@ -9122,7 +9130,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23';
+const VERSAO_SISTEMA='2026-10-23b';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
