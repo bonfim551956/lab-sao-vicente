@@ -14,11 +14,13 @@
 // ============================================================================
 
 const MODELO = 'claude-sonnet-4-6';
-const MAX_EXTRATO = 60000;    // caracteres por bloco enviado à IA
-const MAX_BLOCOS  = 12;       // até isso, um extrato bem grande cabe
+const MAX_EXTRATO = 60000;    // caracteres por parte enviada à IA
+const MAX_PARTES  = 8;        // o que cabe nos 60s da função (ver vercel.json)
+const LIMITE = MAX_PARTES * MAX_EXTRATO;
 
-// Extrato grande não cabe numa chamada só. Em vez de cortar e conferir pela
-// metade, dividimos em blocos por linha e somamos os resultados.
+// Extrato grande não cabe numa chamada só, então vai dividido por linha --
+// nunca no meio de uma. Todas as partes são devolvidas: quem decide se cabe
+// é quem chama, e a resposta a extrato que não cabe é recusar, não cortar.
 function dividirEmBlocos(texto, tamanho) {
   const linhas = String(texto).split(/\r?\n/);
   const blocos = [];
@@ -27,12 +29,66 @@ function dividirEmBlocos(texto, tamanho) {
     if (atual.length + l.length + 1 > tamanho && atual) {
       blocos.push(atual);
       atual = '';
-      if (blocos.length >= MAX_BLOCOS) break;
     }
     atual += (atual ? '\n' : '') + l;
   }
-  if (atual && blocos.length < MAX_BLOCOS) blocos.push(atual);
+  if (atual) blocos.push(atual);
   return blocos.length ? blocos : [''];
+}
+
+const mil = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+function medirExtrato(texto) {
+  const t = String(texto || '');
+  return { caracteres: t.length,
+           linhas: t.split(/\r?\n/).filter(l => l.trim()).length };
+}
+
+// Extrato que não cabe NÃO é lido pela metade. Meia leitura devolve uma
+// diferença que não existe, e isso é pior do que não ter conferido: manda
+// a loja caçar um dinheiro que está lá.
+function naoCabe(res, partes, medida) {
+  if (partes.length <= MAX_PARTES) return false;
+  res.status(413).json({
+    erro: 'Este extrato é grande demais para uma conferência só.\n\n'
+      + 'Recebi ' + mil(medida.linhas) + ' linha(s), '
+      + mil(medida.caracteres) + ' caracteres. Cabem '
+      + mil(LIMITE) + ' caracteres por vez.\n\n'
+      + 'Não vou conferir pela metade: o que ficasse de fora viraria '
+      + 'diferença que não existe. Divida o extrato em períodos menores e '
+      + 'confira um de cada vez.',
+  });
+  return true;
+}
+
+// As partes vão todas de uma vez. Em fila, a função morria no tempo limite
+// antes de terminar de ler -- era o teto real, não os 60.000 caracteres.
+async function lerPartes(chave, montar, partes, maxTokens) {
+  return Promise.all(partes.map((p, i) => {
+    const info = partes.length > 1 ? ` (parte ${i + 1} de ${partes.length})` : '';
+    return pedirJSON(chave, montar(p, info), maxTokens);
+  }));
+}
+
+// Junta o que a IA achou numa forma só, lida em partes. "soNoSistema" é
+// recalculado no fim: um lançamento ausente na parte 1 pode estar na 2, e
+// somar as listas inventaria lançamento sem par.
+function juntarForma(partes, linhas) {
+  const out = { totalExtrato: 0, conciliados: [], soNoExtrato: [], soNoSistema: [],
+                provavelMotivo: '', resumo: '' };
+  partes.forEach(p => {
+    out.totalExtrato += Number(p.totalExtrato) || 0;
+    (p.conciliados || []).forEach(x => out.conciliados.push(x));
+    (p.soNoExtrato || []).forEach(x => out.soNoExtrato.push(x));
+    if (p.provavelMotivo && !out.provavelMotivo) out.provavelMotivo = p.provavelMotivo;
+    if (p.resumo && !out.resumo) out.resumo = p.resumo;
+  });
+  const casados = new Set();
+  out.conciliados.forEach(c => { if (c && c.os) casados.add(String(c.os)); });
+  out.soNoSistema = (linhas || [])
+    .filter(l => !casados.has(String(l.os || '')))
+    .map(l => ({ os: l.os, valor: Number(l.valor) || 0 }));
+  return out;
 }
 
 // Junta o resultado de vários blocos: soma os totais por forma e concatena
@@ -53,7 +109,10 @@ function juntarResultados(partes) {
       if (f.provavelMotivo && !porForma[k].provavelMotivo) porForma[k].provavelMotivo = f.provavelMotivo;
       if (f.resumo && !porForma[k].resumo) porForma[k].resumo = f.resumo;
       (f.soNoExtrato || []).forEach(x => porForma[k].soNoExtrato.push(x));
-      (f.soNoSistema || []).forEach(x => porForma[k].soNoSistema.push(x));
+      // "soNoSistema" de uma parte so nao quer dizer nada: o lancamento pode
+      // estar na parte seguinte. Lido em partes, a lista nao e confiavel e
+      // fica vazia em vez de apontar lancamento que existe.
+      if (partes.length === 1) (f.soNoSistema || []).forEach(x => porForma[k].soNoSistema.push(x));
     });
     (p.naoIdentificado || []).forEach(x => naoIdent.push(x));
     (p.porDia || []).forEach(x => {
@@ -104,9 +163,12 @@ module.exports = async (req, res) => {
 
     const linhas = Array.isArray(lancamentos) ? lancamentos : [];
     const totalSistema = linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
-    const texto = String(extrato).slice(0, MAX_EXTRATO);
 
-    const prompt =
+    const medida = medirExtrato(extrato);
+    const partesTexto = dividirEmBlocos(extrato, MAX_EXTRATO);
+    if (naoCabe(res, partesTexto, medida)) return;
+
+    const montarPrompt = (texto, parteInfo) =>
 `Você confere o caixa de uma ótica. Compare o que o sistema registrou com o extrato.
 
 FORMA DE PAGAMENTO: ${forma}
@@ -115,7 +177,7 @@ DATA: ${data || '(não informada)'}
 LANÇAMENTOS DO SISTEMA (${linhas.length}, total R$ ${totalSistema.toFixed(2)}):
 ${linhas.map(l => `- OS ${l.os || '-'} | ${l.cliente || '-'} | R$ ${Number(l.valor || 0).toFixed(2)}`).join('\n') || '(nenhum)'}
 
-EXTRATO COLADO PELO OPERADOR:
+EXTRATO COLADO PELO OPERADOR${parteInfo}:
 ${texto}
 
 IMPORTANTE: sua resposta inteira deve ser UM OBJETO JSON. Comece com { e termine
@@ -139,17 +201,23 @@ Regras:
 - Considere taxas de maquininha, pagamento que cai no dia seguinte, valor
   lançado trocado e venda que não foi registrada como motivos possíveis.
 - "resumo" em uma frase curta, em português do Brasil.
+- No máximo 25 itens em cada lista; havendo mais, diga a quantidade no "resumo".
+- Some apenas o que estiver NESTE trecho de extrato.
 - Se o extrato não tiver valores reconhecíveis, devolva bateu=false e explique
   em "resumo".`;
 
     let resultado;
   try {
-    resultado = await pedirJSON(chave, prompt, 2000);
+    const partes = await lerPartes(chave, montarPrompt, partesTexto, 4000);
+    resultado = partesTexto.length > 1 ? juntarForma(partes, linhas) : partes[0];
   } catch (e) {
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
   }
 
     // o total do sistema é nosso, não da IA
+    resultado.blocos = partesTexto.length;
+    resultado.linhasLidas = medida.linhas;
+    resultado.caracteres = medida.caracteres;
     resultado.totalSistema = Math.round(totalSistema * 100) / 100;
     resultado.totalExtrato = Math.round((Number(resultado.totalExtrato) || 0) * 100) / 100;
     resultado.diferenca = Math.round((resultado.totalExtrato - resultado.totalSistema) * 100) / 100;
@@ -175,7 +243,9 @@ async function conciliarTudo({ chave, data, formas, extrato }, res) {
     return res.status(400).json({ erro: 'Cole os extratos ou escolha os arquivos.' });
   }
 
+  const medida = medirExtrato(extrato);
   const partesTexto = dividirEmBlocos(extrato, MAX_EXTRATO);
+  if (naoCabe(res, partesTexto, medida)) return;
 
   const blocos = lista.map(f => {
     const linhas = Array.isArray(f.lancamentos) ? f.lancamentos : [];
@@ -225,16 +295,12 @@ Regras:
 - Considere taxas de maquininha, pagamento que cai no dia seguinte, valor lançado
   trocado e venda não registrada como motivos possíveis.
 - Textos curtos, em português do Brasil.
+- No máximo 25 itens em cada lista; havendo mais, diga a quantidade no "resumo".
 - Some apenas o que estiver NESTE trecho de extrato.`;
 
   let out;
   try {
-    const partes = [];
-    for (let i = 0; i < partesTexto.length; i++) {
-      const info = partesTexto.length > 1
-        ? ` (parte ${i + 1} de ${partesTexto.length})` : '';
-      partes.push(await pedirJSON(chave, montarPrompt(partesTexto[i], info), 4000));
-    }
+    const partes = await lerPartes(chave, montarPrompt, partesTexto, 6000);
     out = partesTexto.length > 1 ? juntarResultados(partes) : partes[0];
   } catch (e) {
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
@@ -257,6 +323,9 @@ Regras:
     return { ...f, totalSistema: sistema, totalExtrato: extratoV, diferenca: dif,
              bateu: Math.abs(dif) < 0.01 };
   });
+  out.blocos = partesTexto.length;
+  out.linhasLidas = medida.linhas;
+  out.caracteres = medida.caracteres;
 
   return res.status(200).json(out);
 }
@@ -275,7 +344,9 @@ async function conciliarPeriodo({ chave, extrato, dias, periodo }, res) {
     return res.status(400).json({ erro: 'Cole os extratos ou escolha os arquivos.' });
   }
 
+  const medida = medirExtrato(extrato);
   const partesTexto = dividirEmBlocos(extrato, MAX_EXTRATO);
+  if (naoCabe(res, partesTexto, medida)) return;
 
   const porForma = {};
   lista.forEach(d => Object.entries(d.formas || {}).forEach(([f, v]) => {
@@ -320,16 +391,12 @@ Regras:
 - Considere que o dinheiro do cartão costuma cair dias depois da venda, e que taxas
   reduzem o valor creditado. Aponte isso em "provavelMotivo" quando fizer sentido.
 - Valores em número, ponto decimal, sem "R$". Textos curtos, em português do Brasil.
+- No máximo 25 itens em cada lista; havendo mais, diga a quantidade no "resumoGeral".
 - Some apenas o que estiver NESTE trecho de extrato.`;
 
   let out;
   try {
-    const partes = [];
-    for (let i = 0; i < partesTexto.length; i++) {
-      const info = partesTexto.length > 1
-        ? ` (parte ${i + 1} de ${partesTexto.length})` : '';
-      partes.push(await pedirJSON(chave, montarPrompt(partesTexto[i], info), 6000));
-    }
+    const partes = await lerPartes(chave, montarPrompt, partesTexto, 8000);
     out = partesTexto.length > 1 ? juntarResultados(partes) : partes[0];
   } catch (e) {
     return res.status(e.status || 502).json({ erro: e.message, bruto: e.bruto });
@@ -349,6 +416,8 @@ Regras:
   out.totalExtrato = Math.round(out.formas.reduce((s, f) => s + f.totalExtrato, 0) * 100) / 100;
   out.diferenca = Math.round((out.totalExtrato - out.totalSistema) * 100) / 100;
   out.blocos = partesTexto.length;
+  out.linhasLidas = medida.linhas;
+  out.caracteres = medida.caracteres;
 
   return res.status(200).json(out);
 }
@@ -404,7 +473,9 @@ async function pedirJSON(chave, prompt, maxTokens) {
 
   const truncou = dados.stop_reason === 'max_tokens';
   const err = new Error(truncou
-    ? 'A resposta da IA foi cortada por ser longa demais. Tente um período menor ou um extrato com menos linhas.'
+    ? 'A resposta da IA foi cortada por ser longa demais. Isso acontece quando '
+      + 'o extrato tem muita linha que não casa com nada. Confira um período '
+      + 'menor para ver onde está a sobra.'
     : 'A IA respondeu num formato inesperado.');
   err.status = 502;
   err.bruto = txt.slice(0, 500);

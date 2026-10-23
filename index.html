@@ -3873,6 +3873,7 @@ async function conferirForma(){
       +lista(d.soNoSistema,'só no sistema','#1D4ED8')
       +'<div style="margin-top:8px;font-size:11px;font-weight:700;color:'+(ok?'#16A34A':'#B45309')+'">'
       +(ok?'Conferido e registrado.':'Registrado com a diferença. Pode fechar esta janela.')+'</div>'
+      +selaLeitura(d)
       +'</div>';
 
     // A conferência aconteceu: o resultado fica registrado, tenha batido ou
@@ -4122,6 +4123,7 @@ async function conferirTudo(){
       +'</div>'
       +linhas+naoId
       +(d.resumoGeral?'<div style="font-size:11px;color:var(--mu);margin-top:8px">'+d.resumoGeral+'</div>':'')
+      +selaLeitura(d)
       +'<div style="margin-top:10px;font-size:11px;font-weight:700;text-align:center;color:var(--mu)">Pode fechar esta janela.</div>';
   }catch(e){
     res.innerHTML='<div class="wb" style="white-space:pre-line">'+e.message+'</div>';
@@ -4134,6 +4136,17 @@ async function conferirTudo(){
 // Compara os fechamentos salvos de um intervalo com os extratos do mesmo
 // intervalo. O ganho está em apontar em QUE DIA está a diferença.
 let cpDias=[];
+
+// Quanto do extrato a IA leu. Aparece em toda conferencia, batendo ou nao:
+// e o que permite confiar no resultado.
+function selaLeitura(d){
+  if(!d||!d.linhasLidas)return '';
+  const partes=Number(d.blocos)||1;
+  return '<div style="font-size:10px;color:var(--mu);margin-top:6px;'
+    +'padding-top:6px;border-top:1px solid var(--bo)">'
+    +'Extrato lido por inteiro: <b>'+d.linhasLidas.toLocaleString('pt-BR')
+    +'</b> linha(s)'+(partes>1?(', em '+partes+' partes'):'')+'.</div>';
+}
 
 async function chamarConciliar(corpo){
   const r=await fetch('/api/conciliar',{method:'POST',
@@ -4271,7 +4284,7 @@ async function conferirPeriodo(){
       +(ok?'O período bateu':(d.diferenca>0?'Sobra de '+rs(d.diferenca):'Faltam '+rs(Math.abs(d.diferenca))))+'</div>'
       +'<div style="font-size:11px;margin-top:3px">Sistema <b>'+rs(d.totalSistema)+'</b> · Extratos <b>'+rs(d.totalExtrato)+'</b></div>'
       +(d.resumoGeral?'<div style="font-size:11px;color:var(--mu);margin-top:5px">'+d.resumoGeral+'</div>':'')
-      +(d.blocos>1?'<div style="font-size:10px;color:var(--mu);margin-top:4px">O extrato foi lido em '+d.blocos+' partes por ser longo.</div>':'')
+      +selaLeitura(d)
       +'</div>'+formas+dias+naoId
       +'<button class="bsv" style="margin-top:10px;width:100%" onclick="salvarConfPer()">Guardar esta conferência</button>';
     window._confPer={ini,fim,d};
@@ -8156,6 +8169,9 @@ const MANUAL = [
   + _mP('O sistema guarda a diferença de <b>cada dia</b> separadamente: o dia que bateu fica <b>conferido</b>, e o dia que não bateu continua aberto mostrando quanto sobrou ou faltou. Um dia só se dá por conferido quando <b>todas</b> as formas dele têm valor conferido — inclusive o dinheiro da gaveta.')
   + _mDica('Quando os extratos não trazem a data de cada lançamento, não dá para saber de qual dia é a diferença. O sistema avisa e deixa essas formas <b>pendentes</b> em vez de dar o dia por conferido — aí o jeito é conferir dia a dia para achar o dia certo.')
   + _mDica('PDF digitalizado (foto de papel) não serve — o sistema avisa. Nesse caso copie e cole o conteúdo no campo de texto.')
+  + _mT('Extrato grande')
+  + _mP('Pode colar extrato longo: o sistema divide em partes, lê <b>todas</b> e, no fim do resultado, diz quantas linhas leu. Confira essa linha — é ela que garante que a conta saiu do extrato inteiro.')
+  + _mAt('Passando de <b>480 mil caracteres</b> (algo como 4.000 a 5.000 linhas), ele <b>recusa</b> e pede para dividir em períodos menores. É de propósito: extrato lido pela metade devolve uma diferença que não existe, e manda a loja caçar um dinheiro que está lá.')
 },
 {
   id:'mn-estoque', g:'Caixa e estoque', t:'Estoque de lentes',
@@ -10374,7 +10390,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23e';
+const VERSAO_SISTEMA='2026-10-23f';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
