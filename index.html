@@ -574,6 +574,7 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
       <button class="tab" id="t-cr" onclick="sw('cr')" style="display:none">Crediário</button>
       <button class="tab" id="t-ig" onclick="sw('ig')" style="display:none">Indique e Ganhe</button>
       <button class="tab" id="t-ck" onclick="sw('ck')" style="display:none">Check list</button>
+      <button class="tab" id="t-ac" onclick="sw('ac')" style="display:none">Acompanhamento</button>
 <button class="tab" id="t-ag" onclick="sw('ag')" style="display:none">Aguardando pagamento</button>
 <button class="tab" id="t-nr" onclick="sw('nr')" style="display:none">Não retirados</button>
       <button class="tab" id="t-cc" onclick="sw('cc')" style="display:none">Cancelados</button>
@@ -863,6 +864,26 @@ nav.nb .tabs{width:100%;justify-content:flex-start;}
     </div>
   </div>
   <div id="dp-body"><div class="er">Carregando...</div></div>
+</div>
+
+<div id="acs" class="rm" style="display:none">
+  <div class="rh">
+    <span class="rt">Acompanhamento do check list</span>
+    <span style="font-size:11px;font-weight:700;color:var(--mu);margin-left:10px">as quatro lojas</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <select id="ac-lista" onchange="rnAcomp()" class="dp-f"></select>
+      <select id="ac-loja" onchange="rnAcomp()" class="dp-f"></select>
+      <input type="date" id="ac-ini" onchange="rnAcomp()" class="dp-f"/>
+      <span style="font-size:11px;color:var(--mu);font-weight:700">até</span>
+      <input type="date" id="ac-fim" onchange="rnAcomp()" class="dp-f"/>
+      <button class="bex" onclick="acPeriodo('hoje')">Hoje</button>
+      <button class="bex" onclick="acPeriodo('semana')">Semana</button>
+      <button class="bex" onclick="acPeriodo('mes')">Mês</button>
+      <button class="bex" onclick="expAcomp()">CSV</button>
+    </div>
+  </div>
+  <div class="rsum" id="ac-kpis"></div>
+  <div id="ac-body" style="margin-top:14px"><div class="er">Carregando...</div></div>
 </div>
 
 <div id="mns" class="rm" style="display:none">
@@ -2386,7 +2407,7 @@ function ehDiretor(){return !!(U&&U.r==='diretor');}
 function aplicarAbas(){
   const mostra=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?'block':'none';};
   if(!U||!R){
-    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us','t-mn','t-dp'].forEach(id=>mostra(id,false));
+    ['t-e','t-fc','t-pj','t-sd','t-cr','t-ig','t-us','t-mn','t-dp','t-ac'].forEach(id=>mostra(id,false));
     return;
   }
   const fin=!!(R.ed||R.r==='posvendas');
@@ -2400,6 +2421,8 @@ function aplicarAbas(){
   mostra('t-cf', !!R.cf);
   // O depósito do dinheiro é do diretor, e de mais ninguém.
   mostra('t-dp', ehDiretor());
+  // Acompanhar o check list é de quem cobra: supervisor e diretor.
+  mostra('t-ac', acPodeVer());
   mostra('t-ck', !!listaDoPerfil());
   // O manual e de todo mundo -- o que muda e o conteudo, nao o acesso.
   mostra('t-mn', true);
@@ -2421,14 +2444,14 @@ function doLogout(){
 // ── TABS ──────────────────────────────────────────
 function sw(tab){
   localStorage.setItem('idealize_tab',tab);
-  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks',mn:'mns',dp:'dps'};
+  const map={k:'ks',r:'rs',g:'gs',r2:'r2s',pz:'pzs',fc:'fcs',cf:'cfs',pj:'pjs',us:'uss',nr:'nrs',cc:'ccs',sd:'sds',cr:'crs',ig:'igs',hs:'hss',e:'es',ag:'ags',ck:'cks',mn:'mns',dp:'dps',ac:'acs'};
   // Primeiro esconde tudo
   Object.values(map).forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
   // Atualiza abas
-  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck','mn','dp'].forEach(t=>{
+  ['k','r','g','r2','pz','sd','cr','ig','hs','e','fc','cf','pj','us','nr','cc','ag','ck','mn','dp','ac'].forEach(t=>{
     const tb=document.getElementById('t-'+t);
     if(tb)tb.className='tab'+(tab===t?' active':'');
   });
@@ -2456,6 +2479,7 @@ function sw(tab){
   if(tab==='ag')rnAgPag();
   if(tab==='ck')rnCheck();
   if(tab==='mn')rnManual();
+  if(tab==='ac')rnAcomp();
   if(tab==='dp')rnDeposito();
   if(tab==='nr')rnNaoRet();
   if(tab==='cc')rnCanc();
@@ -4388,6 +4412,241 @@ async function salvarConfPer(){
       +'ficaram com diferença continuam pendentes, para serem conferidas dia '
       +'a dia — é o único jeito de achar o dia certo.');
   }
+}
+
+
+// ── ACOMPANHAMENTO DO CHECK LIST ───────────────────────────────────────────
+// O check list visto de cima, nas quatro lojas: quem fez o que, em que dia, e
+// o que mais fica para tras.
+//
+// Quem ve o que: supervisor acompanha a lista do administrativo; a lista de
+// lideranca e so da diretoria. A Thayna, como supervisora, acompanha a do
+// administrativo -- a dela continua so na aba Check list.
+//
+// ATENCAO ao mexer aqui: as chaves das lojas estao entre ASPAS DUPLAS de
+// proposito. O gerar_lojas.py troca 'saovicente' (aspas simples) pela loja do
+// arquivo em todo o codigo; com aspas simples esta lista viraria quatro vezes
+// a mesma loja.
+const AC_LOJAS=[["saovicente","São Vicente"],["sorocaba","Sorocaba"],
+                ["piracicaba","Piracicaba"],["campinas","Campinas"]];
+const AC_ROTULO={auxiliar:'Administrativo',lider:'Liderança'};
+
+function acListasVisiveis(){
+  if(!U)return [];
+  if(ehDiretor())return ['auxiliar','lider'];
+  if(U.r==='supervisor')return ['auxiliar'];
+  return [];
+}
+function acPodeVer(){return acListasVisiveis().length>0;}
+
+let acDados=null;
+
+function acPeriodo(qual){
+  const ini=document.getElementById('ac-ini'), fim=document.getElementById('ac-fim');
+  const h=new Date(hojeBR()+'T12:00:00');
+  if(qual==='hoje'){ ini.value=hojeBR(); fim.value=hojeBR(); }
+  else if(qual==='semana'){
+    const d=new Date(h); d.setDate(d.getDate()-d.getDay());   // domingo
+    ini.value=d.toLocaleDateString('en-CA'); fim.value=hojeBR();
+  }else{
+    ini.value=new Date(h.getFullYear(),h.getMonth(),1).toLocaleDateString('en-CA');
+    fim.value=hojeBR();
+  }
+  rnAcomp();
+}
+
+// Dia que a loja trabalhou: tem fechamento salvo, ou alguem marcou alguma
+// tarefa. Sem isso, domingo e feriado entrariam na conta como dia pendente.
+function acDiasUteis(loja){
+  const s=new Set();
+  (acDados.fech||[]).forEach(f=>{ if(f.unidade===loja)s.add(f.data); });
+  (acDados.marcas||[]).forEach(m=>{ if(m.unidade===loja)s.add(m.dia); });
+  return [...s].sort();
+}
+
+function acFeitas(loja,lista,dia){
+  const m={};
+  (acDados.marcas||[]).forEach(r=>{
+    if(r.unidade===loja&&r.lista===lista&&r.dia===dia&&r.feito)m[r.item]={por:r.marcado_por};
+  });
+  return m;
+}
+
+function acQuem(loja,lista){
+  const c={};
+  (acDados.marcas||[]).forEach(r=>{
+    if(r.unidade===loja&&r.lista===lista&&r.feito&&r.marcado_por)
+      c[r.marcado_por]=(c[r.marcado_por]||0)+1;
+  });
+  const nomes=Object.keys(c).sort((a,b)=>c[b]-c[a]);
+  return nomes.length?nomes.join(', '):'';
+}
+
+const acBarra=(pct,falta)=>
+  '<div style="background:'+(falta?'#FEE2E2':'var(--bo)')+';border-radius:20px;height:7px;overflow:hidden">'
+  +'<div style="height:100%;width:'+pct+'%;background:'+(falta?'#DC2626':'#16A34A')+'"></div></div>';
+
+async function rnAcomp(){
+  const body=document.getElementById('ac-body'); if(!body)return;
+  const listas=acListasVisiveis();
+  if(!listas.length){body.innerHTML='<div class="er">Sem permissão.</div>';return;}
+
+  const selL=document.getElementById('ac-lista');
+  if(selL&&!selL.dataset.pronto){
+    selL.innerHTML=listas.map(l=>'<option value="'+l+'">'+AC_ROTULO[l]+'</option>').join('');
+    selL.style.display=listas.length>1?'':'none';
+    selL.dataset.pronto='1';
+  }
+  const selU=document.getElementById('ac-loja');
+  if(selU&&!selU.dataset.pronto){
+    selU.innerHTML='<option value="">Todas as lojas</option>'
+      +AC_LOJAS.map(([k,n])=>'<option value="'+k+'">'+n+'</option>').join('');
+    selU.dataset.pronto='1';
+  }
+  const ini=document.getElementById('ac-ini'), fim=document.getElementById('ac-fim');
+  if(!ini.value||!fim.value){acPeriodo('mes');return;}
+  let lista=(selL&&selL.value)||listas[0];
+  if(listas.indexOf(lista)<0)lista=listas[0];   // ninguem ve lista que nao e dele
+  const loja=(selU&&selU.value)||'';
+
+  body.innerHTML='<div class="er">Carregando...</div>';
+  try{
+    const [ms,fc]=await Promise.all([
+      sbGet('checklist_marcacoes','dia=gte.'+ini.value+'&dia=lte.'+fim.value+'&limit=20000'),
+      sbGet('fechamento_caixa','select=unidade,data&data=gte.'+ini.value
+            +'&data=lte.'+fim.value+'&limit=5000')
+    ]);
+    acDados={marcas:(ms||[]).filter(r=>listas.indexOf(r.lista)>=0),fech:fc||[]};
+  }catch(e){
+    body.innerHTML='<div class="wb">Não consegui carregar: '+e.message+'</div>';
+    return;
+  }
+
+  const itens=CHECKLISTS[lista]||[];
+  const lojas=loja?[loja]:AC_LOJAS.map(l=>l[0]);
+  // Loja sem nenhum dia no período não entra: não há o que acompanhar nela.
+  const comDados=lojas.filter(l=>acDiasUteis(l).length>0);
+
+  if(!comDados.length){
+    body.innerHTML='<div class="er">Nenhum movimento neste período.</div>';
+    rnAcTotais([],lista);
+    return;
+  }
+
+  // ── resumo por loja ──────────────────────────────────────────────────────
+  const resumo=comDados.map(l=>{
+    const dias=acDiasUteis(l);
+    let feitas=0;
+    dias.forEach(d=>{ feitas+=Object.keys(acFeitas(l,lista,d)).length; });
+    const total=dias.length*itens.length;
+    return {loja:l, dias:dias.length, feitas, total,
+            pct:total?Math.round(feitas/total*100):0, quem:acQuem(l,lista)};
+  });
+  rnAcTotais(resumo,lista);
+
+  const nomeLoja=k=>(AC_LOJAS.find(x=>x[0]===k)||[k,k])[1];
+  let html='<div class="rh" style="margin-bottom:10px"><span class="rt" style="font-size:14px">'
+    +'Como está cada loja</span></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px">'
+    +resumo.map(r=>{
+      const falta=r.total-r.feitas;
+      return '<div style="background:var(--w);border:1px solid var(--bo);border-radius:16px;padding:15px 17px">'
+        +'<div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:14px">'+nomeLoja(r.loja)+'</b>'
+        +'<span style="font-size:11px;color:var(--mu);font-weight:700">'+r.dias+' dia(s)</span></div>'
+        +'<div style="font-size:11px;color:var(--mu);font-weight:600;margin:2px 0 9px">'
+        +(r.quem||'ninguém marcou nada')+'</div>'
+        +acBarra(r.pct,falta)
+        +'<div style="font-size:12px;font-weight:800;margin-top:7px;color:'+(falta?'#B91C1C':'#16A34A')+'">'
+        +r.pct+'% — '+r.feitas+' de '+r.total+(falta?(' · '+falta+' pendente(s)'):' · tudo feito')+'</div>'
+        +'</div>';
+    }).join('')+'</div>';
+
+  // ── o que mais fica para trás ────────────────────────────────────────────
+  const atraso=itens.map((txt,i)=>{
+    let pendentes=0, dias=0;
+    comDados.forEach(l=>acDiasUteis(l).forEach(d=>{
+      dias++; if(!acFeitas(l,lista,d)[i])pendentes++;
+    }));
+    return {i,txt,pendentes,dias};
+  }).filter(x=>x.pendentes>0).sort((a,b)=>b.pendentes-a.pendentes);
+
+  html+='<div class="rh" style="margin:22px 0 10px"><span class="rt" style="font-size:14px">'
+    +'O que mais fica para trás</span></div>';
+  html+=atraso.length
+    ? '<div class="tw"><table><thead><tr><th>Tarefa</th><th style="width:150px">Pendente em</th></tr></thead><tbody>'
+      +atraso.map(a=>{
+        const pct=a.dias?Math.round(a.pendentes/a.dias*100):0;
+        return '<tr><td style="line-height:1.45">'+a.txt+'</td>'
+          +'<td><b style="color:'+(pct>50?'#B91C1C':'#B45309')+'">'+a.pendentes+' de '+a.dias
+          +'</b><div style="font-size:10px;color:var(--mu);font-weight:700">'+pct+'% dos dias</div></td></tr>';
+      }).join('')+'</tbody></table></div>'
+    : '<div class="er" style="padding:1.2rem">Nenhuma tarefa pendente no período.</div>';
+
+  // ── a grade do mês, quando há uma loja escolhida ─────────────────────────
+  if(loja&&comDados.length===1){
+    const dias=acDiasUteis(loja);
+    html+='<div class="rh" style="margin:22px 0 10px"><span class="rt" style="font-size:14px">'
+      +'Dia a dia</span><span style="font-size:11px;color:var(--mu);font-weight:700;margin-left:8px">'
+      +'✓ feito · vazio em vermelho é pendente</span></div>'
+      +'<div class="tw"><table style="font-size:11px"><thead><tr>'
+      +'<th style="min-width:230px;position:sticky;left:0;background:var(--v)">Tarefa</th>'
+      +dias.map(d=>'<th style="text-align:center;padding:7px 4px">'+d.slice(8,10)+'</th>').join('')
+      +'</tr></thead><tbody>'
+      +itens.map((txt,i)=>'<tr><td style="line-height:1.4;position:sticky;left:0;background:var(--w)">'+txt+'</td>'
+        +dias.map(d=>{
+          const ok=!!acFeitas(loja,lista,d)[i];
+          return '<td style="text-align:center;font-weight:800;'
+            +(ok?'color:#16A34A':'color:#DC2626;background:#FEF2F2')+'">'+(ok?'✓':'·')+'</td>';
+        }).join('')+'</tr>').join('')
+      +'</tbody></table></div>';
+  }else if(!loja){
+    html+='<div style="font-size:11px;color:var(--mu);font-weight:600;margin-top:14px;text-align:center">'
+      +'Escolha uma loja acima para ver o dia a dia, tarefa por tarefa.</div>';
+  }
+
+  body.innerHTML=html;
+}
+
+function rnAcTotais(resumo,lista){
+  const el=document.getElementById('ac-kpis'); if(!el)return;
+  const feitas=resumo.reduce((s,r)=>s+r.feitas,0);
+  const total=resumo.reduce((s,r)=>s+r.total,0);
+  const pct=total?Math.round(feitas/total*100):0;
+  const pior=resumo.slice().sort((a,b)=>a.pct-b.pct)[0];
+  el.innerHTML=
+    '<div class="rs2"><div class="rl">Lista</div><div class="rv" style="font-size:16px">'
+    +(AC_ROTULO[lista]||lista)+'</div></div>'
+    +'<div class="rs2"><div class="rl">Feito no período</div>'
+    +'<div class="rv" style="color:'+(pct>=90?'var(--v)':'var(--vc)')+'">'+pct+'%</div></div>'
+    +'<div class="rs2"><div class="rl">Tarefas pendentes</div>'
+    +'<div class="rv"'+((total-feitas)?' style="color:var(--re)"':'')+'>'+(total-feitas)+'</div></div>'
+    +'<div class="rs2"><div class="rl">Loja mais atrasada</div>'
+    +'<div class="rv" style="font-size:16px">'
+    +(pior?((AC_LOJAS.find(x=>x[0]===pior.loja)||['',''])[1]+' · '+pior.pct+'%'):'—')+'</div></div>';
+}
+
+function expAcomp(){
+  if(!acDados){alert('Carregue o acompanhamento primeiro.');return;}
+  const vis=acListasVisiveis();
+  let lista=(document.getElementById('ac-lista')||{}).value||vis[0];
+  if(vis.indexOf(lista)<0)lista=vis[0];
+  const loja=(document.getElementById('ac-loja')||{}).value||'';
+  const itens=CHECKLISTS[lista]||[];
+  const lojas=(loja?[loja]:AC_LOJAS.map(l=>l[0])).filter(l=>acDiasUteis(l).length>0);
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const linhas=[['LOJA','DIA','TAREFA','FEITO','POR'].map(q).join(',')];
+  lojas.forEach(l=>{
+    const nome=(AC_LOJAS.find(x=>x[0]===l)||[l,l])[1];
+    acDiasUteis(l).forEach(d=>{
+      const m=acFeitas(l,lista,d);
+      itens.forEach((txt,i)=>{
+        linhas.push([nome,d,txt,m[i]?'SIM':'NAO',(m[i]&&m[i].por)||''].map(q).join(','));
+      });
+    });
+  });
+  const b=new Blob(['﻿'+linhas.join('\n')],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download='acompanhamento_'+lista+'.csv';a.click();URL.revokeObjectURL(u);
 }
 
 
@@ -8301,6 +8560,26 @@ const MANUAL = [
 
 /* ─────────────── Referência ─────────────── */
 {
+  id:'mn-acomp', g:'Gestão', t:'Acompanhar o check list das lojas',
+  p:'acompanhamento check list lojas quem fez pendente grade dia a dia cobranca',
+  v:()=>acPodeVer(),
+  h:c=>
+    _mP('Aba <b>Acompanhamento</b>. O check list das quatro lojas visto de cima, sem precisar entrar loja por loja.')
+  + (c.perfil==='diretor'
+     ? _mP('Você acompanha as <b>duas listas</b>: a do administrativo e a de liderança.')
+     : _mP('Você acompanha a lista do <b>administrativo</b>, nas quatro lojas.'))
+  + _mT('O que a tela mostra')
+  + _mUl([
+      '<b>Como está cada loja</b> — um cartão por loja com quem marcou, quantas tarefas de quantas e a barra de progresso.',
+      '<b>O que mais fica para trás</b> — as tarefas ordenadas pelas que mais ficam pendentes, com em quantos dias. É daqui que sai conversa de gestão.',
+      '<b>Dia a dia</b> — a grade de tarefas por dia, com ✓ no feito. Aparece quando você escolhe <b>uma</b> loja.'])
+  + _mP('Filtros de período (hoje, semana, mês ou datas escolhidas), loja e lista. O botão '+_mK('CSV')+' leva tudo para a planilha, uma linha por tarefa por dia.')
+  + _mT('Como os dias são contados')
+  + _mP('Só entram na conta os dias em que a loja <b>trabalhou</b> — os que têm fechamento salvo ou alguma tarefa marcada. Domingo e feriado não viram pendência.')
+  + _mDica('Tarefa não feita não deixa registro: ela é a ausência da marcação. Então loja que aparece com 0% pode ser quem não fez, ou quem fez e não marcou — vale confirmar antes de cobrar.')
+},
+
+{
   id:'mn-regras', g:'Referência', t:'As cinco regras que evitam quase todo erro de caixa',
   p:'regras erro caixa resumo decorar',
   v:c=>c.fin || c.pode('ca'),
@@ -10390,7 +10669,7 @@ document.addEventListener('keydown',e=>{
 // O sistema fica aberto o dia inteiro nas lojas. Se ninguem recarrega a
 // pagina, o navegador segue rodando o codigo antigo e as regras novas nao
 // valem. Aqui a propria pagina pergunta ao servidor se o arquivo mudou.
-const VERSAO_SISTEMA='2026-10-23f';
+const VERSAO_SISTEMA='2026-10-24';
 let _digitalPagina=null,_novaVersaoVista=false;
 
 async function digitalDoServidor(){
